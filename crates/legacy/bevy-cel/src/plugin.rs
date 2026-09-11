@@ -15,7 +15,10 @@ use crate::{
     CharacterExtension, CharacterMaterial, FaceBasis, FaceSdfMaterialInstance,
     InternalEdgeMaterial, OutlineMaterial,
     outline::diagnose_missing_internal_edge_prepass,
-    outline_runtime::{spawn_outline_replicas, sync_direct_morph_replicas, sync_outline_sources},
+    outline_runtime::{
+        despawn_outline_replicas, sync_direct_morph_replicas, sync_outline_replicas,
+        sync_outline_sources,
+    },
     post_process_runtime::StylizedPostProcessPlugin,
 };
 
@@ -53,6 +56,8 @@ impl Plugin for CharacterMaterialPlugin {
         embedded_asset!(app, "shaders/outline_vertex.wgsl");
         embedded_asset!(app, "shaders/outline_fragment.wgsl");
         embedded_asset!(app, "shaders/internal_edge.wgsl");
+        embedded_asset!(app, "shaders/internal_edge_vertex.wgsl");
+        embedded_asset!(app, "shaders/outline_shared.wgsl");
         embedded_asset!(app, "shaders/stylized_post_process.wgsl");
         app.add_plugins((
             MaterialPlugin::<CharacterMaterial>::default(),
@@ -81,7 +86,8 @@ impl Plugin for CharacterMaterialPlugin {
                     .after(TransformSystems::Propagate)
                     .in_set(CharacterFaceBasisSystems),
                 diagnose_missing_internal_edge_prepass,
-                spawn_outline_replicas.in_set(crate::CharacterOutlineSystems),
+                sync_outline_replicas.in_set(crate::CharacterOutlineSystems),
+                despawn_outline_replicas,
                 sync_direct_morph_replicas,
                 sync_outline_sources
                     .after(crate::CharacterOutlineSystems)
@@ -89,6 +95,23 @@ impl Plugin for CharacterMaterialPlugin {
                     .before(bevy::camera::visibility::VisibilitySystems::CheckVisibility),
             ),
         );
+    }
+
+    fn finish(&self, app: &mut App) {
+        // `outline_shared.wgsl` is a pure WGSL import module: no pipeline
+        // references it through a `ShaderRef`, so it must be loaded eagerly for
+        // the shader composer to resolve the outline import graph. Loading
+        // requires the `Shader` asset type, which only exists once a render
+        // plugin is installed; in render-less apps the embedded asset alone is
+        // registered and nothing attempts to compose shaders.
+        if app
+            .world()
+            .contains_resource::<Assets<bevy::shader::Shader>>()
+        {
+            let handle: bevy::prelude::Handle<bevy::shader::Shader> =
+                bevy::asset::load_embedded_asset!(app.world_mut(), "shaders/outline_shared.wgsl");
+            core::mem::forget(handle);
+        }
     }
 }
 

@@ -7,18 +7,20 @@ use bevy::{
         tonemapping::{Tonemapping, tonemapping},
     },
     ecs::{
+        change_detection::DetectChanges,
         schedule::{IntoScheduleConfigs, ScheduleConfigs},
         system::BoxedSystem,
     },
     post_process::bloom::{Bloom, bloom},
     prelude::{
-        App, Changed, Commands, Component, Entity, Has, Local, Plugin, Query, Reflect, With,
+        App, Assets, Camera3d, Commands, Component, Entity, Has, Local, Plugin, Query, Ref,
+        Reflect, Res, With,
     },
     render::{extract_component::ExtractComponent, render_resource::ShaderType},
     shader::ShaderRef,
 };
 
-use crate::{GenshinDisplayTransform, StylizedPostProcessProfile};
+use crate::{GenshinDisplayTransform, InternalEdgeMaterial, StylizedPostProcessProfile};
 
 /// Embedded WGSL path for the ordered stylized fullscreen pass.
 pub const STYLIZED_POST_PROCESS_SHADER_PATH: &str =
@@ -104,33 +106,87 @@ impl Plugin for StylizedPostProcessPlugin {
     }
 }
 
+/// Owns the crate-managed camera rendering components and enforces the union of
+/// their requirements every frame.
+///
+/// Cameras carrying a [`StylizedPostProcessProfile`] or a [`GenshinDisplayTransform`]
+/// are *managed*: [`Hdr`], [`Bloom`], [`Tonemapping`], [`DepthPrepass`], and
+/// [`NormalPrepass`] on them are owned by this system, and manual insertion or
+/// removal of those components is overridden. The enforced state is the union of
+///
+/// - the profile's toggles (`hdr`, `bloom`, `tonemapping`, `prepass_edges`),
+/// - the HDR intermediate required by an active [`GenshinDisplayTransform`], and
+/// - the depth/normal prepasses required while any enabled
+///   [`InternalEdgeMaterial`] exists.
+///
+/// Cameras without a profile or display transform are never touched, and
+/// [`Tonemapping`] is only written while a profile is present.
 fn apply_profiles(
     mut commands: Commands,
-    profiles: Query<(Entity, &StylizedPostProcessProfile), Changed<StylizedPostProcessProfile>>,
+    internal_edge_materials: Option<Res<Assets<InternalEdgeMaterial>>>,
+    mut cameras: Query<
+        (
+            Entity,
+            Option<Ref<StylizedPostProcessProfile>>,
+            Has<GenshinDisplayTransform>,
+            Has<Hdr>,
+            Has<Bloom>,
+            Has<DepthPrepass>,
+            Has<NormalPrepass>,
+            Option<&Tonemapping>,
+        ),
+        With<Camera3d>,
+    >,
 ) {
-    for (entity, profile) in &profiles {
+    let internal_edge_requested = internal_edge_materials
+        .as_ref()
+        .is_some_and(|materials| materials.iter().any(|(_, m)| m.settings.is_enabled()));
+    for (entity, profile, genshin, has_hdr, has_bloom, has_depth, has_normal, tonemapping) in
+        &mut cameras
+    {
+        if profile.is_none() && !genshin {
+            continue;
+        }
+        let profile_changed = profile.as_ref().is_some_and(|p| p.is_changed());
+        let profile = profile.as_deref().copied();
         let mut camera = commands.entity(entity);
-        if profile.hdr_enabled() {
+
+        let hdr_required = profile.is_some_and(|p| p.hdr_enabled()) || genshin;
+        if hdr_required && !has_hdr {
             camera.insert(Hdr);
-        } else {
+        } else if !hdr_required && has_hdr {
             camera.remove::<Hdr>();
         }
-        if profile.bloom_enabled() {
+
+        let bloom_required = profile.is_some_and(|p| p.bloom_enabled());
+        if bloom_required && (!has_bloom || profile_changed) {
             camera.insert(Bloom {
-                intensity: profile.settings().bloom_intensity(),
+                intensity: profile
+                    .expect("bloom requires a profile")
+                    .settings()
+                    .bloom_intensity(),
                 ..Bloom::NATURAL
             });
-        } else {
+        } else if !bloom_required && has_bloom {
             camera.remove::<Bloom>();
         }
-        camera.insert(if profile.tonemapping_enabled() {
-            Tonemapping::TonyMcMapface
-        } else {
-            Tonemapping::None
-        });
-        if profile.prepass_edges_enabled() {
+
+        if let Some(profile) = profile {
+            let desired = if profile.tonemapping_enabled() {
+                Tonemapping::TonyMcMapface
+            } else {
+                Tonemapping::None
+            };
+            if tonemapping != Some(&desired) {
+                camera.insert(desired);
+            }
+        }
+
+        let prepass_required =
+            profile.is_some_and(|p| p.prepass_edges_enabled()) || internal_edge_requested;
+        if prepass_required && !(has_depth && has_normal) {
             camera.insert((DepthPrepass, NormalPrepass));
-        } else {
+        } else if !prepass_required && (has_depth || has_normal) {
             camera.remove::<DepthPrepass>().remove::<NormalPrepass>();
         }
     }

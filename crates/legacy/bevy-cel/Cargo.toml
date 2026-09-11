@@ -32,3 +32,5 @@ workspace = true
 
 [dev-dependencies]
 bevy = { workspace = true, features = ["bevy_animation"] }
+# Matches the naga revision used by bevy_shader 0.19 for composed-module validation.
+naga = { version = "=29.0.4", features = ["wgsl-in"] }

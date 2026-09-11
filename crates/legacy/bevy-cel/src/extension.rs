@@ -36,7 +36,7 @@ impl Default for CharacterExtension {
             genshin_packed_normal: None,
             genshin_lighting_palette: GenshinLightingPalette::default(),
             genshin_light_source: GenshinLightSource::default(),
-            outline_cull_mode: OutlineCullMode::Back,
+            outline_cull_mode: OutlineCullMode::Inherit,
         }
     }
 }

@@ -1,9 +1,6 @@
 //! Optional camera-level display transform matching the Genshin Blender graph.
 
-use bevy::{
-    camera::Hdr,
-    prelude::{Component, Reflect},
-};
+use bevy::prelude::{Component, Reflect};
 
 /// Embedded shader used by [`GenshinDisplayTransform`].
 pub const GENSHIN_DISPLAY_TRANSFORM_SHADER_PATH: &str =
@@ -11,13 +8,17 @@ pub const GENSHIN_DISPLAY_TRANSFORM_SHADER_PATH: &str =
 
 /// Applies the source Genshin display transform to one 3D camera.
 ///
-/// The component is deliberately opt-in. It requests an HDR intermediate so
+/// The component is deliberately opt-in. It requires an HDR intermediate so
 /// values above display white survive until the transform, but it does not
 /// add bloom or change the camera's Bevy [`Tonemapping`](bevy::core_pipeline::tonemapping::Tonemapping)
 /// component. Consumers replacing Bevy tonemapping should pair this with
 /// `Tonemapping::None` and configure bloom independently.
+///
+/// Ownership: camera NPR components ([`Hdr`](bevy::camera::Hdr), bloom,
+/// tonemapping, prepasses) are owned by `apply_profiles`, which enforces the
+/// union of profile and display-transform requirements; manual insertion of
+/// those components on a managed camera is overridden.
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Reflect)]
-#[require(Hdr)]
 pub struct GenshinDisplayTransform;
 
 /// CPU reference for the fixed per-channel display transform.

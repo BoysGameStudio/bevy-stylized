@@ -14,10 +14,17 @@ use bevy::{
 
 use crate::EyeEmissionSettings;
 
-/// Embedded vertex shader used by both outline passes.
+/// Embedded vertex shader used by the inverted hull.
 pub const OUTLINE_VERTEX_SHADER_PATH: &str = "embedded://bevy_cel/shaders/outline_vertex.wgsl";
 /// Embedded fragment shader used by the inverted hull.
 pub const OUTLINE_FRAGMENT_SHADER_PATH: &str = "embedded://bevy_cel/shaders/outline_fragment.wgsl";
+/// Embedded vertex shader used by the optional prepass accent.
+///
+/// Unlike the hull vertex shader this binds the 32-byte
+/// [`InternalEdgeAccentSettings`] uniform; both vertex shaders share the same
+/// deformation logic through the `bevy_cel::outline_shared` WGSL module.
+pub const INTERNAL_EDGE_VERTEX_SHADER_PATH: &str =
+    "embedded://bevy_cel/shaders/internal_edge_vertex.wgsl";
 /// Embedded fragment shader used by the optional prepass accent.
 pub const INTERNAL_EDGE_SHADER_PATH: &str = "embedded://bevy_cel/shaders/internal_edge.wgsl";
 
@@ -308,6 +315,20 @@ pub struct InternalEdgeMaterial {
     pub settings: InternalEdgeAccentSettings,
 }
 
+impl InternalEdgeMaterial {
+    /// Returns the embedded vertex shader path binding the small accent uniform.
+    #[must_use]
+    pub const fn vertex_shader_path() -> &'static str {
+        INTERNAL_EDGE_VERTEX_SHADER_PATH
+    }
+
+    /// Returns the embedded prepass-edge fragment shader path.
+    #[must_use]
+    pub const fn fragment_shader_path() -> &'static str {
+        INTERNAL_EDGE_SHADER_PATH
+    }
+}
+
 impl Material for InternalEdgeMaterial {
     fn specialize(
         _pipeline: &MaterialPipeline,
@@ -319,7 +340,7 @@ impl Material for InternalEdgeMaterial {
     }
 
     fn vertex_shader() -> ShaderRef {
-        OUTLINE_VERTEX_SHADER_PATH.into()
+        INTERNAL_EDGE_VERTEX_SHADER_PATH.into()
     }
 
     fn fragment_shader() -> ShaderRef {

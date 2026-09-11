@@ -63,8 +63,9 @@ pub use hair::HairHighlightSettings;
 pub use ilm::{IlmDebugMode, IlmLayout, IlmMaterialIdSource, IlmSettings};
 pub use lighting::{CelLightingDebugMode, CelLightingSettings};
 pub use outline::{
-    INTERNAL_EDGE_SHADER_PATH, InternalEdgeAccentSettings, InternalEdgeMaterial,
-    OUTLINE_FRAGMENT_SHADER_PATH, OUTLINE_VERTEX_SHADER_PATH, OutlineMaterial, OutlineSettings,
+    INTERNAL_EDGE_SHADER_PATH, INTERNAL_EDGE_VERTEX_SHADER_PATH, InternalEdgeAccentSettings,
+    InternalEdgeMaterial, OUTLINE_FRAGMENT_SHADER_PATH, OUTLINE_VERTEX_SHADER_PATH,
+    OutlineMaterial, OutlineSettings,
 };
 pub use outline_runtime::{CharacterOutline, CharacterOutlineSystems};
 pub use plugin::{
@@ -163,10 +164,14 @@ pub const GENSHIN_LIGHT_SOURCE_UNIFORM_BINDING: u32 = 126;
 /// Cull-mode specialization reserved for a later outline pass.
 ///
 /// This only selects raster culling. It does not implement outline geometry or shading.
+/// The default [`OutlineCullMode::Inherit`] keeps the cull mode derived from the base
+/// [`StandardMaterial`]; the other variants override it during pipeline specialization.
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, Reflect)]
 pub enum OutlineCullMode {
-    /// Render front faces, culling back faces.
+    /// Keep the cull mode derived from the base material unchanged.
     #[default]
+    Inherit,
+    /// Render front faces, culling back faces.
     Back,
     /// Render back faces, culling front faces.
     Front,
@@ -175,11 +180,24 @@ pub enum OutlineCullMode {
 }
 
 impl OutlineCullMode {
+    /// Returns the overriding raster cull face, or `None` for
+    /// [`OutlineCullMode::Inherit`] and [`OutlineCullMode::None`].
     const fn face(self) -> Option<Face> {
         match self {
+            Self::Inherit => None,
             Self::Back => Some(Face::Back),
             Self::Front => Some(Face::Front),
             Self::None => None,
+        }
+    }
+
+    /// Applies this cull mode to a specialized pipeline descriptor.
+    ///
+    /// [`OutlineCullMode::Inherit`] leaves the base-material-derived cull mode
+    /// untouched; the other variants override it.
+    pub fn apply(self, descriptor: &mut RenderPipelineDescriptor) {
+        if self != Self::Inherit {
+            descriptor.primitive.cull_mode = self.face();
         }
     }
 }
@@ -237,6 +255,9 @@ pub struct CharacterExtension {
     #[uniform(126)]
     genshin_light_source: GenshinLightSource,
     /// Raster culling seam used by a future outline pass.
+    ///
+    /// Defaults to [`OutlineCullMode::Inherit`], which keeps the cull mode derived
+    /// from the base `StandardMaterial` instead of overriding it.
     pub outline_cull_mode: OutlineCullMode,
 }
 
@@ -274,7 +295,7 @@ impl MaterialExtension for CharacterExtension {
         layout: &MeshVertexBufferLayoutRef,
         key: MaterialExtensionKey<Self>,
     ) -> Result<(), SpecializedMeshPipelineError> {
-        descriptor.primitive.cull_mode = key.bind_group_data.outline_cull_mode.face();
+        key.bind_group_data.outline_cull_mode.apply(descriptor);
         append_skin_attributes(descriptor, layout)?;
 
         append_optional_attribute(

@@ -1,12 +1,13 @@
 use bevy::{
     camera::primitives::Aabb,
+    ecs::lifecycle::RemovedComponents,
     mesh::{
         Mesh3d,
         morph::{MeshMorphWeights, MorphWeights},
         skinning::SkinnedMesh,
     },
     pbr::MeshMaterial3d,
-    prelude::{Added, ChildOf, Commands, Component, Entity, Handle, Query, Transform, Without},
+    prelude::{Changed, ChildOf, Commands, Component, Entity, Handle, Query, Transform, Without},
 };
 
 use crate::{InternalEdgeMaterial, OutlineMaterial};
@@ -16,6 +17,16 @@ use crate::{InternalEdgeMaterial, OutlineMaterial};
 pub struct CharacterOutlineSystems;
 
 /// Outline passes attached to one source mesh without copying its geometry asset.
+///
+/// Runtime contract:
+///
+/// - `hull` and `internal_edge` are *mutable at runtime*: re-inserting a changed
+///   `CharacterOutline` updates the replica `MeshMaterial3d` handles, spawns a
+///   newly added internal-edge replica, and despawns a removed one.
+/// - Mesh, [`Aabb`], skinning, and morph state are *followed* from the source
+///   entity every frame; they are never owned by the replicas.
+/// - Removing `CharacterOutline` despawns all of its replicas. Despawning the
+///   source entity also despawns them through the [`ChildOf`] relationship.
 #[derive(Clone, Debug, Component)]
 pub struct CharacterOutline {
     hull: Handle<OutlineMaterial>,
@@ -33,6 +44,9 @@ impl CharacterOutline {
     }
 
     /// Adds a separate optional depth/normal-prepass internal-edge pass.
+    ///
+    /// The pass may also be attached after the outline was added by re-inserting
+    /// the component; the replica is then spawned late.
     #[must_use]
     pub fn with_internal_edge(mut self, material: Handle<InternalEdgeMaterial>) -> Self {
         self.internal_edge = Some(material);
@@ -43,6 +57,12 @@ impl CharacterOutline {
     #[must_use]
     pub const fn hull(&self) -> &Handle<OutlineMaterial> {
         &self.hull
+    }
+
+    /// Returns the optional internal-edge material handle.
+    #[must_use]
+    pub const fn internal_edge(&self) -> Option<&Handle<InternalEdgeMaterial>> {
+        self.internal_edge.as_ref()
     }
 }
 
@@ -66,38 +86,79 @@ type OutlineSource<'a> = (
     Option<&'a MeshMorphWeights>,
 );
 
+/// Spawns late replicas and follows changed material handles onto replicas.
+/// `Added` also matches the `Changed` filter, so first-time spawning is covered.
 #[expect(
     clippy::redundant_pub_crate,
     reason = "the sibling plugin module registers this private runtime system"
 )]
-pub(crate) fn spawn_outline_replicas(
+pub(crate) fn sync_outline_replicas(
     mut commands: Commands,
-    sources: Query<OutlineSource<'static>, Added<CharacterOutline>>,
+    sources: Query<OutlineSource<'static>, Changed<CharacterOutline>>,
+    mut hull_replicas: Query<(&OutlineReplica, &mut MeshMaterial3d<OutlineMaterial>)>,
+    mut edge_replicas: Query<(
+        Entity,
+        &OutlineReplica,
+        &mut MeshMaterial3d<InternalEdgeMaterial>,
+    )>,
 ) {
     for (source, mesh, outline, skin, morph, morph_reference) in &sources {
-        spawn_replica(
-            &mut commands,
-            ReplicaInput {
-                source,
-                mesh,
-                skin,
-                morph,
-                morph_reference,
-            },
-            MeshMaterial3d(outline.hull.clone()),
-        );
-        if let Some(material) = outline.internal_edge.as_ref() {
-            spawn_replica(
-                &mut commands,
-                ReplicaInput {
-                    source,
-                    mesh,
-                    skin,
-                    morph,
-                    morph_reference,
-                },
-                MeshMaterial3d(material.clone()),
-            );
+        let input = ReplicaInput {
+            source,
+            mesh,
+            skin,
+            morph,
+            morph_reference,
+        };
+        let mut hull_found = false;
+        for (replica, mut material) in &mut hull_replicas {
+            if replica.0 != source {
+                continue;
+            }
+            hull_found = true;
+            if material.0.id() != outline.hull.id() {
+                material.0 = outline.hull.clone();
+            }
+        }
+        if !hull_found {
+            spawn_replica(&mut commands, input, MeshMaterial3d(outline.hull.clone()));
+        }
+        let mut edge_found = false;
+        for (entity, replica, mut material) in &mut edge_replicas {
+            if replica.0 != source {
+                continue;
+            }
+            match outline.internal_edge.as_ref() {
+                Some(handle) => {
+                    edge_found = true;
+                    if material.0.id() != handle.id() {
+                        material.0 = handle.clone();
+                    }
+                }
+                None => commands.entity(entity).despawn(),
+            }
+        }
+        if !edge_found && let Some(material) = outline.internal_edge.as_ref() {
+            spawn_replica(&mut commands, input, MeshMaterial3d(material.clone()));
+        }
+    }
+}
+
+/// Despawns outline replicas when the source drops its `CharacterOutline`.
+#[expect(
+    clippy::redundant_pub_crate,
+    reason = "the sibling plugin module registers this private runtime system"
+)]
+pub(crate) fn despawn_outline_replicas(
+    mut commands: Commands,
+    mut removed: RemovedComponents<CharacterOutline>,
+    replicas: Query<(Entity, &OutlineReplica)>,
+) {
+    for source in removed.read() {
+        for (entity, replica) in &replicas {
+            if replica.0 == source {
+                commands.entity(entity).despawn();
+            }
         }
     }
 }

@@ -34,13 +34,18 @@ fn character_plugin_registers_transform_without_enabling_unmarked_cameras() {
 fn enabling_transform_requests_an_hdr_intermediate() {
     // Given
     let mut app = App::new();
-    app.add_plugins(MinimalPlugins);
+    app.add_plugins((
+        MinimalPlugins,
+        AssetPlugin::default(),
+        CharacterMaterialPlugin,
+    ));
 
     // When
     let camera = app
         .world_mut()
         .spawn((Camera3d::default(), GenshinDisplayTransform))
         .id();
+    app.update();
 
     // Then
     assert!(app.world().get::<GenshinDisplayTransform>(camera).is_some());

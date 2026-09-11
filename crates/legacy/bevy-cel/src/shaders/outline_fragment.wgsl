@@ -1,5 +1,6 @@
 #import bevy_pbr::forward_io::FragmentOutput
-#import bevy_cel::outline_vertex::{OutlineUniform, OutlineVertexOutput, outline}
+#import bevy_cel::outline_shared::OutlineVertexOutput
+#import bevy_cel::outline_vertex::{OutlineUniform, outline}
 
 @group(#{MATERIAL_BIND_GROUP}) @binding(1)
 var outline_lightmap_texture: texture_2d<f32>;

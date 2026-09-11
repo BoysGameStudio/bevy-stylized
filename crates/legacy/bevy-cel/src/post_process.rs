@@ -133,6 +133,14 @@ impl StylizedPostProcessSettings {
 }
 
 /// Independent feature switches and parameters for one 3D camera.
+///
+/// While this component is present, the camera's [`Hdr`](bevy::camera::Hdr),
+/// [`Bloom`](bevy::post_process::bloom::Bloom),
+/// [`Tonemapping`](bevy::core_pipeline::tonemapping::Tonemapping), and prepass
+/// components are owned by the plugin's `apply_profiles` system: it writes the
+/// union of this profile, an active [`GenshinDisplayTransform`](crate::GenshinDisplayTransform), and enabled
+/// internal-edge materials every frame. Manual insertion or removal of those
+/// components on the camera is overridden.
 #[derive(Clone, Copy, Component, Debug, PartialEq, Reflect)]
 pub struct StylizedPostProcessProfile {
     settings: StylizedPostProcessSettings,

@@ -11,7 +11,8 @@ use bevy::{
 };
 use bevy_cel::{
     CharacterMaterialPlugin, CharacterOutline, EyeEmissionSettings, InternalEdgeAccentSettings,
-    OUTLINE_FRAGMENT_SHADER_PATH, OUTLINE_VERTEX_SHADER_PATH, OutlineMaterial, OutlineSettings,
+    InternalEdgeMaterial, OUTLINE_FRAGMENT_SHADER_PATH, OUTLINE_VERTEX_SHADER_PATH,
+    OutlineMaterial, OutlineSettings,
 };
 
 #[test]
@@ -92,9 +93,10 @@ fn genshin_outline_uses_local_vertex_width_and_five_lightmap_classes() {
     assert_eq!(settings.genshin_local_width(), 0.0025);
 
     let vertex = include_str!("../src/shaders/outline_vertex.wgsl");
+    let shared = include_str!("../src/shaders/outline_shared.wgsl");
     let fragment = include_str!("../src/shaders/outline_fragment.wgsl");
-    assert!(vertex.contains("vertex.color.a"));
-    assert!(vertex.contains("local_position += normalize(vertex.normal)"));
+    assert!(shared.contains("vertex.color.a"));
+    assert!(vertex.contains("local_position += normalize(deformed.local_normal)"));
     for threshold in ["alpha > 0.2", "alpha > 0.4", "alpha > 0.6", "alpha > 0.8"] {
         assert!(fragment.contains(threshold));
     }
@@ -176,6 +178,7 @@ fn internal_edge_accent_disables_cleanly_without_both_prepasses() {
 fn outline_shaders_preserve_deformation_and_keep_prepass_accent_optional() {
     // Given
     let vertex = include_str!("../src/shaders/outline_vertex.wgsl");
+    let shared = include_str!("../src/shaders/outline_shared.wgsl");
     let accent = include_str!("../src/shaders/internal_edge.wgsl");
 
     // When
@@ -190,12 +193,40 @@ fn outline_shaders_preserve_deformation_and_keep_prepass_accent_optional() {
     assert!(
         deformation_contract
             .into_iter()
-            .all(|token| vertex.contains(token))
+            .all(|token| shared.contains(token))
     );
+    assert!(vertex.contains("deform_outline_vertex"));
     assert!(vertex.contains("position_world_to_clip"));
     assert!(accent.contains("DEPTH_PREPASS"));
     assert!(accent.contains("NORMAL_PREPASS"));
     assert!(accent.contains("discard"));
+}
+
+#[test]
+fn internal_edge_vertex_shader_binds_the_small_accent_uniform() {
+    // Given
+    let hull_vertex = include_str!("../src/shaders/outline_vertex.wgsl");
+    let accent_vertex = include_str!("../src/shaders/internal_edge_vertex.wgsl");
+
+    // When
+    let hull_size = core::mem::size_of::<bevy_cel::OutlineSettings>();
+    let accent_size = core::mem::size_of::<InternalEdgeAccentSettings>();
+
+    // Then
+    assert_eq!(accent_size, 32);
+    assert!(hull_size > accent_size);
+    assert_ne!(
+        InternalEdgeMaterial::vertex_shader_path(),
+        bevy_cel::OUTLINE_VERTEX_SHADER_PATH
+    );
+    assert_eq!(
+        InternalEdgeMaterial::vertex_shader_path(),
+        bevy_cel::INTERNAL_EDGE_VERTEX_SHADER_PATH
+    );
+    assert!(accent_vertex.contains("struct InternalEdgeUniform"));
+    assert!(!accent_vertex.contains("OutlineUniform"));
+    assert!(hull_vertex.contains("struct OutlineUniform"));
+    assert!(accent_vertex.contains("deform_outline_vertex"));
 }
 
 #[test]
@@ -267,4 +298,149 @@ fn outline_tracks_replaced_source_mesh_and_dynamic_bounds() {
     assert_eq!(rows[0].0.0, second);
     assert_eq!(rows[0].1.center, replacement.center);
     assert_eq!(rows[0].1.half_extents, replacement.half_extents);
+}
+
+fn outline_app() -> App {
+    let mut app = App::new();
+    app.add_plugins((
+        MinimalPlugins,
+        AssetPlugin::default(),
+        CharacterMaterialPlugin,
+    ));
+    app
+}
+
+fn add_outline_material(app: &mut App) -> Handle<OutlineMaterial> {
+    app.world_mut()
+        .resource_mut::<Assets<OutlineMaterial>>()
+        .add(OutlineMaterial::default())
+}
+
+fn add_internal_edge_material(app: &mut App) -> Handle<bevy_cel::InternalEdgeMaterial> {
+    app.world_mut()
+        .resource_mut::<Assets<bevy_cel::InternalEdgeMaterial>>()
+        .add(bevy_cel::InternalEdgeMaterial::default())
+}
+
+#[test]
+fn outline_follows_replaced_hull_material_handle() {
+    // Given
+    let mut app = outline_app();
+    let first = add_outline_material(&mut app);
+    let second = add_outline_material(&mut app);
+    let source = app
+        .world_mut()
+        .spawn((
+            Mesh3d(Handle::<Mesh>::default()),
+            CharacterOutline::new(first),
+        ))
+        .id();
+    app.update();
+
+    // When
+    app.world_mut()
+        .entity_mut(source)
+        .insert(CharacterOutline::new(second.clone()));
+    app.update();
+
+    // Then
+    let mut replicas = app
+        .world_mut()
+        .query::<(&MeshMaterial3d<OutlineMaterial>, &ChildOf)>();
+    let handles = replicas
+        .iter(app.world())
+        .filter(|(_, parent)| parent.parent() == source)
+        .map(|(material, _)| material.0.clone())
+        .collect::<Vec<_>>();
+    assert_eq!(handles, vec![second]);
+}
+
+#[test]
+fn internal_edge_replica_spawns_when_attached_after_the_outline() {
+    // Given
+    let mut app = outline_app();
+    let hull = add_outline_material(&mut app);
+    let edge = add_internal_edge_material(&mut app);
+    let source = app
+        .world_mut()
+        .spawn((
+            Mesh3d(Handle::<Mesh>::default()),
+            CharacterOutline::new(hull.clone()),
+        ))
+        .id();
+    app.update();
+    let mut edge_query = app
+        .world_mut()
+        .query::<&MeshMaterial3d<bevy_cel::InternalEdgeMaterial>>();
+    assert_eq!(edge_query.iter(app.world()).count(), 0);
+
+    // When
+    app.world_mut()
+        .entity_mut(source)
+        .insert(CharacterOutline::new(hull.clone()).with_internal_edge(edge.clone()));
+    app.update();
+
+    // Then
+    let handles = edge_query
+        .iter(app.world())
+        .map(|material| material.0.clone())
+        .collect::<Vec<_>>();
+    assert_eq!(handles, vec![edge]);
+
+    // When the internal-edge pass is removed again
+    app.world_mut()
+        .entity_mut(source)
+        .insert(CharacterOutline::new(hull));
+    app.update();
+
+    // Then only the hull replica remains
+    assert_eq!(edge_query.iter(app.world()).count(), 0);
+    let mut hull_query = app
+        .world_mut()
+        .query::<(&MeshMaterial3d<OutlineMaterial>, &ChildOf)>();
+    assert_eq!(
+        hull_query
+            .iter(app.world())
+            .filter(|(_, parent)| parent.parent() == source)
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn removing_character_outline_despawns_its_replicas() {
+    // Given
+    let mut app = outline_app();
+    let hull = add_outline_material(&mut app);
+    let edge = add_internal_edge_material(&mut app);
+    let source = app
+        .world_mut()
+        .spawn((
+            Mesh3d(Handle::<Mesh>::default()),
+            CharacterOutline::new(hull).with_internal_edge(edge),
+        ))
+        .id();
+    app.update();
+
+    // When
+    app.world_mut()
+        .entity_mut(source)
+        .remove::<CharacterOutline>();
+    app.update();
+
+    // Then
+    let mut hull_query = app
+        .world_mut()
+        .query::<(&MeshMaterial3d<OutlineMaterial>, &ChildOf)>();
+    assert_eq!(
+        hull_query
+            .iter(app.world())
+            .filter(|(_, parent)| parent.parent() == source)
+            .count(),
+        0
+    );
+    let mut edge_query = app
+        .world_mut()
+        .query::<&MeshMaterial3d<bevy_cel::InternalEdgeMaterial>>();
+    assert_eq!(edge_query.iter(app.world()).count(), 0);
 }

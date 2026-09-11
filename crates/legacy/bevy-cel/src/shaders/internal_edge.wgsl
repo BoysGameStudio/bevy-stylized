@@ -2,7 +2,7 @@
     forward_io::FragmentOutput,
     prepass_utils::{prepass_depth, prepass_normal},
 }
-#import bevy_cel::outline_vertex::OutlineVertexOutput
+#import bevy_cel::outline_shared::OutlineVertexOutput
 
 struct InternalEdgeUniform {
     color_thresholds: vec4<f32>,

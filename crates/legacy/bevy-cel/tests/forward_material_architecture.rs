@@ -6,7 +6,7 @@ use bevy::{
     material::{AlphaMode, OpaqueRendererMethod},
     pbr::MaterialExtension,
     prelude::{Color, MinimalPlugins, StandardMaterial},
-    render::render_resource::ShaderType,
+    render::render_resource::{Face, PrimitiveState, RenderPipelineDescriptor, ShaderType},
     shader::ShaderRef,
 };
 use bevy_cel::{
@@ -118,9 +118,44 @@ fn specialization_seams_have_stable_defaults() {
     let cull_mode = extension.outline_cull_mode;
 
     // Then
-    assert_eq!(cull_mode, OutlineCullMode::Back);
+    assert_eq!(cull_mode, OutlineCullMode::Inherit);
     assert_eq!(ATTRIBUTE_CHARACTER_MASK.name, "_CEL_MASK");
     assert!(!extension.uses_backface_base_color_uv_b());
+}
+
+#[test]
+fn outline_cull_mode_inherits_unless_an_override_is_selected() {
+    // Given
+    let base_cull_modes = [None, Some(Face::Back), Some(Face::Front)];
+
+    for base_cull_mode in base_cull_modes {
+        // When
+        let mut descriptor = RenderPipelineDescriptor {
+            primitive: PrimitiveState {
+                cull_mode: base_cull_mode,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        OutlineCullMode::Inherit.apply(&mut descriptor);
+
+        // Then
+        assert_eq!(descriptor.primitive.cull_mode, base_cull_mode);
+    }
+
+    // When
+    let mut descriptor = RenderPipelineDescriptor {
+        primitive: PrimitiveState {
+            cull_mode: Some(Face::Back),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    OutlineCullMode::Front.apply(&mut descriptor);
+    OutlineCullMode::None.apply(&mut descriptor);
+
+    // Then
+    assert_eq!(descriptor.primitive.cull_mode, None);
 }
 
 #[test]
