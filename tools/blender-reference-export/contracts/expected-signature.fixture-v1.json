@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Expected Signature for the self-made reference fixture (blender-gltf-npr-v1)",
+  "contract_version": "blender-gltf-npr-v1",
+  "revision": "reference-scene-v1",
+  "notes": [
+    "Signature contract for fixtures/reference/reference_scene.blend, a 100% self-made fixture generated deterministically by tools/blender-reference-export/make_reference_scene.py.",
+    "Unlike the genshin-v3.6.2 contract this role has no upstream node groups to verify; structural verification is the required material set plus the _NPR_* attribute checks from npr-attributes.v1.json.",
+    "source.commit/release are null: the fixture has no Gacha Setup provenance (self-made, committable per docs/reference/05-license-and-provenance-boundary.md)."
+  ],
+  "source": {
+    "repository": null,
+    "release": null,
+    "commit": null,
+    "sha256": null
+  },
+  "roles": {
+    "fixture": {
+      "detect_if_present": null,
+      "detect_scene_property": "bevy_stylized.fixture_role",
+      "required_node_groups": [],
+      "required_materials": [
+        "FixtureMatBody",
+        "FixtureMatGround",
+        "FixtureMatHair",
+        "FixtureMatHead"
+      ]
+    }
+  },
+  "metadata_map": {
+    "fixture": []
+  }
+}

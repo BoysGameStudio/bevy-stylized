@@ -56,6 +56,7 @@ series = "5.2 LTS"
 version = "<exact validated Blender version>"
 
 [gacha_setup]
+repository = "PaoloESAN/gacha-setup"
 release = "v3.6.2"
 tag = "v3.6.2"
 commit = "069e51f3fd89cdc66b4c2741798ede11a5fb16b5"

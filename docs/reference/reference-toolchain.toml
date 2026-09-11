@@ -1,0 +1,58 @@
+# Validated 2026-09-11, see upstream-qualification record. PENDING = not yet validated.
+#
+# 验证记录：docs/reference/upstream-qualification-2026-09-11.md（含同日修正节）
+# 上游仓库：PaoloESAN/gacha-setup（Gacha Setup 本体，michael-gh1 Setup Wizard 的 fork）。
+
+[blender]
+series = "5.2 LTS"
+version = "5.2.1 LTS"      # 实测锁定 2026-09-11：本机 snap /snap/bin/blender，bpy.app.version_string="5.2.1 LTS"（build hash 9e2066aef7ef, built 2026-08-25）
+render_engine = "BLENDER_EEVEE"   # 观测自 Reference 主 shader blend（HoYoverse - Genshin Impact v3.4.blend）scene.render.engine
+color_management = "sRGB"         # 观测自 Reference 主 shader blend：display_device=sRGB / sequencer_colorspace=sRGB
+view_transform = "Standard"       # 观测自 Reference 主 shader blend：view_settings.view_transform=Standard, look=None
+
+[gacha_setup]
+repository = "https://github.com/PaoloESAN/gacha-setup"
+release = "v3.6.2"
+tag = "v3.6.2"
+commit = "069e51f3fd89cdc66b4c2741798ede11a5fb16b5"
+release_asset = "Gacha_Setup-v3.6.2.zip"
+sha256 = "f5ab8206464130962234a7ccab19c7d212a048c848ce3e69518f84fc41a39999"
+license = "GPL-3.0-or-later"   # bl_info license 字段；仓库根 LICENSE 与包内 README License 节均为 GPL-3.0 文本
+
+[export]
+contract = "blender-gltf-npr-v1"   # 形态已定稿为 Draft（docs/reference/06-export-contract-blender-gltf-npr-v1.md），pending ADR-0012 维护者确认；机器可读载体 tools/blender-reference-export/contracts/
+
+[fixture]
+# 自制 Reference fixture（It-1b）：generator 确定性构建，blend 与 glb 均为纯自制内容，可入库。
+id = "reference_scene_v1"
+generator = "tools/blender-reference-export/make_reference_scene.py"
+generator_sha256 = "b6dfca1df52127d3909df8e94a7cbe32be1743d5a563eda0166091b26f22c476"
+blend = "fixtures/reference/reference_scene.blend"
+blend_sha256 = "98e2f05567bbbaf885076ef6b27abb8faa1fd01eb646d6dfa4d2b6d96c9084ca"
+glb = "fixtures/reference/reference_scene.glb"
+glb_sha256 = "51467fcd082845c1e2db01f459c38cc93afd608aff7f47ae51586700161dbc18"
+
+[golden]
+# It-1b Upstream Golden（Blender 侧，local-only：fixtures/golden-local/upstream/）。
+# revision = sha256 over sorted "<case>:<image_sha256>" lines。
+revision = "ee065c8203bbcf1472951a6c2c8ce20e86f0a120dfab1e016bbc1a2d9acd3801"
+renderer = "blender-eevee"
+cases = "pbr_control,gacha_upstream"
+captured = "2026-09-12"
+hardware = "NVIDIA RTX 5090 (local baseline)"
+
+[reference_family]
+id = "genshin-festivity-gacha-setup-v1"
+
+[reference_family.artifacts]
+# 三个 artifact 均为包内 vendor 的 festivize/Blender-miHoYo-Shaders 谱系 shader
+# （setup_wizard/shaders/gi/README.md 注明原始仓库与 GPL-3.0 条款）。
+main = "setup_wizard/shaders/gi/HoYoverse - Genshin Impact v3.4.blend"
+main_git_blob = "7637f1d18a63188ca08870fb554d949dafefaecf"
+outline = "setup_wizard/shaders/gi/HoYoverse - Genshin Impact Outlines v3.blend"
+outline_git_blob = "532e0860065acea1e427f1d4033f69626793036b"
+post = "setup_wizard/shaders/gi/HoYoverse - Genshin Impact Post-Processing.blend"
+post_git_blob = "7cafd3d5fcb77e5e7efa8037531e085887f57d5e"
+
+[profile]
+genshin_schema = "PENDING"

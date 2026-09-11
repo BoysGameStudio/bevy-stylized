@@ -1,0 +1,102 @@
+{
+  "evidence_policy": "ADR-0029: fixed scenes, labeled class/tier/backend/resolution; improvement claims require before/after on the same device",
+  "captured_unix_seconds": 1789155050,
+  "engine_git_commit": "650edc2cabc63fcbe9dc7eadf25a5a77aa5d9708",
+  "gpu": "NVIDIA GeForce RTX 5090 (Vulkan)",
+  "driver": "NVIDIA 615.71.09",
+  "os": "linux x86_64",
+  "records": [
+    {
+      "target_id": "linux-vulkan-rtx5090-hero-1-v1",
+      "scene": "hero_1 (1 Hero material sphere, full features)",
+      "class": "Hero",
+      "tier": "Portable",
+      "backend": "Vulkan",
+      "resolution": [
+        1280,
+        720
+      ],
+      "frame_stats": {
+        "mean_ms": 6.300066750000001,
+        "median_ms": 6.228122,
+        "p95_ms": 6.748851,
+        "min_ms": 6.015847,
+        "max_ms": 7.460876
+      },
+      "gpu_timing": null,
+      "frames": [
+        20,
+        60
+      ]
+    },
+    {
+      "target_id": "linux-vulkan-rtx5090-portable-100-v1",
+      "scene": "portable_100 (100 Cel instances, shared mesh+material, MeshTag variation)",
+      "class": "Cel",
+      "tier": "Portable",
+      "backend": "Vulkan",
+      "resolution": [
+        1280,
+        720
+      ],
+      "frame_stats": {
+        "mean_ms": 6.541741483333334,
+        "median_ms": 6.46362,
+        "p95_ms": 7.175806,
+        "min_ms": 6.208696,
+        "max_ms": 8.111386999999999
+      },
+      "gpu_timing": null,
+      "frames": [
+        20,
+        60
+      ]
+    },
+    {
+      "target_id": "linux-vulkan-rtx5090-portable-500-v1",
+      "scene": "portable_500 (500 Cel instances, shared mesh+material, MeshTag variation)",
+      "class": "Cel",
+      "tier": "Portable",
+      "backend": "Vulkan",
+      "resolution": [
+        1280,
+        720
+      ],
+      "frame_stats": {
+        "mean_ms": 7.177810133333333,
+        "median_ms": 7.139278,
+        "p95_ms": 7.466618,
+        "min_ms": 6.876869,
+        "max_ms": 8.559962
+      },
+      "gpu_timing": null,
+      "frames": [
+        20,
+        60
+      ]
+    },
+    {
+      "target_id": "linux-vulkan-rtx5090-portable-1000-v1",
+      "scene": "portable_1000 (1000 Cel instances, shared mesh+material, MeshTag variation)",
+      "class": "Cel",
+      "tier": "Portable",
+      "backend": "Vulkan",
+      "resolution": [
+        1280,
+        720
+      ],
+      "frame_stats": {
+        "mean_ms": 7.949231816666668,
+        "median_ms": 7.873333999999999,
+        "p95_ms": 8.490323,
+        "min_ms": 7.67757,
+        "max_ms": 8.759794
+      },
+      "gpu_timing": null,
+      "frames": [
+        20,
+        60
+      ]
+    }
+  ]
+}
