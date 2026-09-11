@@ -1,1 +1,5 @@
 /target
+
+# Local-only golden captures of third-party (HoYoverse-derived) art
+# (ADR-0017 §Partial decision): referenced by path, never committed.
+/fixtures/golden-local/
