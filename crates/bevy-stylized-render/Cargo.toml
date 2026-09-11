@@ -1,0 +1,32 @@
+[package]
+name = "bevy-stylized-render"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "Cel@Portable render slice for bevy-stylized: thin Material backend, hull outline, view sync (provisional pending ADR-0001)."
+
+[dependencies]
+bevy = { workspace = true, features = [
+    "bevy_asset",
+    "bevy_core_pipeline",
+    "bevy_image",
+    "bevy_log",
+    "bevy_mesh",
+    "bevy_pbr",
+    "bevy_render",
+    "bevy_window",
+] }
+bevy-stylized-core = { path = "../bevy-stylized-core" }
+
+[dev-dependencies]
+bevy = { workspace = true, features = ["bevy_animation", "bevy_gltf", "bevy_scene", "png", "reflect_auto_register"] }
+bevy-stylized = { path = "../bevy-stylized" }
+golden-harness = { path = "../dev/golden-harness" }
+serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+# Matches the naga revision used by bevy_shader 0.19 for composed-module validation.
+naga = { version = "=29.0.4", features = ["wgsl-in"] }
+
+[lints]
+workspace = true

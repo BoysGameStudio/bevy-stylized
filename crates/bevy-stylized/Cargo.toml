@@ -1,0 +1,35 @@
+[package]
+name = "bevy-stylized"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "bevy-stylized facade crate: StylizedPlugin, two-phase capability plumbing, and stable re-exports."
+
+[dependencies]
+bevy = { workspace = true, features = ["bevy_asset", "bevy_render"] }
+bevy-stylized-core = { path = "../bevy-stylized-core" }
+bevy-stylized-gltf = { path = "../bevy-stylized-gltf", optional = true }
+bevy-stylized-render = { path = "../bevy-stylized-render", optional = true }
+bevy-stylized-profile-genshin = { path = "../bevy-stylized-profile-genshin", optional = true }
+
+[features]
+default = ["gltf", "render"]
+# ADR-0024：cargo feature 只表达 additive 编译能力（这里接入 glTF 导入层 /
+# Cel@Portable 渲染切片），不用于选择运行时 SurfaceClass / ExecutionTier。
+gltf = ["dep:bevy-stylized-gltf", "bevy/bevy_gltf"]
+render = ["dep:bevy-stylized-render"]
+# ADR-0019：V1 唯一锁定的 reference family；默认关闭（ADR-0024 additive）。
+profile-genshin = ["dep:bevy-stylized-profile-genshin"]
+
+[dev-dependencies]
+bevy = { workspace = true, features = [
+    "bevy_animation",
+    "bevy_pbr",
+    "bevy_scene",
+] }
+gltf = { workspace = true, features = ["import"] }
+serde_json.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

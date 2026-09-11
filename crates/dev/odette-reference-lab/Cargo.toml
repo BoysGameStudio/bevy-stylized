@@ -1,0 +1,17 @@
+[package]
+name = "odette-reference-lab"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+description = "Engine-side golden captures of the fixed legacy bevy_cel stack using the Tenacity Odette asset"
+
+[dependencies]
+bevy = { workspace = true, features = ["bevy_animation", "bevy_gltf", "png", "reflect_auto_register"] }
+bevy_cel = { path = "../../legacy/bevy-cel" }
+golden-harness = { path = "../golden-harness" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

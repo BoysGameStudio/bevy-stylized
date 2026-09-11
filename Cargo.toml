@@ -1,6 +1,17 @@
 [workspace]
 resolver = "3"
 members = [
+    "crates/bevy-stylized",
+    "crates/bevy-stylized-core",
+    "crates/bevy-stylized-gltf",
+    "crates/bevy-stylized-profile-genshin",
+    "crates/bevy-stylized-tools",
+    "crates/bevy-stylized-render",
+    "crates/dev/benchmarks",
+    "crates/dev/golden-harness",
+    "crates/dev/odette-reference-lab",
+    "crates/dev/reference-comparison",
+    "crates/dev/showcase",
     "crates/legacy/bevy-cel",
     "crates/legacy/bevy-cel-metadata",
 ]
@@ -16,10 +27,18 @@ edition = "2024"
 # params by design (same allowances as bevy itself / the Flock template).
 type_complexity = "allow"
 too_many_arguments = "allow"
+# Legacy reference crates are frozen verbatim copies; their test-module
+# layout is kept as imported.
+items_after_test_module = "allow"
 
 [workspace.dependencies]
 # Bevy baseline is pinned to the architecture baseline (ARCHITECTURE.md).
 bevy = { version = "=0.19.1", default-features = false }
+# Sub-crate pins mirror the Bevy baseline; bevy-stylized-core may only depend
+# on these three (plus serde), per docs/architecture/03.
+bevy_math = { version = "=0.19.1", default-features = false }
+bevy_color = { version = "=0.19.1", default-features = false }
+bevy_reflect = { version = "=0.19.1", default-features = false }
 
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

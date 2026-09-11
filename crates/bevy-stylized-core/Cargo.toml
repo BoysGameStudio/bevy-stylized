@@ -1,0 +1,25 @@
+[package]
+name = "bevy-stylized-core"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "Domain model, descriptors, capability model and schema versioning for the bevy-stylized framework (no render internals)."
+
+# 依赖边界（docs/architecture/03）：core 只允许依赖
+# bevy_math / bevy_color / bevy_reflect / serde。
+# `tests::dependency_boundary_guard` 会解析本文件并 fail-closed。
+[dependencies]
+bevy_math = { workspace = true, features = ["std", "bevy_reflect"] }
+bevy_color = { workspace = true, features = ["std", "bevy_reflect"] }
+bevy_reflect = { workspace = true, features = ["std"] }
+serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[features]
+default = ["serde"]
+serde = ["dep:serde", "bevy_math/serialize", "bevy_color/serialize"]
+
+[lints]
+workspace = true

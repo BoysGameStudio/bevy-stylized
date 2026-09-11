@@ -1,0 +1,144 @@
+//! `bevy-stylized-render`：It-3b Cel@Portable + It-4 Character@Portable
+//! 渲染切片。
+//!
+//! **Provisional（ADR-0001 未决）**：本 crate 是建立在 Bevy `Material`
+//! 组合路径上的薄层临时 backend；公共语义全部挂在 `bevy-stylized-core`
+//! 的 descriptor 上，ADR-0001 三方对比（It-6）结论引发的返工被限制在
+//! 本 crate 内部。
+//!
+//! 内容：
+//!
+//! - [`material`]：[`StylizedCelMaterial`]——Base Color / Ramp（纹理或解析
+//!   fallback）/ ILM(AO) / Toon Lighting（half-lambert + ramp）/ Rim；
+//! - [`character`]：[`StylizedCharacterMaterial`]——Cel + Face SDF /
+//!   Hair 高光 / Rim / Emission（Character class，docs/rendering/01）；
+//! - [`outline`]：[`StylizedOutlineMaterial`] + [`StylizedOutline`]——
+//!   inverted hull（顶点外扩 + front-face cull）；
+//! - [`instance`]：[`StylizedInstanceData`]——Instance 层数据经 MeshTag
+//!   位打包传输（provisional pending ADR-0004），不破坏自动合批；
+//! - [`view`]：[`StylizedViewSettings`]——core `StylizedViewDescriptor`
+//!   → Bevy view-layer 对象（key light / ambient / exposure）的薄同步；
+//! - [`capability`]：ADR-0022 Stage B 结果的消费与 fail-closed 检查。
+//!
+//! Portable 不变量：不请求任何可选 GPU 特性；不依赖 storage buffer /
+//! compute / bindless；固定 binding；shader 按 Class×Tier 分编译单元
+//! （`cel/portable_forward.wgsl`、`character/portable_forward.wgsl`、
+//! `outline/portable_outline.wgsl` + 共享 `common/npr_common.wgsl`）。
+
+pub mod budget;
+pub mod capability;
+pub mod character;
+pub mod hero;
+pub mod instance;
+pub mod material;
+pub mod outline;
+pub mod post;
+pub mod view;
+
+pub use budget::{
+    count_layout_entries, count_material_usage, instance_usage, mesh_usage_for_model,
+};
+pub use capability::StylizedRenderCapabilities;
+pub use character::{
+    CHARACTER_PORTABLE_FORWARD_SHADER_PATH, StylizedCharacterMaterial, StylizedCharacterParams,
+    apply_character_portable_fallback, character_params_for_variant,
+};
+pub use hero::{
+    HERO_FORWARD_SHADER_PATH, StylizedHeroMaterial, StylizedHeroParams,
+    apply_hero_portable_fallback, hero_params_for_variant,
+};
+pub use instance::{
+    StylizedInstanceData, StylizedInstanceTransport, StylizedInstanceTransportMode,
+    select_transport,
+};
+pub use material::{
+    CEL_FLAG_ILM_TEXTURE, CEL_FLAG_RAMP_TEXTURE, CEL_FLAG_RIM, CEL_PORTABLE_FORWARD_SHADER_PATH,
+    StylizedCelMaterial, StylizedCelParams,
+};
+pub use outline::{
+    OUTLINE_PORTABLE_SHADER_PATH, StylizedOutline, StylizedOutlineMaterial, StylizedOutlineParams,
+    StylizedOutlineReplica,
+};
+pub use post::{
+    STYLIZED_FULLSCREEN_SHADER_PATH, StylizedDisplayTransform, StylizedFullscreenEffect,
+    StylizedPostProcess,
+};
+pub use view::{StylizedKeyLight, StylizedViewSettings, exposure_component, resolve_ambient_light};
+
+use bevy::{
+    app::{App, Plugin, PostUpdate},
+    asset::{Assets, embedded_asset},
+    pbr::MaterialPlugin,
+    prelude::IntoScheduleConfigs,
+};
+
+/// Cel/Character @Portable 渲染插件：注册 shader 资产、材质插件与同步系统。
+///
+/// 由 facade 的 `StylizedPlugin`（`render` feature）自动装配；也可单独
+/// 加入。需要宿主 App 已配置 RenderPlugin 才能真正出图（headless 无
+/// RenderPlugin 时 MaterialPlugin 自动退化为仅资产注册）。
+#[derive(Default)]
+pub struct StylizedRenderPlugin;
+
+impl Plugin for StylizedRenderPlugin {
+    fn build(&self, app: &mut App) {
+        embedded_asset!(app, "shaders/cel/portable_forward.wgsl");
+        embedded_asset!(app, "shaders/character/character_forward.wgsl");
+        embedded_asset!(app, "shaders/outline/portable_outline.wgsl");
+        embedded_asset!(app, "shaders/common/npr_common.wgsl");
+        embedded_asset!(app, "shaders/hero/hero_forward.wgsl");
+        embedded_asset!(app, "shaders/post/stylized_fullscreen.wgsl");
+        app.add_plugins((
+            MaterialPlugin::<StylizedCelMaterial>::default(),
+            MaterialPlugin::<StylizedOutlineMaterial>::default(),
+            MaterialPlugin::<StylizedCharacterMaterial>::default(),
+            MaterialPlugin::<StylizedHeroMaterial>::default(),
+        ));
+        post::register(app);
+        app.register_type::<StylizedCelMaterial>()
+            .register_type::<StylizedOutlineMaterial>()
+            .register_type::<StylizedCharacterMaterial>()
+            .register_type::<StylizedHeroMaterial>()
+            .register_type::<outline::StylizedOutline>()
+            .register_type::<instance::StylizedInstanceData>();
+        // Instance 传输通道：依 Stage B 解析结果选择（当前恒 MeshTagBits，
+        // 见 instance::select_transport 的 provisional 说明）。
+        let mode = instance::select_transport(
+            app.world()
+                .get_resource::<StylizedRenderCapabilities>()
+                .and_then(|c| c.resolved.as_ref()),
+        );
+        app.insert_resource(instance::StylizedInstanceTransportMode(mode));
+        view::register(app);
+        app.add_systems(
+            PostUpdate,
+            (
+                material::sync_cel_material_flags.after(bevy::asset::AssetEventSystems),
+                character::sync_character_material_flags.after(bevy::asset::AssetEventSystems),
+                hero::sync_hero_material_flags.after(bevy::asset::AssetEventSystems),
+                outline::sync_outline_replicas,
+                instance::sync_instance_tags,
+            ),
+        );
+    }
+
+    fn finish(&self, app: &mut App) {
+        // ADR-0022 Stage B 消费：fail-closed（debug 断言 + error 日志）。
+        capability::debug_assert_capabilities_satisfied(
+            app.world().get_resource::<StylizedRenderCapabilities>(),
+        );
+        // `npr_common.wgsl` 是纯 WGSL import 模块：没有 pipeline 经
+        // `ShaderRef` 引用它，必须主动加载才能让 shader composer 解析
+        // import 图（无 render 插件时仅注册 embedded asset）。
+        if app
+            .world()
+            .contains_resource::<Assets<bevy::shader::Shader>>()
+        {
+            let handle: bevy::prelude::Handle<bevy::shader::Shader> = bevy::asset::load_embedded_asset!(
+                app.world_mut(),
+                "shaders/common/npr_common.wgsl"
+            );
+            core::mem::forget(handle);
+        }
+    }
+}

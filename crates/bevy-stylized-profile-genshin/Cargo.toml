@@ -1,0 +1,12 @@
+[package]
+name = "bevy-stylized-profile-genshin"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "Genshin reference family profile for bevy-stylized (V1 唯一锁定 family, ADR-0019); depends only on bevy-stylized-core."
+
+[dependencies]
+bevy-stylized-core = { path = "../bevy-stylized-core" }
+
+[lints]
+workspace = true

@@ -1,0 +1,27 @@
+[package]
+name = "bevy-stylized-gltf"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "glTF import layer for bevy-stylized: _NPR_* vertex attribute registration and bevy_stylized.* extras/sidecar typed import."
+
+[dependencies]
+bevy = { workspace = true, features = ["bevy_asset", "bevy_gltf", "bevy_mesh"] }
+bevy-stylized-core = { path = "../bevy-stylized-core" }
+gltf.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_path_to_error.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+bevy = { workspace = true, features = [
+    "bevy_animation",
+    "bevy_pbr",
+    "bevy_render",
+    "bevy_scene",
+] }
+tempfile.workspace = true
+
+[lints]
+workspace = true

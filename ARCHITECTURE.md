@@ -84,6 +84,8 @@ Production Renderer
 | Upstream upgrade / Golden provenance | `docs/reference/04-upstream-contract-upgrade-and-golden.md` |
 | Reference source register | `docs/reference/source-register.md` |
 | License / provenance boundary | `docs/reference/05-license-and-provenance-boundary.md` |
+| Export contract v1（草案，pending ADR-0012） | `docs/reference/06-export-contract-blender-gltf-npr-v1.md` |
+| Gacha Setup behavior contract v1（草案，pending ADR-0012） | `docs/reference/07-gacha-setup-behavior-contract-v1.md` |
 | Blender export bridge | `docs/authoring/02-blender-reference-export-bridge.md` |
 | Authoring schema / runtime packing | `docs/authoring/03-authoring-schema-runtime-packing.md` |
 | Bevy glTF import contract | `docs/authoring/04-bevy-gltf-import-contract.md` |

@@ -1,0 +1,24 @@
+[package]
+name = "bevy-stylized-tools"
+version.workspace = true
+edition.workspace = true
+publish = false
+description = "bevy-stylized CLI: validate / inspect glTF assets against the _NPR_* contract."
+
+[[bin]]
+name = "bevy-stylized"
+path = "src/main.rs"
+
+[dependencies]
+bevy-stylized-core = { path = "../bevy-stylized-core" }
+bevy-stylized-gltf = { path = "../bevy-stylized-gltf" }
+gltf.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true
