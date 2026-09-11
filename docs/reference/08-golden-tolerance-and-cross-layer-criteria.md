@@ -64,6 +64,19 @@ Upstream Golden（Blender EEVEE）与 Engine Golden（Bevy runtime）的对比�
 > 差距。判据校准（可能含 tone 归一化前置步骤）待 ADR-0007 关闭时按
 > docs/reference/04 流程处理；当前数字存
 > `fixtures/golden-local/reference-scene/*.tier2.json`。
+>
+> **It-5 后续（2026-09-12，同日补充）——tone/能量归一化修复**：上述"偏曝"
+> 的主因不是 Standard view transform 的 roll-off（Standard 实为纯 sRGB
+> 传递，无 roll-off），而是 EEVEE 漫反射的 Lambert `1/π` 能量归一在 Bevy
+> NPR 路径中的缺失 + 背景 world 色未对齐。已在**对比域**（
+> `crates/dev/reference-comparison`，生产渲染器不变）落地归一化：
+> key light 能量 ×1/π + 清屏色=world 色。修复后：
+> production_vs_upstream max_nonedge=0.584 / mean=0.0314 / PSNR=22.5dB /
+> shadow IoU=0.947 / silhouette IoU=0.996；engine_vs_upstream
+> mean=0.126 / PSNR=13.5dB / silhouette IoU=0.993；production_vs_engine
+> max_nonedge=0.475 / mean=0.124 / PSNR=13.9dB。草案判据仍未通过
+> （未放宽任何阈值），残余差距主要在 palette/ramp 语义近似与无阴影投射
+> （已知偏差，A 类）。
 
 ## 4. "Validated" 的定义
 

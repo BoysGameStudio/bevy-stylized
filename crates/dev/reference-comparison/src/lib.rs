@@ -60,12 +60,19 @@ pub const CAMERA_FOV_RADIANS: f32 = 0.691_121_16; // 2*atan(18/50)
 /// 太阳方向（指向光源）：Blender 光源位于 (2,-3,4) 指向原点 →
 /// direction_to_light = normalize((2,4,3))。
 pub const SUN_DIRECTION_TO_LIGHT: Vec3 = Vec3::new(0.371_390_7, 0.742_781_4, 0.557_086);
-/// 太阳色 × 能量（(1.0, 0.956, 0.898) × 3.0，线性）。
-pub const SUN_LINEAR: LinearRgba = LinearRgba::new(3.0, 2.868, 2.694, 1.0);
+/// 太阳色 × 能量 × 1/π（(1.0, 0.956, 0.898) × 3.0 / π，线性）。
+///
+/// **对比域归一化（只在本 crate 生效，生产渲染器不变）**：Blender
+/// "Standard" view transform 是纯 sRGB 传递（无 roll-off），EEVEE 的漫反射
+/// 遵循 Lambert `1/π` 能量归一；我们的 NPR 路径的 half-lambert 无该项。
+/// 跨层归一化（docs/reference/08 §2）因此把 key light 能量乘 1/π。
+pub const SUN_LINEAR: LinearRgba = LinearRgba::new(0.95493, 0.91308, 0.85758, 1.0);
 /// 环境光（Blender world (0.03, 0.03, 0.045)，sRGB → 线性）。
 pub const WORLD_LINEAR: LinearRgba = LinearRgba::new(0.0028, 0.0028, 0.0052, 1.0);
-/// 背景色（sRGB 8-bit；用于 Tier-2 剪影遮罩）。
-pub const BACKGROUND_SRGB: [u8; 3] = [20, 20, 27];
+/// 背景色（world 色经 sRGB 传递后的实测值；用于 Tier-2 剪影遮罩）。
+pub const BACKGROUND_SRGB: [u8; 3] = [48, 48, 60];
+/// 清屏色（= Blender world 线性色；对齐背景，见 docs/reference/08 §2）。
+pub const CLEAR_LINEAR: LinearRgba = LinearRgba::new(0.03, 0.03, 0.045, 1.0);
 
 const GLB: &str = "reference_scene.glb";
 const SETTLE_FRAMES: u32 = 24;
@@ -114,6 +121,8 @@ fn headless_app(resources: RenderResources) -> (App, capture::CaptureTarget) {
         capture::create_capture_target(&mut images, SIZE, SIZE)
     };
     app.insert_resource(TargetHolder(target.clone()));
+    // 背景对齐（docs/reference/08 §2）：清屏色 = Blender world 色。
+    app.insert_resource(bevy::prelude::ClearColor(Color::LinearRgba(CLEAR_LINEAR)));
     (app, target)
 }
 
