@@ -196,3 +196,14 @@ Golden 对比。
 - documentation。
 
 ---
+
+## 迁移状态记录
+
+### 2026-09-11：Legacy Reference Path 导入
+
+- 从 Tenacity(local:`/home/x/Projects/Tenacity`,commit `b5b26ac`)拷贝 `bevy-cel` 与 `bevy-cel-metadata` 到 `crates/legacy/`,package 名保持 `bevy_cel` / `bevy_gltf_metadata`,`embedded://` shader 路径不变。
+- 两个 crate 冻结为 Reference Oracle;其 public API 不是 Bevy Stylized 的稳定契约。Production Path(Phase 2 起）据此做 Core Extraction 与对照验证。
+- 剥离了 `bevy_gltf_metadata` 的可选 `kawaii` feature（依赖未迁移的 `bevy_kawaii_physics`,bevy_cel 未使用）。
+- 未导入 git 历史；本节即 provenance 记录。许可证沿用原 MIT 声明，仓库级许可证仍由 ADR-0017 决定。
+
+---

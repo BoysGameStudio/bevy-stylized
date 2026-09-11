@@ -1,0 +1,29 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/legacy/bevy-cel",
+    "crates/legacy/bevy-cel-metadata",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+# License intentionally unset at the workspace level: pending ADR-0017 /
+# provenance review. Legacy crates carry their original license fields.
+
+[workspace.lints.clippy]
+# Bevy-inherent: ECS queries are complex types and systems take many
+# params by design (same allowances as bevy itself / the Flock template).
+type_complexity = "allow"
+too_many_arguments = "allow"
+
+[workspace.dependencies]
+# Bevy baseline is pinned to the architecture baseline (ARCHITECTURE.md).
+bevy = { version = "=0.19.1", default-features = false }
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_path_to_error = "0.1"
+thiserror = "2"
+tempfile = "3"
+gltf = { version = "=1.4.1", features = ["extensions"] }

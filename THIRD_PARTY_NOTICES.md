@@ -1,6 +1,11 @@
 # Third-Party Notices and Reference Provenance
 
-This documentation package contains architecture text authored for the Bevy Stylized project. It does **not** vendor proprietary game models/textures or the Gacha Setup/Blender shader source files.
+This repository contains architecture text authored for the Bevy Stylized project plus legacy runtime crates imported from the Tenacity project. It does **not** vendor proprietary game models/textures or the Gacha Setup/Blender shader source files.
+
+Imported code:
+
+- `crates/legacy/bevy-cel` and `crates/legacy/bevy-cel-metadata` — copied from the Tenacity project (same author lineage), originally MIT licensed; see `crates/legacy/README.md` for provenance;
+- `crates/legacy/bevy-cel/src/shaders/character_prepass.wgsl` — adapts Bevy 0.19.1's `bevy_pbr` prepass shader (MIT OR Apache-2.0); the MIT license text is bundled in `crates/legacy/bevy-cel/third-party/`.
 
 Reference/provenance sources discussed by the documentation include:
 

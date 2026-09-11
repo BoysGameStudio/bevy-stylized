@@ -49,7 +49,10 @@ bevy-stylized/
 │   ├── bevy-stylized-render/
 │   ├── bevy-stylized-gltf/
 │   ├── bevy-stylized-profile-genshin/    # V1 concrete reference family
-│   └── bevy-stylized-tools/
+│   ├── bevy-stylized-tools/
+│   └── legacy/                           # 迁移期 Tenacity legacy reference（非 V1 crate 集合）
+│       ├── bevy-cel/
+│       └── bevy-cel-metadata/
 │
 ├── shaders/
 │   ├── common/
@@ -85,6 +88,8 @@ bevy-stylized/
 ADR-0016 Package Naming → Accepted: bevy-stylized
 ADR-0017 License & Provenance → still open
 ```
+
+`crates/legacy/` 是迁移期的例外区域：其中的 Tenacity legacy crate(`bevy_cel`、`bevy_gltf_metadata`）冻结为 Reference Oracle，不受上述命名规则约束，也不计入 V1 crate 集合。任何 `bevy-stylized-*` crate 不得依赖 `crates/legacy/`;Production 代码只能从新写的 core/render 中提取与参考。详见 `docs/migration/01-tenacity-migration-plan.md` 的迁移状态记录。
 
 ---
 
