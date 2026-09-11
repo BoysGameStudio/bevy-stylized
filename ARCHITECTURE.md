@@ -9,7 +9,8 @@
 - Bevy baseline: **0.19.1**
 - Reference family currently targeted for V1: **Genshin / Gacha Setup locked reference family**
 - Facade Cargo package: **`bevy-stylized`**
-- GitHub repository / project directory: **`bevy-stylized`**
+- Canonical GitHub repository: **`BoysGameStudio/bevy-stylized`**
+- Project/workspace directory: **`bevy-stylized/`**
 - Rust crate identifier: **`bevy_stylized`**
 - Public license: **Pending ADR-0017 / provenance review**
 

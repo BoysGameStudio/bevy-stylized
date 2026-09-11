@@ -17,7 +17,7 @@ bevy-stylized
 
 | Surface | Convention | Example |
 |---|---|---|
-| GitHub repository | kebab-case | `bevy-stylized` |
+| GitHub repository | owner/repository | `BoysGameStudio/bevy-stylized` |
 | Project/workspace directory | kebab-case | `bevy-stylized/` |
 | Cargo package / crate directory | kebab-case | `bevy-stylized-core/` |
 | Rust crate identifier | snake_case | `bevy_stylized_core` |

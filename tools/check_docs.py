@@ -110,7 +110,7 @@ for f in ROOT.rglob("*.md"):
 
 # 10. Required governance files.
 required = [
-    "ARCHITECTURE.md","GLOSSARY.md","TRACEABILITY.md","DOCS_METADATA.toml",
+    "ARCHITECTURE.md","GLOSSARY.md","TRACEABILITY.md",
     "THIRD_PARTY_NOTICES.md","docs/adr/ADR_INDEX.md",
     "docs/quality/semantic-contract.md","docs/performance/targets.md",
     "docs/platforms/SUPPORT_MATRIX.md","docs/release/V1_RELEASE_CHECKLIST.md",

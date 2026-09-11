@@ -1,17 +1,20 @@
-# Bevy Stylized Architecture Documentation System
+# Bevy Stylized
 
-This package restructures the single 5000+ line Master Plan into a maintainable architecture system.
+A stylized rendering framework for Bevy, currently in **Architecture Pre-Freeze Review**.
 
+The project targets reusable cel/character/hero NPR rendering, reference-driven style profiles, authored lighting, outlines, and scalable runtime paths across different GPU capability tiers.
 
 ## Naming
 
-- Project / repository / Cargo package: `bevy-stylized`
+- Project: **Bevy Stylized**
+- Canonical repository: `BoysGameStudio/bevy-stylized`
+- Facade Cargo package: `bevy-stylized`
 - Rust crate identifier: `bevy_stylized`
 - Subpackages use kebab-case on disk/Cargo and snake_case in Rust.
 
-## Reading order
+## Architecture
 
-For a new contributor:
+Start with:
 
 1. `ARCHITECTURE.md`
 2. `GLOSSARY.md`
@@ -22,6 +25,8 @@ For a new contributor:
 7. Relevant subsystem document
 8. Relevant ADR(s)
 9. `docs/release/02-v1-release-gate.md`
+
+The detailed specifications live under `docs/`.
 
 ## Documentation authority
 
@@ -52,4 +57,4 @@ python3 tools/check_docs.py
 
 The checker validates ADR IDs/statuses, Accepted ADR completeness, Traceability coverage, local documentation paths, archive safety, required governance files and legacy-term regressions.
 
-Documentation package provenance is recorded in `DOCS_METADATA.toml`; file integrity is recorded in `DOCUMENT_MANIFEST.json`.
+Git history is the authoritative version and integrity history for the live repository.

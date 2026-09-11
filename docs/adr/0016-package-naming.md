@@ -24,7 +24,13 @@ Adopt **Bevy Stylized** as the project/framework brand.
 Canonical naming:
 
 ```text
-GitHub repository / project directory:
+Project:
+Bevy Stylized
+
+Canonical GitHub repository:
+BoysGameStudio/bevy-stylized
+
+Project/workspace directory:
 bevy-stylized
 
 Cargo package / crate directories:
@@ -73,7 +79,8 @@ Schema versioning remains independent of Cargo package versioning.
 ## Evidence
 
 - An existing public `bevy_npr` crate makes `bevy-npr` an unsuitable package identity because Cargo/crates.io treats hyphen/underscore-equivalent names as colliding.
-- A 2026-09-11 public web-index check found no exact `bevy-stylized` / `bevy_stylized` crate or docs.rs result. This is **not a namespace reservation**; availability must be rechecked immediately before the first crates.io publish.
+- The canonical GitHub repository now exists as `BoysGameStudio/bevy-stylized`.
+- A GitHub repository name does **not** reserve the crates.io namespace; crates.io availability must still be rechecked immediately before the first publication.
 - `Stylized` matches the architecture scope better than `Toon`, `Cel`, `Anime`, or a game/reference-family name.
 
 ## Consequences

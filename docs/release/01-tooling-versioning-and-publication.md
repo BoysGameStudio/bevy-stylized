@@ -11,7 +11,13 @@
 ADR-0016 已接受：
 
 ```text
-Project / GitHub repository / workspace directory:
+Project:
+Bevy Stylized
+
+Canonical GitHub repository:
+BoysGameStudio/bevy-stylized
+
+Workspace directory:
 bevy-stylized
 
 Facade Cargo package:
@@ -50,7 +56,7 @@ public framework types              → Stylized*
 technical NPR algorithm terms       → Npr* allowed when semantically appropriate
 ```
 
-原 `bevy_npr` 名称存在 registry 冲突，因此不再作为项目/package 名。首次 crates.io 发布前仍必须重新检查 `bevy-stylized` 的实时可用性；命名选择不等于 namespace reservation。
+原 `bevy_npr` 名称存在 registry 冲突，因此不再作为项目/package 名。GitHub repository 名不等于 crates.io namespace reservation；首次 crates.io 发布前仍必须重新检查 `bevy-stylized` 的实时可用性。
 
 ### License
 
