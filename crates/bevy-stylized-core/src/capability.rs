@@ -301,6 +301,10 @@ pub enum StylizedFallbackStep {
     /// （View/相机级步骤，不属于 class 链；由 render 侧
     /// `resolve_outline_mode` 判定，此处仅登记语义。）
     ScreenOutlineToHull,
+    /// StorageTable 实例数据库不可用（tier < Standard 或设备无 storage
+    /// buffer）→ 退回 MeshTag 位打包（V2-e；保真度降级见
+    /// [`crate::StylizedInstanceGpuRecord`] 的两档保真契约）。
+    InstanceTableToMeshTag,
 }
 
 /// Per-class fallback 链（docs/rendering/01 的 class fallback 定义，

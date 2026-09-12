@@ -26,6 +26,11 @@ pub const SCHEMA_NAMESPACE_PREFIX: &str = "bevy_stylized";
 pub const SCHEMA_ID_MATERIAL_V1: StylizedSchemaId =
     StylizedSchemaId::new("bevy_stylized.material", 1, 0);
 
+/// Instance domain v1 的完整 schema 标识（V2-e GPU Instance Database
+/// 记录 schema）。
+pub const SCHEMA_ID_INSTANCE_V1: StylizedSchemaId =
+    StylizedSchemaId::new("bevy_stylized.instance", 1, 0);
+
 /// View domain v1 的完整 schema 标识。
 ///
 /// minor 1.1（additive）：新增可选 `environment` 字段（V2-d 环境模型，

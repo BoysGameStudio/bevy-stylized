@@ -40,9 +40,9 @@ pub use capability::{
     StylizedTierRequirements, fallback_chain, resolve_variant, resolve_with_report,
 };
 pub use descriptor::{
-    StylizedCameraNprState, StylizedInstanceDescriptor, StylizedMaterialDescriptor,
-    StylizedMaterialFlags, StylizedTextureRef, StylizedTextureSemantic, StylizedViewDescriptor,
-    StylizedViewQuality,
+    StylizedCameraNprState, StylizedInstanceDescriptor, StylizedInstanceGpuRecord,
+    StylizedMaterialDescriptor, StylizedMaterialFlags, StylizedTextureRef, StylizedTextureSemantic,
+    StylizedViewDescriptor, StylizedViewQuality,
 };
 pub use environment::{StylizedEnvironment, StylizedFog, StylizedShadowTint, stylized_fog_factor};
 pub use governor::{
@@ -56,8 +56,8 @@ pub use lod::{
 pub use profile::{StylizedProfile, StylizedProfileMetadata};
 pub use quality::StylizedQualityPolicy;
 pub use schema::{
-    SCHEMA_ID_MATERIAL_V1, SCHEMA_ID_VIEW_V1, SCHEMA_NAMESPACE_PREFIX, StylizedSchemaId,
-    StylizedSchemaVersion, StylizedSchemaVersionParseError,
+    SCHEMA_ID_INSTANCE_V1, SCHEMA_ID_MATERIAL_V1, SCHEMA_ID_VIEW_V1, SCHEMA_NAMESPACE_PREFIX,
+    StylizedSchemaId, StylizedSchemaVersion, StylizedSchemaVersionParseError,
 };
 
 /// 常用类型的一站式导出。
@@ -68,9 +68,9 @@ pub mod prelude {
         StylizedResolveError, StylizedResolvedVariant, resolve_variant, resolve_with_report,
     };
     pub use crate::descriptor::{
-        StylizedCameraNprState, StylizedInstanceDescriptor, StylizedMaterialDescriptor,
-        StylizedMaterialFlags, StylizedTextureRef, StylizedTextureSemantic, StylizedViewDescriptor,
-        StylizedViewQuality,
+        StylizedCameraNprState, StylizedInstanceDescriptor, StylizedInstanceGpuRecord,
+        StylizedMaterialDescriptor, StylizedMaterialFlags, StylizedTextureRef,
+        StylizedTextureSemantic, StylizedViewDescriptor, StylizedViewQuality,
     };
     pub use crate::environment::{StylizedEnvironment, StylizedFog, StylizedShadowTint};
     pub use crate::governor::{

@@ -134,6 +134,18 @@ fn cases() -> Vec<Case> {
     ] {
         cases.push(Case { path, defs: FOGGED });
     }
+    // GPU Instance Database（V2-e）：StorageTable 变体（binding 7 =
+    // instance_table storage buffer，由 StylizedCharacterTableMaterial 的
+    // specialize 注入 def）。
+    cases.push(Case {
+        path: CHARACTER_PORTABLE_FORWARD_SHADER_PATH,
+        defs: &[
+            "VERTEX_POSITIONS",
+            "VERTEX_NORMALS",
+            "VERTEX_UVS_A",
+            "INSTANCE_STORAGE_TABLE",
+        ],
+    });
     // 全屏后处理 shader：无 mesh def（guard 在 compose 循环里）。
     for path in FULLSCREEN_CASES {
         cases.push(Case { path, defs: &[] });

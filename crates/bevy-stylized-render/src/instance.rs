@@ -13,6 +13,10 @@
 //!               `crate::lod` 的 `INSTANCE_FLAG_*`，V2-b）
 //! ```
 //!
+//! StorageTable 模式（V2-e，实体带 [`StylizedInstanceSlot`] 时）：
+//! bits 0..=23 = 槽位索引（全精度数据在 `crate::instance_table` 的
+//! `ShaderBuffer` 表里），bits 24..=31 flags 不变。
+//!
 //! 位布局是 **provisional**：ADR-0004 关闭前任何外部代码不得依赖它；
 //! 读写只能经 [`StylizedInstanceData::to_tag`] / [`StylizedInstanceData::from_tag`]。
 //!
@@ -40,14 +44,25 @@ pub const TAG_FLAGS_SHIFT: u32 = 24;
 /// face_threshold 的量化值 0 保留为"未设置"（shader 回退材质默认）。
 pub const TAG_FACE_THRESHOLD_UNSET: u8 = 0;
 
+/// StorageTable 模式下的槽位索引掩码（bits 0..=23；bits 24..=31 仍为
+/// per-character flags，两通道共享）。
+pub const TAG_TABLE_INDEX_MASK: u32 = 0x00FF_FFFF;
+
+/// StorageTable 槽位（由 [`crate::instance_table`] 分配；组件存在即
+/// 声明该实例走表通道——`sync_instance_tags` 把 tag 打包为索引布局）。
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Reflect)]
+pub struct StylizedInstanceSlot(pub u32);
+
 /// Instance 数据传输通道（provisional，pending ADR-0004）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Reflect)]
 pub enum StylizedInstanceTransport {
     /// MeshTag 位打包（Portable 基线；spike 已验证合批不破坏）。
     MeshTagBits,
-    /// storage buffer 实例表（Standard+；spike 证据见
-    /// `target/tmp/adr-0004-spike/`）。**尚未实现**：WebGL2/GLES3.0
-    /// baseline 无 storage buffer，Portable 不可用。
+    /// Storage buffer 实例表（Standard+；V2-e 落地，见
+    /// [`crate::instance_table`]）：MeshTag 携带 24-bit 槽位索引，表携带
+    /// 全精度记录。WebGL2/GLES3.0 baseline 无 storage buffer，Portable
+    /// 永不选择本通道（fallback 语义：
+    /// [`bevy_stylized_core::StylizedFallbackStep::InstanceTableToMeshTag`]）。
     StorageTable,
 }
 
@@ -56,17 +71,22 @@ pub enum StylizedInstanceTransport {
 #[derive(bevy::prelude::Resource, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct StylizedInstanceTransportMode(pub StylizedInstanceTransport);
 
-/// 依 Stage B 解析结果选择传输通道。
+/// 依 Stage B 解析结果选择传输通道（V2-e）。
 ///
-/// 当前实现恒为 `MeshTagBits`（`StorageTable` 未实现；解析到 Standard+
-/// 档位时仍返回 MeshTagBits——这是有意保守行为，StorageTable 落地前不
-/// 得静默切换）。
+/// `resolved.tier >= Standard` ⇒ StorageTable（Standard 档的 tier 需求表
+/// 已要求 `StorageBufferInVertexStage`，故解析到 Standard+ 即蕴含设备
+/// storage 能力）；否则 MeshTagBits。`None`（无解析结果）fail-closed
+/// 落 MeshTagBits。
 #[must_use]
 pub fn select_transport(
     resolved: Option<&bevy_stylized_core::StylizedResolvedVariant>,
 ) -> StylizedInstanceTransport {
-    let _ = resolved; // StorageTable 的选择门槛待实现落地后启用。
-    StylizedInstanceTransport::MeshTagBits
+    match resolved {
+        Some(variant) if variant.tier >= bevy_stylized_core::StylizedExecutionTier::Standard => {
+            StylizedInstanceTransport::StorageTable
+        }
+        _ => StylizedInstanceTransport::MeshTagBits,
+    }
 }
 
 /// Instance 层 NPR 数据（对应 core 的 [`StylizedInstanceDescriptor`]；
@@ -98,6 +118,13 @@ impl Default for StylizedInstanceData {
 }
 
 impl StylizedInstanceData {
+    /// StorageTable 模式的 tag 打包：bits 0..=23 = 槽位索引，bits 24..=31
+    /// = flags（与位打包模式共享）。
+    #[must_use]
+    pub fn index_tag(slot: u32, flags: u8) -> MeshTag {
+        MeshTag((slot & TAG_TABLE_INDEX_MASK) | (u32::from(flags) << TAG_FLAGS_SHIFT))
+    }
+
     /// 打包为 `MeshTag` 位段。
     #[must_use]
     pub fn to_tag(&self) -> MeshTag {
@@ -149,24 +176,38 @@ impl From<StylizedInstanceDescriptor> for StylizedInstanceData {
 /// 把变更过的 [`StylizedInstanceData`] 同步到 `MeshTag`（缺则补插）。
 ///
 /// 只在组件变更（`Added`/`Changed`）时写入，无 per-frame 资产写。
+/// 带 [`StylizedInstanceSlot`] 的实体打包为 StorageTable 索引布局
+/// （bits 0..=23 = 槽位）；其余保持位打包布局。
 pub fn sync_instance_tags(
     mut commands: Commands,
     mut changed: Query<
-        (Entity, &StylizedInstanceData, Option<&mut MeshTag>),
-        Changed<StylizedInstanceData>,
+        (
+            Entity,
+            &StylizedInstanceData,
+            Option<&StylizedInstanceSlot>,
+            Option<&mut MeshTag>,
+        ),
+        bevy::prelude::Or<(Changed<StylizedInstanceData>, Changed<StylizedInstanceSlot>)>,
     >,
-    missing: Query<(Entity, &StylizedInstanceData), bevy::prelude::Without<MeshTag>>,
+    missing: Query<
+        (Entity, &StylizedInstanceData, Option<&StylizedInstanceSlot>),
+        bevy::prelude::Without<MeshTag>,
+    >,
 ) {
-    for (entity, data, tag) in &mut changed {
-        let packed = data.to_tag();
+    let pack = |data: &StylizedInstanceData, slot: Option<&StylizedInstanceSlot>| match slot {
+        Some(slot) => StylizedInstanceData::index_tag(slot.0, data.flags),
+        None => data.to_tag(),
+    };
+    for (entity, data, slot, tag) in &mut changed {
+        let packed = pack(data, slot);
         if let Some(mut tag) = tag {
             *tag = packed;
         } else {
             commands.entity(entity).insert(packed);
         }
     }
-    for (entity, data) in &missing {
-        commands.entity(entity).insert(data.to_tag());
+    for (entity, data, slot) in &missing {
+        commands.entity(entity).insert(pack(data, slot));
     }
 }
 
@@ -224,6 +265,53 @@ mod tests {
             select_transport(None),
             StylizedInstanceTransport::MeshTagBits
         );
+    }
+
+    #[test]
+    fn transport_selection_matrix_caps_by_tier() {
+        use bevy_stylized_core::{
+            StylizedExecutionTier, StylizedResolvedVariant, StylizedSurfaceClass,
+        };
+        let variant = |tier| StylizedResolvedVariant {
+            class: StylizedSurfaceClass::Character,
+            requested_tier: tier,
+            tier,
+            tier_reduced: false,
+            missing_features: Vec::new(),
+        };
+        // Portable（含 tier_reduced 降级）→ MeshTagBits；Standard/High
+        // ⇒ StorageTable（Standard 的 tier 需求表已要求 storage buffer
+        // 特性，解析到该档即蕴含设备能力）。
+        assert_eq!(
+            select_transport(Some(&variant(StylizedExecutionTier::Portable))),
+            StylizedInstanceTransport::MeshTagBits
+        );
+        assert_eq!(
+            select_transport(Some(&variant(StylizedExecutionTier::Standard))),
+            StylizedInstanceTransport::StorageTable
+        );
+        assert_eq!(
+            select_transport(Some(&variant(StylizedExecutionTier::High))),
+            StylizedInstanceTransport::StorageTable
+        );
+        // 降档到 Portable 的 High 请求 → 仍 MeshTagBits（按实际档）。
+        let mut reduced = variant(StylizedExecutionTier::Portable);
+        reduced.requested_tier = StylizedExecutionTier::High;
+        reduced.tier_reduced = true;
+        assert_eq!(
+            select_transport(Some(&reduced)),
+            StylizedInstanceTransport::MeshTagBits
+        );
+    }
+
+    #[test]
+    fn index_tag_layout_carries_slot_and_flags() {
+        let tag = StylizedInstanceData::index_tag(0x00AB_CDEF, 0b1010_0101);
+        assert_eq!(tag.0 & TAG_TABLE_INDEX_MASK, 0x00AB_CDEF);
+        assert_eq!((tag.0 >> TAG_FLAGS_SHIFT) & 0xFF, 0b1010_0101);
+        // 槽位越界截断到 24 bit。
+        let clamped = StylizedInstanceData::index_tag(0xFFFF_FFFF, 0);
+        assert_eq!(clamped.0 & TAG_TABLE_INDEX_MASK, 0x00FF_FFFF);
     }
 
     #[test]

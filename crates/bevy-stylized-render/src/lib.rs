@@ -16,6 +16,9 @@
 //!   inverted hull（顶点外扩 + front-face cull）；
 //! - [`instance`]：[`StylizedInstanceData`]——Instance 层数据经 MeshTag
 //!   位打包传输（provisional pending ADR-0004），不破坏自动合批；
+//! - [`instance_table`]：GPU Instance Database（V2-e）——StorageTable
+//!   通道（Standard+ 能力门控）：MeshTag 携带 24-bit 槽位索引，
+//!   `ShaderBuffer` 表携带全精度记录；
 //! - [`lod`]：per-entity NPR LOD（V2-b）——距离分带 → tier 上限/feature
 //!   削减（经 MeshTag flags 位，零材质变异）+ 可选几何换 mesh；
 //! - [`view`]：[`StylizedViewSettings`]——core `StylizedViewDescriptor`
@@ -32,6 +35,7 @@ pub mod capability;
 pub mod character;
 pub mod hero;
 pub mod instance;
+pub mod instance_table;
 pub mod lod;
 pub mod material;
 pub mod outline;
@@ -45,15 +49,20 @@ pub use budget::{
 pub use capability::StylizedRenderCapabilities;
 pub use character::{
     CHARACTER_PORTABLE_FORWARD_SHADER_PATH, StylizedCharacterMaterial, StylizedCharacterParams,
-    apply_character_portable_fallback, character_params_for_variant,
+    StylizedCharacterTableMaterial, apply_character_portable_fallback,
+    character_params_for_variant,
 };
 pub use hero::{
     HERO_FORWARD_SHADER_PATH, StylizedHeroMaterial, StylizedHeroParams,
     apply_hero_portable_fallback, hero_params_for_variant,
 };
 pub use instance::{
-    StylizedInstanceData, StylizedInstanceTransport, StylizedInstanceTransportMode,
-    select_transport,
+    StylizedInstanceData, StylizedInstanceSlot, StylizedInstanceTransport,
+    StylizedInstanceTransportMode, select_transport,
+};
+pub use instance_table::{
+    INSTANCE_RECORD_STRIDE, StylizedInstanceTable, StylizedInstanceTableEntry,
+    pack_instance_record, sync_instance_table,
 };
 pub use lod::{
     INSTANCE_FLAG_DROP_HERO_EXTRAS, INSTANCE_FLAG_FACE_HARD_STEP, INSTANCE_FLAG_HAIR_SPECULAR_OFF,
@@ -108,6 +117,7 @@ impl Plugin for StylizedRenderPlugin {
             MaterialPlugin::<StylizedCelMaterial>::default(),
             MaterialPlugin::<StylizedOutlineMaterial>::default(),
             MaterialPlugin::<StylizedCharacterMaterial>::default(),
+            MaterialPlugin::<character::StylizedCharacterTableMaterial>::default(),
             MaterialPlugin::<StylizedHeroMaterial>::default(),
             MaterialPlugin::<screen_outline::StylizedScreenOutlineMaterial>::default(),
         ));
@@ -119,8 +129,9 @@ impl Plugin for StylizedRenderPlugin {
             .register_type::<screen_outline::StylizedScreenOutline>()
             .register_type::<outline::StylizedOutline>()
             .register_type::<instance::StylizedInstanceData>();
-        // Instance 传输通道：依 Stage B 解析结果选择（当前恒 MeshTagBits，
-        // 见 instance::select_transport 的 provisional 说明）。
+        // Instance 传输通道：依 Stage B 解析结果选择（Standard+ →
+        // StorageTable，见 instance::select_transport；表通道落地见
+        // instance_table 模块）。
         let mode = instance::select_transport(
             app.world()
                 .get_resource::<StylizedRenderCapabilities>()
@@ -129,11 +140,14 @@ impl Plugin for StylizedRenderPlugin {
         app.insert_resource(instance::StylizedInstanceTransportMode(mode));
         view::register(app);
         lod::register(app);
+        instance_table::register(app);
         app.add_systems(
             PostUpdate,
             (
                 material::sync_cel_material_flags.after(bevy::asset::AssetEventSystems),
                 character::sync_character_material_flags.after(bevy::asset::AssetEventSystems),
+                character::sync_character_table_material_flags
+                    .after(bevy::asset::AssetEventSystems),
                 hero::sync_hero_material_flags.after(bevy::asset::AssetEventSystems),
                 outline::sync_outline_replicas,
                 screen_outline::sync_screen_outline,

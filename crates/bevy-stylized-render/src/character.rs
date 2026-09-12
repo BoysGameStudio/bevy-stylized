@@ -249,6 +249,14 @@ impl From<&StylizedCharacterMaterial> for StylizedCharacterMaterialKey {
     }
 }
 
+impl From<&StylizedCharacterTableMaterial> for StylizedCharacterMaterialKey {
+    fn from(material: &StylizedCharacterTableMaterial) -> Self {
+        Self {
+            double_sided: material.double_sided,
+        }
+    }
+}
+
 /// Character@Portable 材质（共享材质；face 状态逐实例经 MeshTag）。
 #[derive(Asset, AsBindGroup, Clone, Debug, Reflect)]
 #[bind_group_data(StylizedCharacterMaterialKey)]
@@ -508,5 +516,160 @@ mod tests {
         assert!(material.face_sdf_texture.is_some());
         assert!(material.params.has_flag(CHAR_FLAG_FACE_SDF_TEXTURE));
         assert!((material.params.face_misc.x - 0.55).abs() < f32::EPSILON);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// V2-e：StorageTable 变体（Standard+；provisional pending ADR-0004）
+// ---------------------------------------------------------------------------
+
+/// Character 的 StorageTable 变体材质：与 [`StylizedCharacterMaterial`]
+/// 共享 shader 与参数语义，差异仅在实例数据通道——`instance_table`
+/// （read-only storage buffer，binding 7）携带全精度记录，MeshTag 携带
+/// 24-bit 槽位索引。
+///
+/// **能力门控**：仅 Standard+ 设备（storage buffer 是 Standard 档的 tier
+/// 需求）。Portable 应用/设备不得实例化本类型（layout 含 storage
+/// binding）；Portable 路径继续使用 [`StylizedCharacterMaterial`] +
+/// MeshTag 位打包。
+#[derive(Asset, AsBindGroup, Clone, Debug, Reflect)]
+#[bind_group_data(StylizedCharacterMaterialKey)]
+pub struct StylizedCharacterTableMaterial {
+    /// 材质 uniform（与 [`StylizedCharacterMaterial`] 相同语义）。
+    #[uniform(0)]
+    pub params: StylizedCharacterParams,
+    /// 基色纹理。
+    #[texture(1)]
+    #[sampler(2)]
+    pub base_color_texture: Option<Handle<Image>>,
+    /// ILM/control 纹理。
+    #[texture(3)]
+    #[sampler(4)]
+    pub ilm_texture: Option<Handle<Image>>,
+    /// Face SDF 纹理。
+    #[texture(5)]
+    #[sampler(6)]
+    pub face_sdf_texture: Option<Handle<Image>>,
+    /// GPU Instance Database（全精度实例记录表；binding 7）。
+    #[storage(7, read_only)]
+    pub instance_table: Handle<bevy::render::storage::ShaderBuffer>,
+    /// 双面渲染。
+    pub double_sided: bool,
+}
+
+impl Default for StylizedCharacterTableMaterial {
+    fn default() -> Self {
+        let mut material = Self {
+            params: StylizedCharacterParams::default(),
+            base_color_texture: None,
+            ilm_texture: None,
+            face_sdf_texture: None,
+            instance_table: Handle::default(),
+            double_sided: false,
+        };
+        material.sync_flags();
+        material
+    }
+}
+
+impl StylizedCharacterTableMaterial {
+    /// 同步纹理存在性标志位（与 [`StylizedCharacterMaterial::sync_flags`]
+    /// 相同规则）。
+    pub fn sync_flags(&mut self) {
+        self.params
+            .set_flag(CHAR_FLAG_ILM_TEXTURE, self.ilm_texture.is_some());
+        self.params
+            .set_flag(CHAR_FLAG_FACE_SDF_TEXTURE, self.face_sdf_texture.is_some());
+    }
+
+    /// 标志位是否已与纹理句柄一致（避免事件回声）。
+    fn flags_consistent(&self) -> bool {
+        self.params.has_flag(CHAR_FLAG_ILM_TEXTURE) == self.ilm_texture.is_some()
+            && self.params.has_flag(CHAR_FLAG_FACE_SDF_TEXTURE) == self.face_sdf_texture.is_some()
+    }
+
+    /// 由 MeshTag 变体转换（共享纹理，接入既有表 buffer）。
+    #[must_use]
+    pub fn from_mesh_tag_material(
+        material: &StylizedCharacterMaterial,
+        instance_table: Handle<bevy::render::storage::ShaderBuffer>,
+    ) -> Self {
+        Self {
+            params: material.params,
+            base_color_texture: material.base_color_texture.clone(),
+            ilm_texture: material.ilm_texture.clone(),
+            face_sdf_texture: material.face_sdf_texture.clone(),
+            instance_table,
+            double_sided: material.double_sided,
+        }
+    }
+}
+
+impl Material for StylizedCharacterTableMaterial {
+    fn vertex_shader() -> ShaderRef {
+        CHARACTER_PORTABLE_FORWARD_SHADER_PATH.into()
+    }
+
+    fn fragment_shader() -> ShaderRef {
+        CHARACTER_PORTABLE_FORWARD_SHADER_PATH.into()
+    }
+
+    fn alpha_mode(&self) -> bevy::material::AlphaMode {
+        if self.params.cel.has_flag(CEL_FLAG_ALPHA_MASK) {
+            bevy::material::AlphaMode::Mask(self.params.cel.rim.w)
+        } else {
+            bevy::material::AlphaMode::Opaque
+        }
+    }
+
+    fn enable_prepass() -> bool {
+        true
+    }
+
+    fn enable_shadows() -> bool {
+        false
+    }
+
+    fn specialize(
+        _pipeline: &bevy::pbr::MaterialPipeline,
+        descriptor: &mut bevy::render::render_resource::RenderPipelineDescriptor,
+        _layout: &bevy::mesh::MeshVertexBufferLayoutRef,
+        key: bevy::pbr::MaterialPipelineKey<Self>,
+    ) -> Result<(), bevy::render::render_resource::SpecializedMeshPipelineError> {
+        // 表通道 shader 变体（同一 WGSL 编译单元，def 分支）。
+        let def = bevy::shader::ShaderDefVal::from("INSTANCE_STORAGE_TABLE");
+        descriptor.vertex.shader_defs.push(def.clone());
+        if let Some(fragment) = &mut descriptor.fragment {
+            fragment.shader_defs.push(def);
+        }
+        if key.bind_group_data.double_sided {
+            descriptor.primitive.cull_mode = None;
+        }
+        Ok(())
+    }
+}
+
+/// 表变体的标志位同步（资产事件驱动；与 MeshTag 变体相同规则）。
+pub fn sync_character_table_material_flags(
+    mut events: bevy::ecs::message::MessageReader<
+        bevy::asset::AssetEvent<StylizedCharacterTableMaterial>,
+    >,
+    mut materials: bevy::prelude::ResMut<bevy::prelude::Assets<StylizedCharacterTableMaterial>>,
+) {
+    for event in events.read() {
+        let id = match *event {
+            bevy::asset::AssetEvent::Added { id }
+            | bevy::asset::AssetEvent::Modified { id }
+            | bevy::asset::AssetEvent::LoadedWithDependencies { id } => id,
+            bevy::asset::AssetEvent::Removed { .. } | bevy::asset::AssetEvent::Unused { .. } => {
+                continue;
+            }
+        };
+        if materials.get(id).is_some_and(|m| m.flags_consistent()) {
+            continue;
+        }
+        if let Some(mut material) = materials.get_mut(id) {
+            material.sync_flags();
+        }
     }
 }

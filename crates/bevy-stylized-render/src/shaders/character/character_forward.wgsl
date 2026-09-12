@@ -79,6 +79,20 @@ var face_sdf_texture: texture_2d<f32>;
 @group(#{MATERIAL_BIND_GROUP}) @binding(6)
 var face_sdf_sampler: sampler;
 
+// GPU Instance Database（V2-e，provisional pending ADR-0004）：全精度实例
+// 记录表（read-only storage buffer）。仅 StylizedCharacterTableMaterial
+// （Standard+）注入 INSTANCE_STORAGE_TABLE def；Portable 变体无此 binding。
+// 布局与 instance_table.rs 的 48B 步长一致。
+struct StylizedInstanceRecord {
+    scalars: vec4<f32>, // x = face_threshold, y = outline_scale, zw 预留
+    indices: vec4<u32>, // x = face_side, y = profile_index, z = palette_index, w = quality_flags
+    light_tint: vec4<f32>,
+}
+#ifdef INSTANCE_STORAGE_TABLE
+@group(#{MATERIAL_BIND_GROUP}) @binding(7)
+var<storage, read> instance_table: array<StylizedInstanceRecord>;
+#endif
+
 @vertex
 fn vertex(vertex_in: Vertex) -> VertexOutput {
     let deformed = deform_vertex(vertex_in);
@@ -139,6 +153,12 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
         }
     }
 
+    // 实例数据源：MeshTag（两通道共享）。
+    var tag: u32 = 0u;
+#ifdef VERTEX_OUTPUT_INSTANCE_INDEX
+    tag = mesh_functions::get_tag(in.instance_index);
+#endif
+
     // View 层 key light。
     var light_direction = vec3<f32>(0.0, 1.0, 0.0);
     var light_color = vec3<f32>(1.0);
@@ -168,13 +188,10 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
     // lerp(0, half_lambert, smoothstep(0.01, 0.4, ao))）。
     var lit_factor = half_lambert * smoothstep(0.01, 0.4, ao);
 
-    // Face SDF：有纹理时替换 cel 阴影；per-instance 阈值/侧选择经 MeshTag。
+    // Face SDF：有纹理时替换 cel 阴影；per-instance 阈值/侧选择经 MeshTag
+    // 位打包，或（INSTANCE_STORAGE_TABLE）经 24-bit 槽位索引读全精度表。
 #ifdef VERTEX_UVS_A
     if (flags & CHAR_FLAG_FACE_SDF_TEXTURE) != 0u {
-        var tag: u32 = 0u;
-#ifdef VERTEX_OUTPUT_INSTANCE_INDEX
-        tag = mesh_functions::get_tag(in.instance_index);
-#endif
         // v1 近似：face forward 只随 model matrix 变换（不随蒙皮）；
         // 逐骨骼 face rig 属后续迭代（rendering/02 注记）。
         let face_forward_world = normalize(
@@ -186,15 +203,26 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
                 * vec4<f32>(params.face_up.xyz, 0.0)).xyz
         );
         let dots = face_light_dots(light_direction, face_forward_world, face_up_world);
-        // 阈值：材质基准；MeshTag 携带时逐实例覆盖（量化 1..=255 → 0..=1）。
+        // 阈值：材质基准；实例通道覆盖。
         var threshold = face_threshold_from_dots(dots.x);
+        var force_flip = params.face_misc.z > 0.5;
+#ifdef INSTANCE_STORAGE_TABLE
+        // 表通道：tag 低 24 位 = 槽位索引（全精度，无量化）。
+        let slot = tag & 0xFFFFFFu;
+        if slot < arrayLength(&instance_table) {
+            let record = instance_table[slot];
+            threshold = record.scalars.x;
+            force_flip = force_flip || record.indices.x != 0u;
+        }
+#else
         let tag_threshold = (tag >> TAG_FACE_THRESHOLD_SHIFT) & 0xFFu;
         if tag_threshold != 0u {
             threshold = f32(tag_threshold - 1u) / 254.0;
         }
         // 侧选择：自动按光源方向；bit16 / face_misc.z 强制翻转。
+        force_flip = force_flip || ((tag >> TAG_FACE_SIDE_SHIFT) & 1u) != 0u;
+#endif
         var flip = dots.y < 0.0;
-        let force_flip = ((tag >> TAG_FACE_SIDE_SHIFT) & 1u) != 0u || params.face_misc.z > 0.5;
         if force_flip {
             flip = !flip;
         }

@@ -18,7 +18,9 @@ use bevy_reflect::Reflect;
 
 use crate::{
     axis::{StylizedExecutionTier, StylizedSurfaceClass, StylizedValidationMode},
-    schema::{SCHEMA_ID_MATERIAL_V1, SCHEMA_ID_VIEW_V1, StylizedSchemaVersion},
+    schema::{
+        SCHEMA_ID_INSTANCE_V1, SCHEMA_ID_MATERIAL_V1, SCHEMA_ID_VIEW_V1, StylizedSchemaVersion,
+    },
 };
 
 /// 纹理语义（docs/authoring/03）：决定 sRGB/Linear、压缩、过滤、Mipmap 与精度。
@@ -156,6 +158,79 @@ impl Default for StylizedInstanceDescriptor {
     }
 }
 
+/// Instance 层全精度记录（V2-e GPU Instance Database 的记录 schema；
+/// provisional pending ADR-0004）。
+///
+/// **两档保真契约**（同一逻辑数据的两条传输通道）：
+///
+/// - **Portable（MeshTag 位打包）**：只携带粗粒度子集——
+///   `face_threshold` u8 量化（1/254 步进）、`face_side` 1 bit、
+///   `outline_scale` u7（0..=2）、`profile_index` u8、`quality_flags` 的
+///   低 8 bit；`palette_index` 与 `light_tint` **不可表达**；
+/// - **Standard+（StorageTable）**：本记录全字段全精度（f32 / u32），
+///   MeshTag 退化为 24-bit 槽位索引。
+///
+/// 通道选择由 resolver 决定（tier ≥ Standard 且设备具备 storage buffer
+/// ⇒ StorageTable；否则 MeshTagBits + 登记
+/// [`StylizedFallbackStep::InstanceTableToMeshTag`](crate::StylizedFallbackStep::InstanceTableToMeshTag)
+/// 语义）。
+#[derive(Clone, Copy, Debug, PartialEq, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct StylizedInstanceGpuRecord {
+    /// 内容所声明的 schema 版本（命名空间固定为
+    /// [`SCHEMA_ID_INSTANCE_V1`](crate::schema::SCHEMA_ID_INSTANCE_V1)）。
+    #[cfg_attr(feature = "serde", serde(default = "default_instance_schema_version"))]
+    pub schema_version: StylizedSchemaVersion,
+    /// Face SDF 阈值（全精度；MeshTag 通道量化为 1/254）。
+    pub face_threshold: f32,
+    /// Face 基准侧（0/1）。
+    pub face_side: u32,
+    /// 描边宽度缩放（0..=2；MeshTag 通道 u7 量化）。
+    pub outline_scale: f32,
+    /// Profile / ramp 行索引（MeshTag 通道限 u8）。
+    pub profile_index: u32,
+    /// Palette override 索引（MeshTag 通道不可表达）。
+    pub palette_index: u32,
+    /// Quality override 位（LOD/quality 语义位，render 侧解释）。
+    pub quality_flags: u32,
+    /// Lighting override 染色（线性；MeshTag 通道不可表达）。
+    pub light_tint: LinearRgba,
+}
+
+#[cfg(feature = "serde")]
+fn default_instance_schema_version() -> StylizedSchemaVersion {
+    crate::schema::SCHEMA_ID_INSTANCE_V1.version
+}
+
+impl Default for StylizedInstanceGpuRecord {
+    fn default() -> Self {
+        Self {
+            schema_version: SCHEMA_ID_INSTANCE_V1.version,
+            face_threshold: 0.5,
+            face_side: 0,
+            outline_scale: 1.0,
+            profile_index: 0,
+            palette_index: 0,
+            quality_flags: 0,
+            light_tint: LinearRgba::WHITE,
+        }
+    }
+}
+
+impl From<StylizedInstanceDescriptor> for StylizedInstanceGpuRecord {
+    /// 无损方向：descriptor → record（record 是超集）。
+    fn from(descriptor: StylizedInstanceDescriptor) -> Self {
+        Self {
+            face_threshold: descriptor.face_threshold,
+            face_side: descriptor.face_side,
+            outline_scale: descriptor.outline_scale,
+            profile_index: descriptor.profile_index,
+            quality_flags: descriptor.per_character_flags,
+            ..StylizedInstanceGpuRecord::default()
+        }
+    }
+}
+
 /// View 层质量状态（当前 view 实际运行的 tier 与验证模式快照）。
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -283,6 +358,32 @@ mod tests {
         let json = serde_json::to_string(&view).expect("serialize");
         let back: StylizedViewDescriptor = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(view, back);
+    }
+
+    #[test]
+    fn instance_gpu_record_roundtrip_and_descriptor_widening() {
+        let record = StylizedInstanceGpuRecord {
+            face_threshold: 0.5001, // MeshTag 量化网格外的全精度值
+            palette_index: 7,
+            light_tint: LinearRgba::new(0.9, 0.95, 1.1, 1.0),
+            ..StylizedInstanceGpuRecord::default()
+        };
+        let json = serde_json::to_string(&record).expect("serialize");
+        let back: StylizedInstanceGpuRecord = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(record, back);
+
+        // descriptor → record 是无损 widening（record 为超集）。
+        let descriptor = StylizedInstanceDescriptor {
+            face_threshold: 0.75,
+            face_side: 1,
+            profile_index: 9,
+            ..StylizedInstanceDescriptor::default()
+        };
+        let widened = StylizedInstanceGpuRecord::from(descriptor);
+        assert_eq!(widened.face_threshold, 0.75);
+        assert_eq!(widened.face_side, 1);
+        assert_eq!(widened.profile_index, 9);
+        assert_eq!(widened.schema_version, SCHEMA_ID_INSTANCE_V1.version);
     }
 
     #[test]

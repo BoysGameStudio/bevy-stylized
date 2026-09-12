@@ -19,6 +19,7 @@
 | 项 | 阻塞 ADR | 位置 | 现有证据 |
 |---|---|---|---|
 | MeshTag 位段布局（instance 传输方案 A）；StorageTable 声明未实现 | ADR-0004 | crates/bevy-stylized-render/src/instance.rs、cel/character/hero WGSL 的位段注释 | 100/1000 实例 1 draw + 逐实例差异图（`tests/instance_batching.rs`、spike 报告） |
+| GPU Instance Database（V2-e）：StorageTable 通道（槽位只增不减无回收、表重写为全量、仅 Character 有表变体材质、bindless 生产路径未做）；`directional_light_color` 之外的正式实例数据布局 | ADR-0004 | render/src/instance_table.rs、character.rs（`StylizedCharacterTableMaterial`）、character WGSL `INSTANCE_STORAGE_TABLE` 分支 | 100/1000/5000 × 两通道 × 稳态/churn 测量（`target/tmp/instance-db/`：全规模 1 draw；churn@5000 表 17.8ms vs tag 29.6ms）+ 全精度阈值梯度 golden + 选择矩阵单测 |
 | Per-class fallback 链与 `*_portable_fallback` 的触发语义（tier_reduced 即应用全链） | 无专属 ADR（fallback 策略；ADR-0018 已 Accepted 不覆盖此项） | crates/bevy-stylized-core/src/capability.rs（`STYLIZED_FALLBACK_CHAINS`）、render/src/character.rs、hero.rs | 快照式 fallback 矩阵测试（3 class × 3 档 × 4 能力模型） |
 | View 层映射常数（昼夜 ambient 亮度/色温、ILM AO floor、display-transform hook 曲线） | ADR-0009 | render/src/view.rs（`NIGHT_AMBIENT_*`）、render/src/post.rs、character WGSL AO floor | view 同步单测 + character golden |
 | 环境 NPR（V2-d first cut）：DistanceFog uniform 通道复用（`directional_light_color` = 阴影染色通道）、线性雾无 height falloff、zenith = 平涂清屏色、outline 不挂雾、无 IBL/reflection | ADR-0009 | core/src/environment.rs、render/src/view.rs（`environment_distance_fog`）、npr_common.wgsl 环境段 | 3 套 showcase 环境捕获（day/dusk/night）+ 既有 golden diff=0（恒等默认）+ 映射单测 |
@@ -52,7 +53,7 @@
 | 0001 | 1（覆盖 4 个材质 + 4 个 WGSL） |
 | 0002 | 1 |
 | 0003 | 1 |
-| 0004 | 1 |
+| 0004 | 2（+V2-e StorageTable 通道） |
 | 0005/0006 | 1 |
 | 0007 | tier2 阈值草案校准（docs/reference/08 已记实测注记） |
 | 0008 | 1 |
