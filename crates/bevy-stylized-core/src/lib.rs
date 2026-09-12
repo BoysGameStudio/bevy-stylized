@@ -22,6 +22,7 @@ pub mod budget;
 pub mod capability;
 pub mod descriptor;
 pub mod governor;
+pub mod lod;
 pub mod profile;
 pub mod quality;
 pub mod schema;
@@ -46,6 +47,10 @@ pub use governor::{
     QualityAdjustment, QualityDecision, QualitySignals, QualityTransition, StylizedQualityGovernor,
     StylizedQualityGovernorConfig,
 };
+pub use lod::{
+    StylizedLodBandPolicy, StylizedLodPolicy, StylizedLodResolution, StylizedLodThresholds,
+    resolve_lod, resolve_lod_band,
+};
 pub use profile::{StylizedProfile, StylizedProfileMetadata};
 pub use quality::StylizedQualityPolicy;
 pub use schema::{
@@ -69,6 +74,7 @@ pub mod prelude {
         QualityAdjustment, QualityDecision, QualitySignals, QualityTransition,
         StylizedQualityGovernor, StylizedQualityGovernorConfig,
     };
+    pub use crate::lod::{StylizedLodPolicy, StylizedLodResolution, StylizedLodThresholds};
     pub use crate::profile::{StylizedProfile, StylizedProfileMetadata};
     pub use crate::quality::StylizedQualityPolicy;
     pub use crate::schema::{StylizedSchemaId, StylizedSchemaVersion};

@@ -9,8 +9,9 @@
 //   + spec ramp（半角高光坐标采样 × 强度）
 //
 // Portable 合法：全部 fixed binding + filterable float 纹理；无 storage /
-// compute / bindless。fallback（HERO_FLAG_PORTABLE_FALLBACK）关闭
-// matcap / spec ramp / packed normal。
+// compute / bindless。fallback 两层：材质级（HERO_FLAG_PORTABLE_FALLBACK）
+// 与 per-instance LOD（MeshTag flags bits 24..31，V2-b）——两者都关闭
+// matcap / spec ramp / packed normal，face SDF 可降为硬 step。
 //
 // 结构名在本模块内唯一（naga-oil 跨模块同名 struct 冲突规避）。
 
@@ -70,6 +71,11 @@ const HERO_FLAG_GENSHIN_RAMP: u32 = 32u;
 // MeshTag 位段（与 instance.rs 一致；provisional pending ADR-0004）。
 const TAG_FACE_THRESHOLD_SHIFT: u32 = 8u;
 const TAG_FACE_SIDE_SHIFT: u32 = 16u;
+// Per-instance flags（bits 24..31，与 lod.rs 的 INSTANCE_FLAG_* 一致，V2-b）。
+const TAG_FLAGS_SHIFT: u32 = 24u;
+const INSTANCE_FLAG_DROP_HERO_EXTRAS: u32 = 1u;  // matcap / spec ramp / packed normal
+const INSTANCE_FLAG_FACE_HARD_STEP: u32 = 2u;
+const INSTANCE_FLAG_HAIR_SPECULAR_OFF: u32 = 4u;
 
 @group(#{MATERIAL_BIND_GROUP}) @binding(0)
 var<uniform> params: HeroParams;
@@ -153,6 +159,16 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
     let char_flags = bitcast<u32>(params.character.face_misc.y);
     let hero_flags = bitcast<u32>(params.hero_b.w);
 
+    // Per-instance LOD（V2-b）：MeshTag flags 逐实例削减，材质资产不动。
+    var tag: u32 = 0u;
+#ifdef VERTEX_OUTPUT_INSTANCE_INDEX
+    tag = mesh_functions::get_tag(in.instance_index);
+#endif
+    let instance_flags = (tag >> TAG_FLAGS_SHIFT) & 0xFFu;
+    let drop_hero_extras = (instance_flags & INSTANCE_FLAG_DROP_HERO_EXTRAS) != 0u;
+    let instance_face_hard_step = (instance_flags & INSTANCE_FLAG_FACE_HARD_STEP) != 0u;
+    let hair_specular_off = (instance_flags & INSTANCE_FLAG_HAIR_SPECULAR_OFF) != 0u;
+
     var base = params.character.cel.base_color_factor;
 #ifdef VERTEX_UVS_A
     base *= textureSample(base_color_texture, base_color_sampler, in.uv);
@@ -175,7 +191,7 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
     // 重建式——profile 特化属 profile crate）。
     var normal = normalize(in.world_normal);
 #ifdef VERTEX_UVS_A
-    if (hero_flags & HERO_FLAG_PACKED_NORMAL) != 0u {
+    if (hero_flags & HERO_FLAG_PACKED_NORMAL) != 0u && !drop_hero_extras {
         let packed = textureSample(packed_normal_texture, packed_normal_sampler, in.uv).rg;
         let tangent_xy = packed * 2.0 - vec2<f32>(1.0);
         let tangent_z = sqrt(max(1.0 - dot(tangent_xy, tangent_xy), 0.0));
@@ -250,10 +266,6 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
     // Face SDF（与 character 一致；共享材质 + MeshTag 实例数据）。
 #ifdef VERTEX_UVS_A
     if (char_flags & CHAR_FLAG_FACE_SDF_TEXTURE) != 0u {
-        var tag: u32 = 0u;
-#ifdef VERTEX_OUTPUT_INSTANCE_INDEX
-        tag = mesh_functions::get_tag(in.instance_index);
-#endif
         let face_forward_world = normalize(
             (mesh_functions::get_world_from_local(in.instance_index)
                 * vec4<f32>(params.character.face_forward_softness.xyz, 0.0)).xyz
@@ -280,7 +292,7 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
         }
         let sdf = textureSample(face_sdf_texture, face_sdf_sampler, vec2<f32>(uv_x, in.uv.y)).r;
         let softness = params.character.face_forward_softness.w;
-        if (hero_flags & HERO_FLAG_PORTABLE_FALLBACK) != 0u {
+        if (hero_flags & HERO_FLAG_PORTABLE_FALLBACK) != 0u || instance_face_hard_step {
             lit_factor = step(threshold, sdf);
         } else {
             lit_factor = smoothstep(threshold - softness, threshold + softness, sdf);
@@ -300,15 +312,16 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
     var color = base.rgb * soft_mix * sharp_mix * max(ambient, vec3<f32>(0.05));
 
     // Hair 高光（cheap Blinn × ILM.B 高光抑制）。
-    if (char_flags & CHAR_FLAG_HAIR_SPECULAR) != 0u {
+    if (char_flags & CHAR_FLAG_HAIR_SPECULAR) != 0u && !hair_specular_off {
         let view_direction = normalize(view.world_position - in.world_position.xyz);
         let half_vector = normalize(light_direction + view_direction);
         let specular = pow(clamp(dot(normal, half_vector), 0.0, 1.0), params.character.hair.x);
         color += specular * params.character.hair.y * spec_suppress * light_color;
     }
 
-    // Spec ramp（半角高光 × ILM.B 抑制；Portable fallback 下关闭）。
-    if (hero_flags & HERO_FLAG_SPEC_RAMP) != 0u {
+    // Spec ramp（半角高光 × ILM.B 抑制；material fallback 或 per-instance
+    // LOD（drop_hero_extras）下关闭）。
+    if (hero_flags & HERO_FLAG_SPEC_RAMP) != 0u && !drop_hero_extras {
         let view_direction = normalize(view.world_position - in.world_position.xyz);
         let half_vector = normalize(light_direction + view_direction);
         let spec_coord = clamp(dot(normal, half_vector), 0.0, 1.0);
@@ -317,8 +330,8 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
     }
 
     // Metal matcap（view-space normal 查找 × ILM.R metal mask（>0.9）；
-    // fallback 关闭）。
-    if (hero_flags & HERO_FLAG_MATCAP) != 0u {
+    // material fallback 或 per-instance LOD 关闭）。
+    if (hero_flags & HERO_FLAG_MATCAP) != 0u && !drop_hero_extras {
         let view_normal = normalize(
             (view.view_from_world * vec4<f32>(normal, 0.0)).xyz
         );

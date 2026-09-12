@@ -1,4 +1,4 @@
-//! Showcase 框架（It-9a）：12 个固定用例（docs/showcase/01 关卡表 ×
+//! Showcase 框架（It-9a）：14 个固定用例（docs/showcase/01 关卡表 ×
 //! release gate §Showcase）。
 //!
 //! 每个用例 = 固定场景构建器 + 可选 headless 捕获。职责边界：
@@ -143,7 +143,7 @@ pub fn capture_case(case: &ShowcaseCase, resources: RenderResources) -> Captured
     panic!("showcase capture timed out for {}", case.name);
 }
 
-/// 全部 12 个用例（顺序固定）。
+/// 全部 14 个用例（顺序固定）。
 pub fn all_cases() -> Vec<ShowcaseCase> {
     vec![
         ShowcaseCase {
@@ -240,6 +240,13 @@ pub fn all_cases() -> Vec<ShowcaseCase> {
             asset_root: None,
             // screen-space 描边是 Standard+ 特性。
             tier: Some(StylizedExecutionTier::Standard),
+        },
+        ShowcaseCase {
+            name: "lod",
+            build: cases::lod,
+            view: None,
+            asset_root: None,
+            tier: None,
         },
     ]
 }

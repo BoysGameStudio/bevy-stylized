@@ -31,6 +31,10 @@ use bevy_stylized_core::{
 
 use crate::capability::{StylizedCapabilityConfig, StylizedResolvedCapabilities};
 
+/// tier 覆盖资源（定义在 render crate——LOD 系统与 variant 切换共同消费；
+/// 此处 re-export 保持 `bevy_stylized::StylizedTierOverride` 公共路径不变）。
+pub use bevy_stylized_render::StylizedTierOverride;
+
 /// 动态质量资源：governor 实例 + 外部信号注入点。
 ///
 /// `resolution` / `scene_complexity` / `thermal_pressure` / `battery_level`
@@ -74,21 +78,6 @@ impl StylizedDynamicQuality {
             thermal_pressure: None,
             battery_level: None,
             gpu_frame_time_override_ms: None,
-        }
-    }
-}
-
-/// 动态质量给出的 tier 覆盖（`None` = 与 Stage A 请求档一致，无动态调整）。
-#[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct StylizedTierOverride(pub Option<StylizedExecutionTier>);
-
-impl StylizedTierOverride {
-    /// 有效请求档：`min(requested, override)`（动态调整只降不升于请求档）。
-    #[must_use]
-    pub fn effective_tier(&self, requested: StylizedExecutionTier) -> StylizedExecutionTier {
-        match self.0 {
-            Some(override_tier) => requested.min(override_tier),
-            None => requested,
         }
     }
 }

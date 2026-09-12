@@ -1,6 +1,6 @@
 //! Showcase 全量捕获测试（GPU-gated，无 GPU graceful skip）。
 //!
-//! 跑全部 12 个用例并断言：捕获非黑（平均亮度超过地板线）、PNG 已写盘
+//! 跑全部 14 个用例并断言：捕获非黑（平均亮度超过地板线）、PNG 已写盘
 //! （`fixtures/golden-local/showcase/`，gitignored）。
 
 use showcase::all_cases;

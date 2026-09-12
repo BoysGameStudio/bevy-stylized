@@ -45,6 +45,8 @@
 09 Platform Stress
 10 Genshin Reference
 11 Performance Arena
+12 Outline Advanced（V2-a）
+13 LOD Gradient（V2-b）
 ```
 
 ---

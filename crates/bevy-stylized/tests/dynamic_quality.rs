@@ -226,3 +226,49 @@ fn real_diagnostics_feed_reaches_governor() {
     );
     assert!(quality.governor.tier() < StylizedExecutionTier::High);
 }
+
+#[test]
+fn governor_override_reaches_per_instance_lod() {
+    // 端到端（V2-b × V2-c）：合成帧时 → governor 降档 → StylizedTierOverride
+    // → render sync_lod 把 near 实例压为 portable fallback（MeshTag flags）。
+    use bevy_stylized::stylized_render::{INSTANCE_FLAG_DROP_HERO_EXTRAS, StylizedInstanceData};
+
+    let mut app = build_app();
+    simulate_high_device(&mut app);
+    app.world_mut().spawn((
+        Camera::default(),
+        Transform::from_xyz(0.0, 0.0, 0.0),
+        GlobalTransform::from_xyz(0.0, 0.0, 0.0),
+    ));
+    // near 带（距离 2 < mid_start 10）：LOD 自身不削减，只有 override 能压它。
+    let instance = app
+        .world_mut()
+        .spawn((
+            StylizedInstanceData::default(),
+            Transform::from_xyz(0.0, 0.0, -2.0),
+            GlobalTransform::from_xyz(0.0, 0.0, -2.0),
+        ))
+        .id();
+
+    app.world_mut()
+        .resource_mut::<StylizedDynamicQuality>()
+        .gpu_frame_time_override_ms = Some(20.0);
+    update_n(&mut app, 4);
+
+    assert_eq!(
+        app.world().resource::<StylizedTierOverride>().0,
+        Some(StylizedExecutionTier::Portable),
+        "governor override 应已生效"
+    );
+    let flags = app
+        .world()
+        .entity(instance)
+        .get::<StylizedInstanceData>()
+        .expect("instance data")
+        .flags;
+    assert_ne!(
+        flags & INSTANCE_FLAG_DROP_HERO_EXTRAS,
+        0,
+        "override=Portable 时 LOD 必须压低头实例（min 语义）"
+    );
+}

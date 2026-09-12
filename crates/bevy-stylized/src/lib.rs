@@ -32,13 +32,18 @@
 //! `GltfPlugin`（见该函数文档）。
 
 mod capability;
+// `dynamic_quality` 依赖 render crate 的 `StylizedTierOverride`（V2-b 起
+// tier override 由 LOD 系统与 governor 共同消费，单一真源在 render）。
+#[cfg(feature = "render")]
 mod dynamic_quality;
 
 pub mod prelude {
     //! 常用类型的一站式导出。
     #[cfg(feature = "render")]
+    pub use crate::dynamic_quality::*;
+    #[cfg(feature = "render")]
     pub use crate::stylized_render::*;
-    pub use crate::{StylizedPlugin, capability::*, dynamic_quality::*, stylized_core::prelude::*};
+    pub use crate::{StylizedPlugin, capability::*, stylized_core::prelude::*};
     #[cfg(feature = "gltf")]
     pub use crate::{stylized_gltf::*, stylized_gltf_plugin};
 }
@@ -47,6 +52,7 @@ pub use capability::{
     StylizedCapabilityConfig, StylizedResolvedCapabilities, requested_wgpu_features,
     stylized_capabilities_from_wgpu,
 };
+#[cfg(feature = "render")]
 pub use dynamic_quality::{
     StylizedDynamicQuality, StylizedDynamicQualityPlugin, StylizedQualityDecisionEvent,
     StylizedTierOverride, dynamic_quality_system,

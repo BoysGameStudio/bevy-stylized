@@ -9,7 +9,8 @@
 //! bits  8..=15  face_threshold（u8 量化 0..=1；0 = 未设置，用材质默认）
 //! bit   16      face_side（0 = 自动按光源方向，1 = 强制翻转）
 //! bits  17..=23 outline_scale（u7 量化 0..=2）
-//! bits  24..=31 per_character_flags（8 位）
+//! bits  24..=31 per_character_flags（8 位；bit 0..=2 的 LOD 语义见
+//!               `crate::lod` 的 `INSTANCE_FLAG_*`，V2-b）
 //! ```
 //!
 //! 位布局是 **provisional**：ADR-0004 关闭前任何外部代码不得依赖它；

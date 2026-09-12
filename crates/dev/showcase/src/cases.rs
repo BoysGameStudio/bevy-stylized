@@ -8,7 +8,7 @@ use bevy::{
     color::LinearRgba,
     image::Image,
     math::{Mat4, Quat, Vec3, primitives::Sphere},
-    mesh::{Mesh, skinning::SkinnedMesh},
+    mesh::{Mesh, Meshable, skinning::SkinnedMesh},
     pbr::MeshMaterial3d,
     prelude::{App, Camera3d, Mesh3d, Transform, With},
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
@@ -547,4 +547,130 @@ pub fn outline_advanced(app: &mut App) {
     app.world_mut()
         .entity_mut(camera)
         .insert(bevy_stylized::stylized_render::screen_outline::StylizedScreenOutline::default());
+}
+
+// ---------------------------------------------------------------------------
+// lod（V2-b）：同一 hero 角色随距离梯度降级（near→very far；永不降 class）
+// ---------------------------------------------------------------------------
+/// LOD 用例的相机/布局常数（单测断言分带用）。
+pub const LOD_CAMERA_EYE: Vec3 = Vec3::ZERO;
+/// （角度度, 距离, 半径）× 4：near/mid/far/very_far。
+pub const LOD_LAYOUT: [(f32, f32, f32); 4] = [
+    (-16.0, 6.0, 0.62),
+    (-4.0, 17.0, 1.7),
+    (6.0, 32.0, 3.2),
+    (16.0, 55.0, 5.7),
+];
+
+pub fn lod(app: &mut App) {
+    // 程序化 matcap（径向金属渐变）+ ILM（R=metal mask 全 1，G=AO 全 1）。
+    let (w, h) = (64usize, 64usize);
+    let mut data = Vec::with_capacity(w * h * 4);
+    for y in 0..h {
+        for x in 0..w {
+            let dx = x as f32 / w as f32 - 0.5;
+            let dy = y as f32 / h as f32 - 0.5;
+            let r = (dx * dx + dy * dy).sqrt();
+            let v = ((1.0 - (r * 2.0).clamp(0.0, 1.0)) * 255.0) as u8;
+            data.extend_from_slice(&[v, v / 2, 255 - v, 255]);
+        }
+    }
+    let mut matcap = Image::new_fill(
+        Extent3d {
+            width: w as u32,
+            height: h as u32,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        &[0, 0, 0, 255],
+        TextureFormat::Rgba8Unorm,
+        RenderAssetUsages::default(),
+    );
+    matcap.data = Some(data);
+    let matcap = app.world_mut().resource_mut::<Assets<Image>>().add(matcap);
+    let mut ilm_data = Vec::new();
+    for _ in 0..16 * 16 {
+        ilm_data.extend_from_slice(&[255, 255, 0, 0]);
+    }
+    let mut ilm = Image::new_fill(
+        Extent3d {
+            width: 16,
+            height: 16,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        &[0, 0, 0, 255],
+        TextureFormat::Rgba8Unorm,
+        RenderAssetUsages::default(),
+    );
+    ilm.data = Some(ilm_data);
+    let ilm = app.world_mut().resource_mut::<Assets<Image>>().add(ilm);
+
+    // 共享 hero 材质：matcap + hair 高光全开（near 全特性；远处经
+    // per-instance flags 削减，材质资产不变）。
+    let mut hero_params =
+        StylizedHeroParams::default().with_matcap(0.9, LinearRgba::new(1.0, 0.9, 0.8, 1.0));
+    hero_params.character = hero_params.character.with_hair_specular(28.0, 0.8);
+    let material = app
+        .world_mut()
+        .resource_mut::<Assets<StylizedHeroMaterial>>()
+        .add(StylizedHeroMaterial {
+            params: hero_params,
+            ilm_texture: Some(ilm),
+            matcap_texture: Some(matcap),
+            ..StylizedHeroMaterial::default()
+        });
+
+    for (angle_deg, dist, radius) in LOD_LAYOUT {
+        let x = dist * angle_deg.to_radians().tan();
+        let position = Vec3::new(x, 0.0, -dist);
+        let mesh = app
+            .world_mut()
+            .resource_mut::<Assets<Mesh>>()
+            .add(Sphere::new(radius));
+        // 几何 LOD：far 起换低模（band 2/3 声明了映射才换 Mesh3d）。
+        let low = app
+            .world_mut()
+            .resource_mut::<Assets<Mesh>>()
+            .add(Sphere::new(radius).mesh().uv(8, 6));
+        let mut lod_meshes = StylizedLodMeshes::new(mesh.clone());
+        lod_meshes.band_meshes[2] = Some(low.clone());
+        lod_meshes.band_meshes[3] = Some(low);
+        app.world_mut().spawn((
+            Mesh3d(mesh),
+            MeshMaterial3d(material.clone()),
+            StylizedInstanceData::default(),
+            lod_meshes,
+            Transform::from_translation(position),
+        ));
+    }
+    case_camera(app, LOD_CAMERA_EYE, Vec3::new(0.0, 0.0, -10.0));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 布局确定性：四球落在 near/mid/far/very_far 四带（相机原点）。
+    #[test]
+    fn lod_layout_bands_are_deterministic() {
+        let thresholds = bevy_stylized::stylized_core::StylizedLodThresholds::default();
+        let expected = [0, 1, 2, 3];
+        for (i, (angle_deg, dist, _)) in LOD_LAYOUT.iter().enumerate() {
+            let x = dist * angle_deg.to_radians().tan();
+            let actual = (Vec3::new(x, 0.0, -dist) - LOD_CAMERA_EYE).length();
+            let band = bevy_stylized::stylized_core::resolve_lod_band(actual, &thresholds);
+            assert_eq!(band, expected[i], "layout[{i}] distance {actual}");
+            // 离带边界留 ≥15% 余量（防止布局微调时静默跨带）。
+            let bounds = [
+                0.0,
+                thresholds.mid_start,
+                thresholds.far_start,
+                thresholds.very_far_start,
+                f32::INFINITY,
+            ];
+            let margin = (actual - bounds[band as usize]).min(bounds[band as usize + 1] - actual);
+            assert!(margin > 1.0, "layout[{i}] too close to band edge: {actual}");
+        }
+    }
 }

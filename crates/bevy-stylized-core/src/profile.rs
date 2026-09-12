@@ -13,6 +13,7 @@ use bevy_reflect::Reflect;
 
 use crate::{
     axis::{StylizedExecutionTier, StylizedSurfaceClass},
+    lod::StylizedLodPolicy,
     quality::StylizedQualityPolicy,
     schema::StylizedSchemaVersion,
 };
@@ -59,5 +60,13 @@ pub trait StylizedProfile {
         _to: StylizedSurfaceClass,
     ) -> bool {
         false
+    }
+
+    /// Profile 的默认 LOD 政策（V2-b，provisional pending ADR-0018 的 LOD 条款）。
+    ///
+    /// 默认 `None`（不启用 LOD）。政策语义只削减 tier/feature/几何，
+    /// 永不跨 Surface Class（与 [`allows_surface_class_lod`] 的正交不变量一致）。
+    fn lod_policy(&self) -> Option<StylizedLodPolicy> {
+        None
     }
 }

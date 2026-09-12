@@ -199,6 +199,14 @@ Golden 对比。
 
 ## 迁移状态记录
 
+### 2026-09-12：V2-a / V2-c / V2-f 完成
+
+- **V2-a 高级描边**：屏幕空间 depth/normal 边缘描边（overlay 网格材质路径 + prepass，Standard+ 相机级 opt-in）+ hull 混合模式；Portable 默认零成本（fallback 链新增 ScreenOutlineToHull）；golden 语义断言（screen 抓内部边、hybrid 为并集）；showcase 新增 outline-advanced 用例。
+- **V2-c Dynamic Quality**：core `StylizedQualityGovernor` 纯逻辑状态机（迟滞带、升降独立冷却、EMA 平滑、防振荡、环形历史 + reason 可观测）；facade `StylizedDynamicQualityPlugin`（opt-in，diagnostics 喂入，tier override 写出；variant 切换落地属 V2-b）。
+- **V2-f Asset Compiler 骨架**：`bevy-stylized compile`（descriptor 生成 + ILM 四通道打包 + 纹理引用改写 + 先规划后落盘 fail-closed）；新契约键 `bevy_stylized.compile/v1`（provisional，已登记 docs/reference/06 §5.1）；新增 image/sha2 依赖（PNG 打包与产物哈希）。
+- 顺带修复：facade doctest 在 `--no-default-features` 下的 V1 遗留编译失败。
+- 全量验证绿（73 suite）。
+
 ### 2026-09-12：Reference-parity 修正（行为合同核查后续）
 
 - 行为合同 9 项待核实全部经节点级证据核实（`tools/blender-reference-export/inspect_node_math.py` 转储 42 个节点组）；新发现：上游 blend 含 Blender 5.2.1 不可解析节点（cast-shadow / curvature-rim 为锁定环境下的死路径，upstream Golden 已反映该状态）。

@@ -9,6 +9,10 @@ Semantic Versioning applies once the first release is published.
 
 ### Added
 
+- V2-b：NPR LOD（provisional pending ADR-0018 的 LOD 落地条款；不变量：只削减 tier/feature/几何，永不降 Surface Class）——
+  - core：新增 `lod` 模块——`StylizedLodThresholds`（mid/far/very_far 起始距离，默认 10/25/50，非单调 fail-closed 落 near 带）、`StylizedLodBandPolicy`（tier 上限 + feature 削减列表 + 可选简化 variant）、`StylizedLodPolicy`（4 带默认政策：near 不动 / mid cap Standard / far cap Portable（= portable variant 全链）/ very_far 追加 face 硬 step + hair 高光关闭）、`resolve_lod_band`/`resolve_lod`（纯函数确定性分带）；`StylizedProfile::lod_policy()` hook（默认 `None`，不破坏现有 profile 实现）；
+  - render：新增 `lod` 模块——`StylizedLodPolicyResource`（默认政策资源）、`StylizedLodMeshes`（band→mesh 映射组件，声明映射才换 `Mesh3d`，近距自动恢复 base）、`sync_lod`（PostUpdate，先于 `sync_instance_tags`）：按最近相机距离分带 → 有效 tier = min(band tier_cap, `StylizedTierOverride`) → guard-write `StylizedInstanceData.flags` bit 0..=2（MeshTag 位，**零 per-frame 材质资产变异**）；`StylizedTierOverride` 自 facade 移入 render（单一真源；facade 经 re-export 保持 `bevy_stylized::StylizedTierOverride` 公共路径不变；facade `dynamic_quality` 模块随之仅在 `render` feature 下编译）；hero shader 逐实例消费 flags（matcap/spec ramp/packed normal 关闭、face SDF 硬 step、hair 高光关闭），与材质级 `HERO_FLAG_PORTABLE_FALLBACK` 并存；
+  - 证据：render 单测 6 个（分带确定性、portable cap 蕴含全链、override min 语义、非 LOD 位保留、几何换 mesh + 近距恢复、零材质变异回归守卫）、facade 端到端测试 `governor_override_reaches_per_instance_lod`（合成帧时 → governor 降档 → override → near 实例 flags 置位）、showcase 新增 `lod` 用例（同 hero 角色 4 球距离 6/17/32/55 → near/mid/far/very_far 四带梯度 + far 起几何低模，布局分带确定性单测）。
 - V2-a Advanced Outline（provisional pending ADR-0008）——
   - `StylizedScreenOutline`（per-camera opt-in）+ `StylizedScreenOutlineMaterial`：screen-space depth/normal 边缘检测 overlay（Transparent3d + Blend，无深度写，屏幕覆盖三角形直出 clip）；
   - `StylizedOutlineMode`（Hull/ScreenSpace/Hybrid）+ `resolve_outline_mode` tier 门控（Standard+ 才允许 screen-space，回落 hull；core 登记 `StylizedFallbackStep::ScreenOutlineToHull`）；

@@ -16,6 +16,8 @@
 //!   inverted hull（顶点外扩 + front-face cull）；
 //! - [`instance`]：[`StylizedInstanceData`]——Instance 层数据经 MeshTag
 //!   位打包传输（provisional pending ADR-0004），不破坏自动合批；
+//! - [`lod`]：per-entity NPR LOD（V2-b）——距离分带 → tier 上限/feature
+//!   削减（经 MeshTag flags 位，零材质变异）+ 可选几何换 mesh；
 //! - [`view`]：[`StylizedViewSettings`]——core `StylizedViewDescriptor`
 //!   → Bevy view-layer 对象（key light / ambient / exposure）的薄同步；
 //! - [`capability`]：ADR-0022 Stage B 结果的消费与 fail-closed 检查。
@@ -30,6 +32,7 @@ pub mod capability;
 pub mod character;
 pub mod hero;
 pub mod instance;
+pub mod lod;
 pub mod material;
 pub mod outline;
 pub mod post;
@@ -51,6 +54,10 @@ pub use hero::{
 pub use instance::{
     StylizedInstanceData, StylizedInstanceTransport, StylizedInstanceTransportMode,
     select_transport,
+};
+pub use lod::{
+    INSTANCE_FLAG_DROP_HERO_EXTRAS, INSTANCE_FLAG_FACE_HARD_STEP, INSTANCE_FLAG_HAIR_SPECULAR_OFF,
+    StylizedLodMeshes, StylizedLodPolicyResource, StylizedTierOverride, lod_flags_for, sync_lod,
 };
 pub use material::{
     CEL_FLAG_ILM_TEXTURE, CEL_FLAG_RAMP_TEXTURE, CEL_FLAG_RIM, CEL_PORTABLE_FORWARD_SHADER_PATH,
@@ -118,6 +125,7 @@ impl Plugin for StylizedRenderPlugin {
         );
         app.insert_resource(instance::StylizedInstanceTransportMode(mode));
         view::register(app);
+        lod::register(app);
         app.add_systems(
             PostUpdate,
             (

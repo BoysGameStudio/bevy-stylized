@@ -24,6 +24,7 @@
 | Outline 生命周期为最小副本同步（bounds/LOD/despawn 完整语义未定） | ADR-0008 | render/src/outline.rs（`StylizedOutline`/`sync_outline_replicas`）、outline WGSL | outline golden + Odette 发卡排障（顶点色宽度抑制） |
 | Screen-space 描边（V2-a）：tier 门控 + overlay 实现 + 混合模式 | ADR-0008 | render/src/screen_outline.rs、outline/screen_outline.wgsl | outline-advanced 三捕获 golden + 边缘计数断言 + gating 单测 |
 | Alpha/prepass/shadow 语义矩阵（Opaque/Mask 支持、Blend 类型层不可达、prepass/shadow 显式关闭） | ADR-0023 | render/tests/semantics_matrix.rs、docs/authoring/05 §7 矩阵表 | 矩阵数据驱动测试 + golden |
+| NPR LOD（V2-b）：距离分带政策、per-instance flags 通道（MeshTag bit 0..=2）、几何换 mesh、`StylizedProfile::lod_policy` hook；`StylizedTierOverride` 移入 render（facade re-export） | ADR-0018 | core/src/lod.rs、render/src/lod.rs、hero WGSL per-instance flags | render 单测 6 个 + facade governor→LOD 端到端 + showcase `lod` 捕获（四带梯度目检） |
 
 ## Hero / Profile / 导入
 
@@ -56,6 +57,7 @@
 | 0008 | 1 |
 | 0009 | 1 |
 | 0010 | 1 |
+| 0018 | 1（V2-b NPR LOD） |
 | 0019 | 1 |
 | 0020 | 1 |
 | 0021 | 1 |
