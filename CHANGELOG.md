@@ -9,6 +9,11 @@ Semantic Versioning applies once the first release is published.
 
 ### Added
 
+- V2-g：Regression/Performance Lab（provisional；ADR-0029 证据格式扩展）——
+  - 新 dev crate `crates/dev/regression-lab`（lib + CLI）：sweep 矩阵 `Count{1,100,1000} × Resolution{512²,720p} × Tier{Portable,Standard} × Lighting{day,night} × Pose{bind,animated}`（crowd 实例场景 24 cells + strip 蒙皮条带场景 16 cells + High 探测 2 cells = 42 cells；High 请求档如实记录解析结果）；Backend 轴只跑 vulkan，其余记录 `skipped-unavailable`（不伪造）；
+  - 测量子采样（文档化）：15 warm-up + 40 测量帧（benchmarks 为 20+60），保持分钟级墙钟；帧统计 mean/median/p95/min/max；4 个代表 cell 的 golden 子集捕获（`fixtures/golden-local/regression-lab/`，首跑写基线，后续 diff）；
+  - 回归门禁：`--gate BASELINE.json` 按 target_id 对齐，mean 帧时劣化 >10% 记回归并 exit 1（缺失 cell 如实记录不算回归）；gate 语义纯逻辑单测覆盖；
+  - 本机基线：`docs/performance/baselines/sweep-nvidia-geforce-rtx-5090--vulkan-2026-09-12.json`（可入库测量数据）。
 - V2-e：GPU Instance Database first cut（provisional pending ADR-0004；**scope 诚实声明**：StorageTable 传输 + 双保真契约落地，完整 bindless 生产路径不在本切片）——
   - core：`StylizedInstanceGpuRecord`（全精度实例记录 schema：face_threshold f32 / face_side / outline_scale f32 / profile_index u32 / palette_index / quality_flags / light_tint；新 schema 命名空间 `bevy_stylized.instance/v1`；**两档保真契约**写入类型文档：MeshTag = 粗粒度子集（u8 量化阈值/u7 outline/u8 profile），表 = 全字段全精度）；`StylizedFallbackStep::InstanceTableToMeshTag`（additive 枚举变体，登记通道回退语义）；
   - render：`instance_table` 模块——`StylizedInstanceTableEntry`（记录组件）+ `StylizedInstanceSlot`（槽位）+ `StylizedInstanceTable` 资源（`ShaderBuffer` 数据资产，48B/槽位）+ `sync_instance_table`（懒初始化、确定性槽位分配、脏时全量重写、容量倍增、**无 per-frame 写**）；`sync_instance_tags` 双布局打包（带槽位 → 24-bit 索引 + flags；否则位打包）；`select_transport` 落地选择规则：**tier ≥ Standard ⇒ StorageTable**（Standard 的 tier 需求表已要求 storage buffer 特性，解析到该档即蕴含设备能力），否则 MeshTagBits；`StylizedCharacterTableMaterial`（与 MeshTag 变体共享 shader/参数语义，`#[storage(7, read_only)]` 表 binding + `INSTANCE_STORAGE_TABLE` shader def；**Portable 永不实例化**——三个主材质 layout 保持零 storage binding，测试钉死）；

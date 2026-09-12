@@ -9,6 +9,7 @@ members = [
     "crates/bevy-stylized-render",
     "crates/dev/benchmarks",
     "crates/dev/golden-harness",
+    "crates/dev/regression-lab",
     "crates/dev/odette-reference-lab",
     "crates/dev/reference-comparison",
     "crates/dev/showcase",

@@ -1,0 +1,1043 @@
+{
+  "schema": "bevy_stylized.sweep/v1",
+  "evidence_policy": "ADR-0029: fixed sweep cells, labeled axes; regression gate = mean frame time +10% vs baseline on the same device",
+  "captured_unix_seconds": 1789187563,
+  "engine_git_commit": "736f996256595dc9cd9141b16e6a20fdc5aef88d",
+  "gpu": "NVIDIA GeForce RTX 5090 (Vulkan)",
+  "driver": "",
+  "os": "linux x86_64",
+  "backends": {
+    "vulkan": "run",
+    "others": "skipped-unavailable (single-adapter machine; no dx12/metal/gl)"
+  },
+  "frames": [
+    15,
+    40
+  ],
+  "cells": [
+    {
+      "target_id": "crowd/n1/512x512/portable/day",
+      "scene": "crowd",
+      "count": 1,
+      "pose": "static",
+      "resolution": [
+        512,
+        512
+      ],
+      "requested_tier": "portable",
+      "resolved_tier": "portable",
+      "lighting": "day",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 6.3136082500000015,
+        "median_ms": 6.310456,
+        "p95_ms": 6.831703,
+        "min_ms": 6.049977,
+        "max_ms": 7.184996
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "crowd/n1/512x512/portable/night",
+      "scene": "crowd",
+      "count": 1,
+      "pose": "static",
+      "resolution": [
+        512,
+        512
+      ],
+      "requested_tier": "portable",
+      "resolved_tier": "portable",
+      "lighting": "night",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 6.6769148000000005,
+        "median_ms": 6.560304,
+        "p95_ms": 7.600025,
+        "min_ms": 6.143393,
+        "max_ms": 8.539176000000001
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "crowd/n1/512x512/standard/day",
+      "scene": "crowd",
+      "count": 1,
+      "pose": "static",
+      "resolution": [
+        512,
+        512
+      ],
+      "requested_tier": "standard",
+      "resolved_tier": "standard",
+      "lighting": "day",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 6.459363349999999,
+        "median_ms": 6.4072770000000006,
+        "p95_ms": 6.900812,
+        "min_ms": 6.2433499999999995,
+        "max_ms": 7.131195
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "crowd/n1/512x512/standard/night",
+      "scene": "crowd",
+      "count": 1,
+      "pose": "static",
+      "resolution": [
+        512,
+        512
+      ],
+      "requested_tier": "standard",
+      "resolved_tier": "standard",
+      "lighting": "night",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 6.822350299999999,
+        "median_ms": 6.736815999999999,
+        "p95_ms": 7.545272,
+        "min_ms": 6.468763,
+        "max_ms": 8.38663
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "crowd/n1/1280x720/portable/day",
+      "scene": "crowd",
+      "count": 1,
+      "pose": "static",
+      "resolution": [
+        1280,
+        720
+      ],
+      "requested_tier": "portable",
+      "resolved_tier": "portable",
+      "lighting": "day",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 6.65914795,
+        "median_ms": 6.633882,
+        "p95_ms": 6.959873999999999,
+        "min_ms": 6.435681000000001,
+        "max_ms": 7.058578000000001
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "crowd/n1/1280x720/portable/night",
+      "scene": "crowd",
+      "count": 1,
+      "pose": "static",
+      "resolution": [
+        1280,
+        720
+      ],
+      "requested_tier": "portable",
+      "resolved_tier": "portable",
+      "lighting": "night",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 6.985808525000001,
+        "median_ms": 6.910792,
+        "p95_ms": 7.525916,
+        "min_ms": 6.631108,
+        "max_ms": 8.740313
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "crowd/n1/1280x720/standard/day",
+      "scene": "crowd",
+      "count": 1,
+      "pose": "static",
+      "resolution": [
+        1280,
+        720
+      ],
+      "requested_tier": "standard",
+      "resolved_tier": "standard",
+      "lighting": "day",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 6.936818299999999,
+        "median_ms": 6.839037,
+        "p95_ms": 7.429765,
+        "min_ms": 6.594398,
+        "max_ms": 8.704426
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "crowd/n1/1280x720/standard/night",
+      "scene": "crowd",
+      "count": 1,
+      "pose": "static",
+      "resolution": [
+        1280,
+        720
+      ],
+      "requested_tier": "standard",
+      "resolved_tier": "standard",
+      "lighting": "night",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 6.84711435,
+        "median_ms": 6.717028,
+        "p95_ms": 7.568425,
+        "min_ms": 6.570844,
+        "max_ms": 8.641978
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "crowd/n100/512x512/portable/day",
+      "scene": "crowd",
+      "count": 100,
+      "pose": "static",
+      "resolution": [
+        512,
+        512
+      ],
+      "requested_tier": "portable",
+      "resolved_tier": "portable",
+      "lighting": "day",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 6.913651475,
+        "median_ms": 6.874774,
+        "p95_ms": 7.219911,
+        "min_ms": 6.722789,
+        "max_ms": 7.2419329999999995
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "crowd/n100/512x512/portable/night",
+      "scene": "crowd",
+      "count": 100,
+      "pose": "static",
+      "resolution": [
+        512,
+        512
+      ],
+      "requested_tier": "portable",
+      "resolved_tier": "portable",
+      "lighting": "night",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 7.033641600000003,
+        "median_ms": 6.927062,
+        "p95_ms": 7.631313,
+        "min_ms": 6.745271,
+        "max_ms": 7.828702999999999
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "crowd/n100/512x512/standard/day",
+      "scene": "crowd",
+      "count": 100,
+      "pose": "static",
+      "resolution": [
+        512,
+        512
+      ],
+      "requested_tier": "standard",
+      "resolved_tier": "standard",
+      "lighting": "day",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 6.915787400000002,
+        "median_ms": 6.859585,
+        "p95_ms": 7.333635,
+        "min_ms": 6.769547,
+        "max_ms": 7.450764
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "crowd/n100/512x512/standard/night",
+      "scene": "crowd",
+      "count": 100,
+      "pose": "static",
+      "resolution": [
+        512,
+        512
+      ],
+      "requested_tier": "standard",
+      "resolved_tier": "standard",
+      "lighting": "night",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 7.24495185,
+        "median_ms": 7.168865,
+        "p95_ms": 8.110190999999999,
+        "min_ms": 6.824119,
+        "max_ms": 8.184099999999999
+      },
+      "golden": {
+        "status": "baselined",
+        "max_channel_delta": 0,
+        "psnr_db": 999.0
+      },
+      "gpu_timing": null
+    },
+    {
+      "target_id": "crowd/n100/1280x720/portable/day",
+      "scene": "crowd",
+      "count": 100,
+      "pose": "static",
+      "resolution": [
+        1280,
+        720
+      ],
+      "requested_tier": "portable",
+      "resolved_tier": "portable",
+      "lighting": "day",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 7.096362625,
+        "median_ms": 6.9706339999999996,
+        "p95_ms": 7.8044270000000004,
+        "min_ms": 6.77153,
+        "max_ms": 8.876418000000001
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "crowd/n100/1280x720/portable/night",
+      "scene": "crowd",
+      "count": 100,
+      "pose": "static",
+      "resolution": [
+        1280,
+        720
+      ],
+      "requested_tier": "portable",
+      "resolved_tier": "portable",
+      "lighting": "night",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 7.1104246999999985,
+        "median_ms": 7.04837,
+        "p95_ms": 7.680224,
+        "min_ms": 6.721286,
+        "max_ms": 7.918411
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "crowd/n100/1280x720/standard/day",
+      "scene": "crowd",
+      "count": 100,
+      "pose": "static",
+      "resolution": [
+        1280,
+        720
+      ],
+      "requested_tier": "standard",
+      "resolved_tier": "standard",
+      "lighting": "day",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 7.073215424999999,
+        "median_ms": 7.008875000000001,
+        "p95_ms": 7.589234,
+        "min_ms": 6.751903,
+        "max_ms": 8.561778
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "crowd/n100/1280x720/standard/night",
+      "scene": "crowd",
+      "count": 100,
+      "pose": "static",
+      "resolution": [
+        1280,
+        720
+      ],
+      "requested_tier": "standard",
+      "resolved_tier": "standard",
+      "lighting": "night",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 7.048208149999999,
+        "median_ms": 6.973598999999999,
+        "p95_ms": 7.7963119999999995,
+        "min_ms": 6.715304,
+        "max_ms": 8.023328
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "crowd/n1000/512x512/portable/day",
+      "scene": "crowd",
+      "count": 1000,
+      "pose": "static",
+      "resolution": [
+        512,
+        512
+      ],
+      "requested_tier": "portable",
+      "resolved_tier": "portable",
+      "lighting": "day",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 8.265217299999998,
+        "median_ms": 8.209467,
+        "p95_ms": 8.697811999999999,
+        "min_ms": 7.989925,
+        "max_ms": 8.710937
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "crowd/n1000/512x512/portable/night",
+      "scene": "crowd",
+      "count": 1000,
+      "pose": "static",
+      "resolution": [
+        512,
+        512
+      ],
+      "requested_tier": "portable",
+      "resolved_tier": "portable",
+      "lighting": "night",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 8.3983988,
+        "median_ms": 8.344921,
+        "p95_ms": 8.950817,
+        "min_ms": 8.036372,
+        "max_ms": 10.307502
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "crowd/n1000/512x512/standard/day",
+      "scene": "crowd",
+      "count": 1000,
+      "pose": "static",
+      "resolution": [
+        512,
+        512
+      ],
+      "requested_tier": "standard",
+      "resolved_tier": "standard",
+      "lighting": "day",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 8.441617350000001,
+        "median_ms": 8.307912,
+        "p95_ms": 10.003842,
+        "min_ms": 7.996227,
+        "max_ms": 10.078572
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "crowd/n1000/512x512/standard/night",
+      "scene": "crowd",
+      "count": 1000,
+      "pose": "static",
+      "resolution": [
+        512,
+        512
+      ],
+      "requested_tier": "standard",
+      "resolved_tier": "standard",
+      "lighting": "night",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 8.181888325000001,
+        "median_ms": 8.124988,
+        "p95_ms": 8.54712,
+        "min_ms": 7.954238000000001,
+        "max_ms": 8.59531
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "crowd/n1000/1280x720/portable/day",
+      "scene": "crowd",
+      "count": 1000,
+      "pose": "static",
+      "resolution": [
+        1280,
+        720
+      ],
+      "requested_tier": "portable",
+      "resolved_tier": "portable",
+      "lighting": "day",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 8.473098700000001,
+        "median_ms": 8.394553,
+        "p95_ms": 9.196387999999999,
+        "min_ms": 8.111243,
+        "max_ms": 10.004112000000001
+      },
+      "golden": {
+        "status": "baselined",
+        "max_channel_delta": 0,
+        "psnr_db": 999.0
+      },
+      "gpu_timing": null
+    },
+    {
+      "target_id": "crowd/n1000/1280x720/portable/night",
+      "scene": "crowd",
+      "count": 1000,
+      "pose": "static",
+      "resolution": [
+        1280,
+        720
+      ],
+      "requested_tier": "portable",
+      "resolved_tier": "portable",
+      "lighting": "night",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 8.632410525,
+        "median_ms": 8.545447,
+        "p95_ms": 9.676077,
+        "min_ms": 8.165173,
+        "max_ms": 10.042584
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "crowd/n1000/1280x720/standard/day",
+      "scene": "crowd",
+      "count": 1000,
+      "pose": "static",
+      "resolution": [
+        1280,
+        720
+      ],
+      "requested_tier": "standard",
+      "resolved_tier": "standard",
+      "lighting": "day",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 8.332628125,
+        "median_ms": 8.30181,
+        "p95_ms": 8.624344,
+        "min_ms": 8.075455,
+        "max_ms": 8.686632
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "crowd/n1000/1280x720/standard/night",
+      "scene": "crowd",
+      "count": 1000,
+      "pose": "static",
+      "resolution": [
+        1280,
+        720
+      ],
+      "requested_tier": "standard",
+      "resolved_tier": "standard",
+      "lighting": "night",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 8.388297374999999,
+        "median_ms": 8.374556,
+        "p95_ms": 8.636197,
+        "min_ms": 8.153742000000001,
+        "max_ms": 8.653618999999999
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "strip/bind/512x512/portable/day",
+      "scene": "strip",
+      "count": 1,
+      "pose": "bind",
+      "resolution": [
+        512,
+        512
+      ],
+      "requested_tier": "portable",
+      "resolved_tier": "portable",
+      "lighting": "day",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 7.008990874999999,
+        "median_ms": 6.943683,
+        "p95_ms": 7.323464,
+        "min_ms": 6.743517,
+        "max_ms": 7.3357079999999995
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "strip/bind/512x512/portable/night",
+      "scene": "strip",
+      "count": 1,
+      "pose": "bind",
+      "resolution": [
+        512,
+        512
+      ],
+      "requested_tier": "portable",
+      "resolved_tier": "portable",
+      "lighting": "night",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 6.865614725000002,
+        "median_ms": 6.794804,
+        "p95_ms": 7.167701999999999,
+        "min_ms": 6.576142999999999,
+        "max_ms": 8.329311
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "strip/bind/512x512/standard/day",
+      "scene": "strip",
+      "count": 1,
+      "pose": "bind",
+      "resolution": [
+        512,
+        512
+      ],
+      "requested_tier": "standard",
+      "resolved_tier": "standard",
+      "lighting": "day",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 6.947369500000001,
+        "median_ms": 6.834187,
+        "p95_ms": 7.683941,
+        "min_ms": 6.636817,
+        "max_ms": 8.290228
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "strip/bind/512x512/standard/night",
+      "scene": "strip",
+      "count": 1,
+      "pose": "bind",
+      "resolution": [
+        512,
+        512
+      ],
+      "requested_tier": "standard",
+      "resolved_tier": "standard",
+      "lighting": "night",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 7.198859125,
+        "median_ms": 7.054791000000001,
+        "p95_ms": 8.642158,
+        "min_ms": 6.700316000000001,
+        "max_ms": 9.362499
+      },
+      "golden": {
+        "status": "baselined",
+        "max_channel_delta": 0,
+        "psnr_db": 999.0
+      },
+      "gpu_timing": null
+    },
+    {
+      "target_id": "strip/bind/1280x720/portable/day",
+      "scene": "strip",
+      "count": 1,
+      "pose": "bind",
+      "resolution": [
+        1280,
+        720
+      ],
+      "requested_tier": "portable",
+      "resolved_tier": "portable",
+      "lighting": "day",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 6.877145524999999,
+        "median_ms": 6.852631,
+        "p95_ms": 7.257561,
+        "min_ms": 6.642949000000001,
+        "max_ms": 7.388226
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "strip/bind/1280x720/portable/night",
+      "scene": "strip",
+      "count": 1,
+      "pose": "bind",
+      "resolution": [
+        1280,
+        720
+      ],
+      "requested_tier": "portable",
+      "resolved_tier": "portable",
+      "lighting": "night",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 6.870213450000001,
+        "median_ms": 6.837583,
+        "p95_ms": 7.355905,
+        "min_ms": 6.58509,
+        "max_ms": 8.434348
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "strip/bind/1280x720/standard/day",
+      "scene": "strip",
+      "count": 1,
+      "pose": "bind",
+      "resolution": [
+        1280,
+        720
+      ],
+      "requested_tier": "standard",
+      "resolved_tier": "standard",
+      "lighting": "day",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 7.120946625,
+        "median_ms": 6.980442,
+        "p95_ms": 8.276472,
+        "min_ms": 6.671431999999999,
+        "max_ms": 8.423708
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "strip/bind/1280x720/standard/night",
+      "scene": "strip",
+      "count": 1,
+      "pose": "bind",
+      "resolution": [
+        1280,
+        720
+      ],
+      "requested_tier": "standard",
+      "resolved_tier": "standard",
+      "lighting": "night",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 6.979777625000001,
+        "median_ms": 6.92686,
+        "p95_ms": 7.4824019999999996,
+        "min_ms": 6.645813,
+        "max_ms": 7.570267
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "strip/animated/512x512/portable/day",
+      "scene": "strip",
+      "count": 1,
+      "pose": "animated",
+      "resolution": [
+        512,
+        512
+      ],
+      "requested_tier": "portable",
+      "resolved_tier": "portable",
+      "lighting": "day",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 6.985300175000002,
+        "median_ms": 6.960092,
+        "p95_ms": 7.421438,
+        "min_ms": 6.715114000000001,
+        "max_ms": 7.5139320000000005
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "strip/animated/512x512/portable/night",
+      "scene": "strip",
+      "count": 1,
+      "pose": "animated",
+      "resolution": [
+        512,
+        512
+      ],
+      "requested_tier": "portable",
+      "resolved_tier": "portable",
+      "lighting": "night",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 6.7900079500000015,
+        "median_ms": 6.695918000000001,
+        "p95_ms": 8.375046000000001,
+        "min_ms": 6.431963,
+        "max_ms": 8.428737
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "strip/animated/512x512/standard/day",
+      "scene": "strip",
+      "count": 1,
+      "pose": "animated",
+      "resolution": [
+        512,
+        512
+      ],
+      "requested_tier": "standard",
+      "resolved_tier": "standard",
+      "lighting": "day",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 6.81990405,
+        "median_ms": 6.728127000000001,
+        "p95_ms": 7.5817890000000006,
+        "min_ms": 6.513536,
+        "max_ms": 8.575913
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "strip/animated/512x512/standard/night",
+      "scene": "strip",
+      "count": 1,
+      "pose": "animated",
+      "resolution": [
+        512,
+        512
+      ],
+      "requested_tier": "standard",
+      "resolved_tier": "standard",
+      "lighting": "night",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 6.720435849999999,
+        "median_ms": 6.676862000000001,
+        "p95_ms": 7.021707999999999,
+        "min_ms": 6.445037,
+        "max_ms": 7.2142
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "strip/animated/1280x720/portable/day",
+      "scene": "strip",
+      "count": 1,
+      "pose": "animated",
+      "resolution": [
+        1280,
+        720
+      ],
+      "requested_tier": "portable",
+      "resolved_tier": "portable",
+      "lighting": "day",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 6.791669624999999,
+        "median_ms": 6.746422,
+        "p95_ms": 7.20911,
+        "min_ms": 6.459555,
+        "max_ms": 8.134845
+      },
+      "golden": {
+        "status": "baselined",
+        "max_channel_delta": 0,
+        "psnr_db": 999.0
+      },
+      "gpu_timing": null
+    },
+    {
+      "target_id": "strip/animated/1280x720/portable/night",
+      "scene": "strip",
+      "count": 1,
+      "pose": "animated",
+      "resolution": [
+        1280,
+        720
+      ],
+      "requested_tier": "portable",
+      "resolved_tier": "portable",
+      "lighting": "night",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 6.741663025000001,
+        "median_ms": 6.66505,
+        "p95_ms": 7.298888,
+        "min_ms": 6.450197,
+        "max_ms": 7.442086
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "strip/animated/1280x720/standard/day",
+      "scene": "strip",
+      "count": 1,
+      "pose": "animated",
+      "resolution": [
+        1280,
+        720
+      ],
+      "requested_tier": "standard",
+      "resolved_tier": "standard",
+      "lighting": "day",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 6.717033175,
+        "median_ms": 6.698562,
+        "p95_ms": 7.177591,
+        "min_ms": 6.45709,
+        "max_ms": 7.256458
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "strip/animated/1280x720/standard/night",
+      "scene": "strip",
+      "count": 1,
+      "pose": "animated",
+      "resolution": [
+        1280,
+        720
+      ],
+      "requested_tier": "standard",
+      "resolved_tier": "standard",
+      "lighting": "night",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 6.911247675,
+        "median_ms": 6.7671,
+        "p95_ms": 8.341313,
+        "min_ms": 6.461187,
+        "max_ms": 8.615828
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "crowd/n1000/1280x720/high/day",
+      "scene": "crowd",
+      "count": 1000,
+      "pose": "static",
+      "resolution": [
+        1280,
+        720
+      ],
+      "requested_tier": "high",
+      "resolved_tier": "high",
+      "lighting": "day",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 8.434861125000001,
+        "median_ms": 8.286610999999999,
+        "p95_ms": 9.728975,
+        "min_ms": 7.991547,
+        "max_ms": 10.531880000000001
+      },
+      "golden": null,
+      "gpu_timing": null
+    },
+    {
+      "target_id": "strip/animated/1280x720/high/day",
+      "scene": "strip",
+      "count": 1,
+      "pose": "animated",
+      "resolution": [
+        1280,
+        720
+      ],
+      "requested_tier": "high",
+      "resolved_tier": "high",
+      "lighting": "day",
+      "backend": "vulkan",
+      "class": "Cel",
+      "frame_stats": {
+        "mean_ms": 6.792811299999999,
+        "median_ms": 6.736844,
+        "p95_ms": 7.288879,
+        "min_ms": 6.4791110000000005,
+        "max_ms": 7.578823
+      },
+      "golden": null,
+      "gpu_timing": null
+    }
+  ]
+}

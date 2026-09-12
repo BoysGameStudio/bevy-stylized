@@ -199,6 +199,14 @@ Golden 对比。
 
 ## 迁移状态记录
 
+### 2026-09-12：V2 批次完成（V2-b / V2-d / V2-e / V2-g）
+
+- **V2-b NPR LOD**：core `StylizedLodPolicy`（4 距离带，只削 tier/feature/几何、永不降 class）+ render 逐实例解析（guard-write MeshTag flags，结构性零材质变异）+ 几何 LOD 换 mesh + governor tier override 端到端联动；showcase `lod` 用例四带梯度可见。
+- **V2-d Environment NPR**：core `StylizedEnvironment`（线性雾 + 大气调色板 + 阴影染色，恒等默认零开销——复用 Bevy DistanceFog view uniform，零新 binding）；三 shader 接线；恒等默认对既有全部 golden diff=0 证明零回归；showcase 昼/黄昏/夜三用例。
+- **V2-e GPU Instance Database**：StorageTable 传输落地（Standard+ 能力门控，MeshTag 携带 24-bit 槽位索引，48B/槽全精度记录 `bevy_stylized.instance/v1`）；两档保真契约成文；实测 5000 实例 churn 17.8ms（表）vs 29.6ms（MeshTag），稳态等价；Portable 三主材质 storage=0 钉死。
+- **V2-g 回归实验室**：`crates/dev/regression-lab`，42-cell sweep（Count × Resolution × Tier × Lighting × Pose + High 探测，backend 轴诚实记 skipped-unavailable），`--gate` 回归门禁（>10% 劣化 exit 1，实测 pass）；sweep 基线入库 docs/performance/baselines/。
+- V2 批次全量验证绿（78 suite）；CHANGELOG 与 provisional 清单同步更新。
+
 ### 2026-09-12：V2-a / V2-c / V2-f 完成
 
 - **V2-a 高级描边**：屏幕空间 depth/normal 边缘描边（overlay 网格材质路径 + prepass，Standard+ 相机级 opt-in）+ hull 混合模式；Portable 默认零成本（fallback 链新增 ScreenOutlineToHull）；golden 语义断言（screen 抓内部边、hybrid 为并集）；showcase 新增 outline-advanced 用例。
