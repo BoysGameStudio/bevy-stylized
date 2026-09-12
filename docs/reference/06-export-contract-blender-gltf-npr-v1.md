@@ -12,7 +12,9 @@
   - 锁定的 glTF exporter 设置集合或任一值；
   - `_NPR_*` attribute 的名称 / domain / data type / accessor 形态；
   - manifest schema（当前 `export-manifest-v1`）；
-  - sidecar schema（当前 `export-sidecar-v1`）。
+  - sidecar schema（当前 `export-sidecar-v1.1`）。
+
+> **Draft 修订记录（2026-09-12，pending ADR-0012 确认时一并审议）**：sidecar schema 从 `export-sidecar-v1` 增量扩展为 `export-sidecar-v1.1`——新增可选字段 `bevy_stylized.genshin.ground_truth`（palette/ramp/材质实例 ground truth 提取，仅 main 角色产出）。该变更为纯增量（additive-only），不破坏 v1 消费方；因本合同尚处 Draft（未经 ADR-0012 冻结），以修订记录形式纳入而非提升合同版本号。若 ADR-0012 确认时认为应触发合同版本升级，则随冻结一并升版。
 - Node-graph signature 的 revision（当前 `gacha-setup-v3.6.2-069e51f3fd89`）跟随上游 Gacha Setup commit，不属于合同版本，但其变化按 04 的流程分类（A–F）处理。
 - 运行期禁止“同一合同版本号下的静默行为漂移”：桥在每次导出时把实际应用的设置做 canonical JSON SHA-256（`export_settings_hash`）写入 manifest，与锁定值比对。
 
@@ -102,7 +104,7 @@
 
 ADR-0020（glTF Extras vs Sidecar Precedence）仍为 Proposed，因此本合同只冻结**中性机制**，不冻结优先级：
 
-1. 桥同时产生两种输出：glTF `extras`（`export_extras=true`，Blender custom properties 随 GLB 携带）与 versioned sidecar（`export-sidecar.json`，schema `export-sidecar-v1`，承载 `bevy_stylized.*` namespaced metadata，命名空间规范见 ADR-0016 方向与 docs/authoring/03-authoring-schema-runtime-packing.md）。
+1. 桥同时产生两种输出：glTF `extras`（`export_extras=true`，Blender custom properties 随 GLB 携带）与 versioned sidecar（`export-sidecar.json`，schema `export-sidecar-v1.1`（v1 + 增量 ground_truth 字段，见 §1 修订记录），承载 `bevy_stylized.*` namespaced metadata，命名空间规范见 ADR-0016 方向与 docs/authoring/03-authoring-schema-runtime-packing.md）。
 2. 两种输出的字段集在 v1 保持一致（sidecar 为正本，extras 为随包副本）。
 3. **消费方优先级与冲突解决规则显式推迟到 ADR-0020**；在该 ADR 关闭前，runtime 导入器不得对二者冲突做静默取舍，遇到不一致必须以诊断/错误暴露。
 

@@ -24,22 +24,27 @@ contract = "blender-gltf-npr-v1"   # 形态已定稿为 Draft（docs/reference/0
 
 [fixture]
 # 自制 Reference fixture（It-1b）：generator 确定性构建，blend 与 glb 均为纯自制内容，可入库。
-id = "reference_scene_v1"
+# v2（2026-09-12）：FixtureHairCard 增加 UV 层（wizard-injection 模拟的 lightmap 采样需要 UV）。
+id = "reference_scene_v2"
 generator = "tools/blender-reference-export/make_reference_scene.py"
-generator_sha256 = "b6dfca1df52127d3909df8e94a7cbe32be1743d5a563eda0166091b26f22c476"
+generator_sha256 = "bb1f5bbc6667edc022fa6ac60b536f3ca69edabffc2149e0b0700128485bafad"
 blend = "fixtures/reference/reference_scene.blend"
-blend_sha256 = "98e2f05567bbbaf885076ef6b27abb8faa1fd01eb646d6dfa4d2b6d96c9084ca"
+blend_sha256 = "d77eeb2a709d924f89dd112e6465102f2e4217bceaadd67556191a1400e96daa"
 glb = "fixtures/reference/reference_scene.glb"
-glb_sha256 = "51467fcd082845c1e2db01f459c38cc93afd608aff7f47ae51586700161dbc18"
+glb_sha256 = "0b00b8a851d90c0c77c04ea73060d54e3592c37dec40f1a0da2544cec359a024"
 
 [golden]
 # It-1b Upstream Golden（Blender 侧，local-only：fixtures/golden-local/upstream/）。
-# revision = sha256 over sorted "<case>:<image_sha256>" lines。
-revision = "ee065c8203bbcf1472951a6c2c8ce20e86f0a120dfab1e016bbc1a2d9acd3801"
+# 2026-09-12 重基线：gacha_upstream 接入真实 ILM/face-SDF/ramp 贴图（wizard-injection
+# 部分模拟，贴图来源 Tenacity odette-npr 本地 sidecar，HoYoverse 衍生、永不入库）。
+# revision = sha256 over sorted "<case>:<image_pixels_sha256>" lines（像素内容哈希；
+# Blender PNG 文件字节含时间戳、跨进程不稳定，见 docs/reference/08 §6）。
+revision = "c4703b3d99b04c375abf5a12da0535f9d57009c2198d2121b9f1f4ded290c2f9"
 renderer = "blender-eevee"
 cases = "pbr_control,gacha_upstream"
 captured = "2026-09-12"
 hardware = "NVIDIA RTX 5090 (local baseline)"
+wizard_injection = "partially-emulated"   # ramp/lightmap/face 贴图经 render_golden.py 注入；palette 属性仍由 Lighting Panel rig 语义提供
 
 [reference_family]
 id = "genshin-festivity-gacha-setup-v1"

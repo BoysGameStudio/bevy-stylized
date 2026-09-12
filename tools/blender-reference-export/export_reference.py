@@ -224,6 +224,100 @@ def group_node_instances(group_name):
                 yield mat, node
 
 
+def socket_json_value(sock):
+    value = getattr(sock, "default_value", None)
+    if value is None:
+        return None
+    if hasattr(value, "__iter__") and not isinstance(value, str):
+        return [float(v) for v in value]
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return float(value)
+    return str(value)
+
+
+def extract_ground_truth(signature, role):
+    """Extract upstream palette/ramp ground truth for the sidecar.
+
+    Per docs/reference/07 (verified 2026-09-12): the global palette is driven
+    by ShaderNodeAttribute nodes (runtime-injected by the Lighting Panel rig /
+    wizard); per-material defaults live on the top-level group instances;
+    ramp/lightmap images are wizard-injected (image=None in the vendor blend).
+    """
+    spec = signature.get("ground_truth", {}).get(role)
+    if spec is None:
+        return None
+
+    truth = {}
+
+    palette_group = bpy.data.node_groups.get(spec["palette_group"])
+    if palette_group is not None:
+        defaults = {}
+        for item in palette_group.interface.items_tree:
+            if item.item_type == "SOCKET" and item.in_out == "OUTPUT" \
+                    and not item.name.startswith("-"):
+                value = getattr(item, "default_value", None)
+                if hasattr(value, "__iter__") and not isinstance(value, str):
+                    value = [float(v) for v in value]
+                elif isinstance(value, (int, float)):
+                    value = float(value)
+                if value is not None:
+                    defaults[item.name] = value
+        attributes = {}
+        for node in palette_group.nodes:
+            if node.bl_idname == "ShaderNodeAttribute" and node.attribute_name:
+                out = node.outputs.get("Color") or node.outputs.get("Vector")
+                fed = [l.to_socket.name for l in palette_group.links
+                       if l.from_node == node]
+                attributes[node.attribute_name] = {
+                    "node": node.name,
+                    "drives": sorted(set(fed)),
+                }
+        truth["palette"] = {
+            "source": "shader_attribute_nodes",
+            "attributes": attributes,
+            "interface_defaults": defaults,
+            "note": "palette values are runtime-injected via mesh/scene attributes "
+                    "by the Lighting Panel rig (setup_wizard ColorPicker-*/ColorWheel-* "
+                    "objects); interface defaults are the in-blend fallback ground truth",
+        }
+
+    materials = {}
+    for mat in bpy.data.materials:
+        if not mat.node_tree:
+            continue
+        for node in mat.node_tree.nodes:
+            if node.bl_idname == "ShaderNodeGroup" and node.node_tree \
+                    and node.node_tree.name in spec["material_groups"]:
+                sockets = {}
+                for sock in node.inputs:
+                    if sock.is_linked or sock.name.startswith("-") or not sock.name:
+                        continue
+                    value = socket_json_value(sock)
+                    if value is not None:
+                        sockets[sock.name] = value
+                materials.setdefault(mat.name, {})[node.node_tree.name] = {
+                    "instance": node.name,
+                    "inputs": sockets,
+                }
+    truth["materials"] = materials
+
+    textures = {}
+    for group_name in spec["texture_groups"]:
+        group = bpy.data.node_groups.get(group_name)
+        if group is None:
+            continue
+        for node in group.nodes:
+            if node.bl_idname == "ShaderNodeTexImage":
+                textures.setdefault(group_name, {})[node.name] = {
+                    "image": node.image.name if node.image else None,
+                    "wizard_injected": node.image is None,
+                }
+    truth["textures"] = textures
+    return truth
+
+
 def build_metadata(signature, role, contract_version, source_path, source_sha):
     """Responsibilities 4 and 6: map upstream inputs to bevy_stylized.* metadata."""
     mapped = {}
@@ -253,7 +347,7 @@ def build_metadata(signature, role, contract_version, source_path, source_sha):
         if values:
             mapped[entry["key"]] = values[0]["value"] if len(values) == 1 else values
     sidecar = {
-        "bevy_stylized.schema_version": "export-sidecar-v1",
+        "bevy_stylized.schema_version": "export-sidecar-v1.1",
         "bevy_stylized.export_contract_version": contract_version,
         "bevy_stylized.source": {
             "path": os.path.basename(source_path),
@@ -264,6 +358,9 @@ def build_metadata(signature, role, contract_version, source_path, source_sha):
         },
         "bevy_stylized.metadata": mapped,
     }
+    ground_truth = extract_ground_truth(signature, role)
+    if ground_truth is not None:
+        sidecar["bevy_stylized.genshin.ground_truth"] = ground_truth
     scene = bpy.context.scene
     scene["bevy_stylized.export_contract_version"] = contract_version
     scene["bevy_stylized.source_role"] = role

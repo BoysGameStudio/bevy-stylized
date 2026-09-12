@@ -106,6 +106,6 @@ profile, not this bridge.
 
 - Export contract: `blender-gltf-npr-v1`
 - Manifest schema: `export-manifest-v1` (`contracts/manifest.schema.json`)
-- Sidecar schema: `export-sidecar-v1`
+- Sidecar schema: `export-sidecar-v1.1`（v1 + 增量 `bevy_stylized.genshin.ground_truth` 字段，main 角色产出 palette/材质实例/贴图引用 ground truth）
 - Signature revision: `gacha-setup-v3.6.2-069e51f3fd89`
   (derived from the actual v3.6.2 artifacts on Blender 5.2.1 LTS)

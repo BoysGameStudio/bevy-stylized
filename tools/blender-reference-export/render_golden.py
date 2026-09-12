@@ -38,6 +38,26 @@ GACHA_BODY_GROUP = "HoYoverse - GI Body"
 GACHA_FACE_GROUP = "HoYoverse - GI Face"
 GACHA_HELPER_OBJECTS = ["Light Direction", "Head Forward", "Head Origin", "Head Up"]
 
+# Wizard-injection emulation (local-only textures, never committed):
+# Tenacity odette-npr sidecar textures, mapped per the verified channel
+# layout (docs/reference/07 §3.2: R=metal, G=AO, B=spec-suppress, A=material-id).
+DEFAULT_TEXTURE_DIR = "/home/x/Projects/Tenacity/crates/client-bevy/assets/models/odette-npr"
+
+# (node group, node name prefix, texture filename, colorspace)
+GROUP_IMAGE_ASSIGNMENTS = [
+    ("Body Shadow Ramp", "Body_Shadow_Ramp", "shadow_ramp.png", "sRGB"),
+    ("Hair Shadow Ramp", "Hair_Shadow_Ramp", "shadow_ramp.png", "sRGB"),
+    ("Face Factor", "Face_Lightmap", "face_lightmap.png", "Non-Color"),
+    ("Face Factor", "Face_Shadow", "face_shadow.png", "Non-Color"),
+    ("Face Shadow", "Face_Shadow", "face_shadow.png", "Non-Color"),  # optional: not in GI Body/Face append closure
+    ("Genshin Metallic", "MetalMap", "metal_map.png", "sRGB"),
+    ("Genshin Specular", "Image Texture", "specular_ramp.png", "sRGB"),
+]
+OPTIONAL_IMAGE_GROUPS = {"Face Shadow"}
+
+TEXTURE_PROVENANCE = ("Tenacity odette-npr sidecar textures (local-only, "
+                      "HoYoverse-derived; never committed to bevy-stylized)")
+
 
 def log(msg):
     print(f"[render-golden] {msg}", flush=True)
@@ -51,6 +71,18 @@ def sha256_file(path):
     return h.hexdigest()
 
 
+def sha256_pixels(path):
+    """Content hash of decoded pixels (PNG file bytes embed timestamps)."""
+    import struct
+    img = bpy.data.images.load(path)
+    pixels = img.pixels[:]
+    h = hashlib.sha256()
+    h.update(struct.pack("<II", img.size[0], img.size[1]))
+    h.update(bytearray(struct.pack(f"<{len(pixels)}f", *pixels)))
+    bpy.data.images.remove(img)
+    return h.hexdigest()
+
+
 def parse_args():
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
     p = argparse.ArgumentParser(description="Capture upstream goldens")
@@ -58,6 +90,9 @@ def parse_args():
     p.add_argument("--out-dir", required=True)
     p.add_argument("--vendor-blend", default=DEFAULT_VENDOR_BLEND)
     p.add_argument("--cases", default="pbr_control,gacha_upstream")
+    p.add_argument("--texture-dir", default=DEFAULT_TEXTURE_DIR,
+                   help="Wizard-injection emulation texture dir (local-only); "
+                        "gacha_upstream fails closed if missing")
     return p.parse_args(argv)
 
 
@@ -80,12 +115,13 @@ def golden_sidecar(case, png_path, blend_path):
         "gacha_setup_asset_digest": "f5ab8206464130962234a7ccab19c7d212a048c848ce3e69518f84fc41a39999",
         "export_contract": "PENDING (blender-gltf-npr-v1 drafted in It-1a; not yet maintainer-confirmed)",
         "profile_schema": "PENDING (gacha/v1 drafted; [profile].genshin_schema still PENDING in reference-toolchain.toml)",
-        "fixture": "reference_scene_v1",
+        "fixture": str(bpy.context.scene.get("bevy_stylized.fixture_id", "unknown")),
         "fixture_sha256": sha256_file(blend_path),
         "renderer": "blender-eevee",
         "case": case,
         "image": os.path.basename(png_path),
         "image_sha256": sha256_file(png_path),
+        "image_pixels_sha256": sha256_pixels(png_path),
         "resolution": [scn.render.resolution_x, scn.render.resolution_y],
         "render_engine": scn.render.engine,
         "color_management": {
@@ -100,7 +136,52 @@ def golden_sidecar(case, png_path, blend_path):
     }
 
 
-def gacha_material(name, group, base_color, body_hair=None):
+def load_texture(texture_dir, filename, colorspace):
+    path = os.path.join(texture_dir, filename)
+    if not os.path.exists(path):
+        raise RuntimeError(f"texture not found: {path}")
+    img = bpy.data.images.load(path, check_existing=True)
+    img.colorspace_settings.name = colorspace
+    return img
+
+
+def assign_group_images(texture_dir):
+    """Assign wizard-injected images into the shared group-internal nodes."""
+    used = {}
+    for group_name, node_prefix, filename, colorspace in GROUP_IMAGE_ASSIGNMENTS:
+        group = bpy.data.node_groups.get(group_name)
+        if group is None:
+            if group_name in OPTIONAL_IMAGE_GROUPS:
+                log(f"optional texture group {group_name!r} not appended; skipping")
+                continue
+            raise RuntimeError(f"expected node group missing for texture wiring: {group_name!r}")
+        matched = [n for n in group.nodes
+                   if n.bl_idname == "ShaderNodeTexImage" and n.name.startswith(node_prefix)]
+        if not matched:
+            raise RuntimeError(f"no texture node {node_prefix!r} in group {group_name!r}")
+        img = load_texture(texture_dir, filename, colorspace)
+        for node in matched:
+            node.image = img
+        used[f"{group_name}/{node_prefix}*"] = {
+            "file": filename,
+            "sha256": sha256_file(os.path.join(texture_dir, filename)),
+            "colorspace": colorspace,
+            "nodes": [n.name for n in matched],
+        }
+    return used
+
+
+def wire_lightmap(nt, group_node, texture_dir, filename):
+    """Wire a real ILM/lightmap texture into a GI Body group instance."""
+    img = load_texture(texture_dir, filename, "Non-Color")
+    tex = nt.nodes.new("ShaderNodeTexImage")
+    tex.image = img
+    nt.links.new(tex.outputs["Color"], group_node.inputs["Lightmap Color"])
+    nt.links.new(tex.outputs["Alpha"], group_node.inputs["Lightmap Alpha"])
+
+
+def gacha_material(name, group, base_color, body_hair=None, texture_dir=None,
+                   lightmap=None):
     mat = bpy.data.materials.new(name)
     mat.use_nodes = True
     nt = mat.node_tree
@@ -126,10 +207,19 @@ def gacha_material(name, group, base_color, body_hair=None):
         "Use Specular Ramp": 0.0,
         "Enable Metallics?": 0.0,
     }
+    if texture_dir is not None and lightmap is not None:
+        # Wizard-injection emulation: real lightmap wired, upstream vendor
+        # material defaults restored where the texture path supports them.
+        neutral_defaults.update({
+            "Use Lightmap AO": 1.0,     # vendor default (docs/reference/07 §3.2 G=AO)
+            "Enable Metallics?": 1.0,   # vendor default (R=metal mask, >0.9)
+        })
     for sock_name, value in neutral_defaults.items():
         sock = node.inputs.get(sock_name)
         if sock is not None and not sock.is_linked:
             sock.default_value = value
+    if texture_dir is not None and lightmap is not None:
+        wire_lightmap(nt, node, texture_dir, lightmap)
     shader_out = node.outputs.get("Shader") or node.outputs.get("BSDF")
     if shader_out is None:
         raise RuntimeError(f"group {group.name!r} exposes no shader output")
@@ -137,7 +227,7 @@ def gacha_material(name, group, base_color, body_hair=None):
     return mat
 
 
-def setup_gacha_upstream(vendor_blend):
+def setup_gacha_upstream(vendor_blend, texture_dir=None):
     """Append the Gacha node groups (and their helper objects) from the vendor blend."""
     if not os.path.exists(vendor_blend):
         raise RuntimeError(f"vendor blend not found: {vendor_blend}")
@@ -155,10 +245,16 @@ def setup_gacha_upstream(vendor_blend):
         if obj.name in GACHA_HELPER_OBJECTS and obj.name not in bpy.context.scene.objects:
             bpy.context.scene.collection.objects.link(obj)
 
+    textures_used = {}
+    if texture_dir is not None:
+        textures_used = assign_group_images(texture_dir)
+
     body_mat = gacha_material("GachaMatBody", appended[GACHA_BODY_GROUP],
-                              (0.72, 0.42, 0.30), body_hair=0.0)
+                              (0.72, 0.42, 0.30), body_hair=0.0,
+                              texture_dir=texture_dir, lightmap="body_lightmap.png")
     hair_mat = gacha_material("GachaMatHair", appended[GACHA_BODY_GROUP],
-                              (0.32, 0.20, 0.11), body_hair=1.0)
+                              (0.32, 0.20, 0.11), body_hair=1.0,
+                              texture_dir=texture_dir, lightmap="hair_lightmap.png")
     face_mat = gacha_material("GachaMatFace", appended[GACHA_FACE_GROUP],
                               (0.86, 0.66, 0.56))
     if face_mat.node_tree:
@@ -177,6 +273,7 @@ def setup_gacha_upstream(vendor_blend):
             raise RuntimeError(f"fixture object missing: {obj_name}")
         obj.data.materials.clear()
         obj.data.materials.append(mat)
+    return textures_used
 
 
 def main():
@@ -193,13 +290,21 @@ def main():
         # Fresh file load per case for isolation.
         bpy.ops.wm.open_mainfile(filepath=blend)
         png = os.path.join(out_dir, f"{case}.png")
+        textures_used = None
         try:
             if case == "gacha_upstream":
-                setup_gacha_upstream(vendor)
+                texture_dir = os.path.abspath(args.texture_dir)
+                if not os.path.isdir(texture_dir):
+                    raise RuntimeError(f"texture dir not found: {texture_dir}")
+                textures_used = setup_gacha_upstream(vendor, texture_dir)
             elif case != "pbr_control":
                 raise RuntimeError(f"unknown case {case!r}")
             render_to(png)
             sidecar = golden_sidecar(case, png, blend)
+            if textures_used:
+                sidecar["textures"] = textures_used
+                sidecar["texture_provenance"] = TEXTURE_PROVENANCE
+                sidecar["wizard_injection_emulated"] = True
             sidecar_path = os.path.join(out_dir, f"{case}.golden.json")
             with open(sidecar_path, "w", encoding="utf-8") as f:
                 json.dump(sidecar, f, indent=1)

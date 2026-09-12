@@ -1,9 +1,9 @@
 {
- "bevy_stylized.schema_version": "export-sidecar-v1",
+ "bevy_stylized.schema_version": "export-sidecar-v1.1",
  "bevy_stylized.export_contract_version": "blender-gltf-npr-v1",
  "bevy_stylized.source": {
   "path": "reference_scene.blend",
-  "sha256": "98e2f05567bbbaf885076ef6b27abb8faa1fd01eb646d6dfa4d2b6d96c9084ca",
+  "sha256": "d77eeb2a709d924f89dd112e6465102f2e4217bceaadd67556191a1400e96daa",
   "role": "fixture",
   "gacha_setup_release": null,
   "gacha_setup_commit": null

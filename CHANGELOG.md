@@ -14,6 +14,14 @@ Semantic Versioning applies once the first release is published.
   - 测量子采样（文档化）：15 warm-up + 40 测量帧（benchmarks 为 20+60），保持分钟级墙钟；帧统计 mean/median/p95/min/max；4 个代表 cell 的 golden 子集捕获（`fixtures/golden-local/regression-lab/`，首跑写基线，后续 diff）；
   - 回归门禁：`--gate BASELINE.json` 按 target_id 对齐，mean 帧时劣化 >10% 记回归并 exit 1（缺失 cell 如实记录不算回归）；gate 语义纯逻辑单测覆盖；
   - 本机基线：`docs/performance/baselines/sweep-nvidia-geforce-rtx-5090--vulkan-2026-09-12.json`（可入库测量数据）。
+- V2 GPU-driven Rendering 可行性评估（评估交付，非生产特性）——
+  - API 调研 + spike 证据：`docs/rendering/04-gpu-driven-feasibility.md`（能力矩阵：indirect draw 内建默认启用 / 内建管线 GPU frustum+occlusion culling / instance compaction 构建块 pub 但无 phase 注入点 / meshlet feature-gated High-only / 自定义 compute 可用）；
+  - spike crate `crates/dev/gpu-driven-spike`（publish=false）：compute 视锥剔除 + 实例压缩原型（raw wgpu 层，golden-harness probe 设备），10k/50k/100k 实例——CPU 剔除线性 0.21→2.08ms vs GPU dispatch ≈0.15ms 平坦（100k 时 ~14×），CPU/GPU 可见计数逐一相等的正确性门；原始数据 `target/tmp/gpu-driven-spike/spike_results.json`；
+  - 结论：不做自定义 GPU-driven 改造（内建已覆盖；实例规模距瓶颈两个量级）；Portable 管线零触碰；重访条件写入文档。
+- 三层对比 loop-closure（dev-only，reference-comparison）——
+  - production 路径接线侧车声明纹理（export-sidecar-v1.1 + golden provenance 的 Tenacity 本地路径，env-gated `TENACITY_ROOT`）：Body/Hair ← ILM lightmap + shadow ramp（Genshin 寻址）、Head ← face lightmap（SDF softness 0.001 取侧车 ground truth）；`Use Specular Ramp=0` 不接线；metal_map **不接线**（上游 Metallic 块公式与我方 matcap 语义不同源，实测绑定反降 PSNR——记录在案的语义缺口）；face_shadow 无生产槽位（wiring gap 记录）；
+  - 结构性发现：上游 diffuse 项不乘 key light 能量（能量由 palette lit 携带）；对比域 palette lit 设为 fixture 太阳能量色（去掉 1/π，能量只进 soft 层），shadow 色取侧车 Daytime Shadow Color；
+  - 结果：production_vs_upstream **PSNR 16.9 → 21.0dB**；判据不放宽（仍 REPORT）；dated 记录见 docs/reference/08。
 - V2-e：GPU Instance Database first cut（provisional pending ADR-0004；**scope 诚实声明**：StorageTable 传输 + 双保真契约落地，完整 bindless 生产路径不在本切片）——
   - core：`StylizedInstanceGpuRecord`（全精度实例记录 schema：face_threshold f32 / face_side / outline_scale f32 / profile_index u32 / palette_index / quality_flags / light_tint；新 schema 命名空间 `bevy_stylized.instance/v1`；**两档保真契约**写入类型文档：MeshTag = 粗粒度子集（u8 量化阈值/u7 outline/u8 profile），表 = 全字段全精度）；`StylizedFallbackStep::InstanceTableToMeshTag`（additive 枚举变体，登记通道回退语义）；
   - render：`instance_table` 模块——`StylizedInstanceTableEntry`（记录组件）+ `StylizedInstanceSlot`（槽位）+ `StylizedInstanceTable` 资源（`ShaderBuffer` 数据资产，48B/槽位）+ `sync_instance_table`（懒初始化、确定性槽位分配、脏时全量重写、容量倍增、**无 per-frame 写**）；`sync_instance_tags` 双布局打包（带槽位 → 24-bit 索引 + flags；否则位打包）；`select_transport` 落地选择规则：**tier ≥ Standard ⇒ StorageTable**（Standard 的 tier 需求表已要求 storage buffer 特性，解析到该档即蕴含设备能力），否则 MeshTagBits；`StylizedCharacterTableMaterial`（与 MeshTag 变体共享 shader/参数语义，`#[storage(7, read_only)]` 表 binding + `INSTANCE_STORAGE_TABLE` shader def；**Portable 永不实例化**——三个主材质 layout 保持零 storage binding，测试钉死）；

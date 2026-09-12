@@ -2,7 +2,7 @@
 
 `reference_scene.blend` is a 100% self-made fixture scene generated
 deterministically by `tools/blender-reference-export/make_reference_scene.py`
-(id `reference_scene_v1`, hashes locked in
+(id `reference_scene_v2`, hashes locked in
 `docs/reference/reference-toolchain.toml` `[fixture]`). It contains no
 upstream-derived content and is committable per
 `docs/reference/05-license-and-provenance-boundary.md`.

@@ -32,7 +32,7 @@ import sys
 import bpy
 from mathutils import Vector
 
-SCENE_VERSION = "reference_scene_v1"
+SCENE_VERSION = "reference_scene_v2"
 
 # Fixed scene constants (do not change without bumping SCENE_VERSION and
 # re-capturing goldens).
@@ -138,6 +138,14 @@ def make_hair_card(mat):
             faces.append((i, i + 1, i + cols + 2, i + cols + 1))
     mesh = bpy.data.meshes.new("FixtureHairCard")
     mesh.from_pydata(verts, [], faces)
+    # Deterministic planar UVs (grid coordinates) so lightmap/ramp texture
+    # paths can bind to this mesh.
+    uv_layer = mesh.uv_layers.new(name="UVMap")
+    for poly in mesh.polygons:
+        for li in poly.loop_indices:
+            vi = mesh.loops[li].vertex_index
+            r, c = divmod(vi, cols + 1)
+            uv_layer.data[li].uv = (c / cols, r / rows)
     mesh.update()
     obj = bpy.data.objects.new("FixtureHairCard", mesh)
     bpy.context.collection.objects.link(obj)

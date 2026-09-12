@@ -199,6 +199,14 @@ Golden 对比。
 
 ## 迁移状态记录
 
+### 2026-09-12：GPU-driven 评估 + 对比链路闭环
+
+- **GPU-driven 可行性评估**（`docs/rendering/04-gpu-driven-feasibility.md` + `crates/dev/gpu-driven-spike`）：Bevy 0.19.1 已默认启用 indirect draw + GPU 剔除；compute 视锥剔除 spike 实测 100k 实例 GPU 0.15ms vs CPU 2.08ms（~14×）；结论：**不建议自定义 GPU-driven 改造**（内建管线已覆盖，框架实例规模距瓶颈两个量级），重访条件成文。
+- **导出桥 palette/ramp 真值**：sidecar 升级 `export-sidecar-v1.1`，新增 `bevy_stylized.genshin.ground_truth`（材质级 64 项参数：阴影色 1–5、Face Blush、Outline Color 1–5、Metallic 常数等）；palette 注入机制查明（ShaderNodeAttribute + Lighting Panel rig，blend 内默认全白）。
+- **Upstream Golden 真实贴图路径**：fixture 升 v2（发卡补 UV），odette-npr 本地贴图按已核实通道布局接入（ramp/ILM/face SDF/metal/spec），provenance 记录贴图 sha256 与 `wizard_injection_emulated`；golden 重基线，复现脚本两次 bit-identical。Blender PNG 字节不稳（时间戳元数据）→ provenance 改用像素内容哈希。
+- **对比链路闭环**：production 消费侧车 palette 真值 + ILM 贴图接线；结构性发现（diffuse 不乘光能、能量由 palette lit 携带）归一化后 production vs upstream **16.9dB → 21.0dB**（mean −51%）；残余缺口（metallic 语义不同源、face_shadow 槽位、cast shadow、rig palette 导出）全部记录在 docs/reference/08。
+- 全量验证绿（81 suite）。
+
 ### 2026-09-12：V2 批次完成（V2-b / V2-d / V2-e / V2-g）
 
 - **V2-b NPR LOD**：core `StylizedLodPolicy`（4 距离带，只削 tier/feature/几何、永不降 class）+ render 逐实例解析（guard-write MeshTag flags，结构性零材质变异）+ 几何 LOD 换 mesh + governor tier override 端到端联动；showcase `lod` 用例四带梯度可见。

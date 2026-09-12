@@ -92,6 +92,74 @@ fn upstream_golden_path() -> PathBuf {
         .join("../../../fixtures/golden-local/upstream/gacha_upstream.png")
 }
 
+/// 桥产出的 upstream ground-truth sidecar（vendor main blend 的 main-role
+/// 导出；local-only，见 fixtures/golden-local/ 规则）。
+fn upstream_sidecar_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../fixtures/golden-local/upstream/export-main/export-sidecar.json")
+}
+
+/// 从桥 sidecar 提取的 upstream palette ground truth。
+///
+/// 来源（docs/reference/07 §3.7，2026-09-12 核实）：palette socket 由
+/// `ShaderNodeAttribute` 驱动（Lighting Panel rig / wizard 运行时注入）；
+/// blend 内可提取的 ground truth 是 `Global Material Properties` 的
+/// interface 默认值 + Lighting Panel picker 默认（均为白色），材质级阴影
+/// 色在各材质的 group 实例默认值里。
+struct UpstreamPalette {
+    // 全局四色接口默认（全白）不再消费——golden 用的是 rig 注入值
+    //（未导出），白色会整体欠曝；lit 能量经太阳常数归一（见
+    // adopt_production）。此处只保留实际消费的字段。
+    /// 全局 `Shadow Position` 默认值（阴影阈值基准）。
+    shadow_position: f32,
+    /// 材质级 ground truth：Face Shader 的 Daytime Shadow Color
+    ///（暖粉阴影色，docs/reference/07 §3.7 已核实为材质实例默认）。
+    daytime_shadow: LinearRgba,
+}
+
+fn sidecar_color(defaults: &serde_json::Value, name: &str) -> Option<LinearRgba> {
+    let arr = defaults.get(name)?.as_array()?;
+    if arr.len() < 3 {
+        return None;
+    }
+    Some(LinearRgba::new(
+        arr[0].as_f64()? as f32,
+        arr[1].as_f64()? as f32,
+        arr[2].as_f64()? as f32,
+        1.0,
+    ))
+}
+
+fn load_upstream_palette() -> UpstreamPalette {
+    let path = upstream_sidecar_path();
+    let text = std::fs::read_to_string(&path)
+        .unwrap_or_else(|e| panic!("upstream sidecar missing ({e}): {path:?} — run the export bridge on the vendor main blend (role=main)"));
+    let json: serde_json::Value = serde_json::from_str(&text).expect("parse upstream sidecar");
+    let defaults = json
+        .get("bevy_stylized.genshin.ground_truth")
+        .and_then(|gt| gt.get("palette"))
+        .and_then(|p| p.get("interface_defaults"))
+        .expect("sidecar missing bevy_stylized.genshin.ground_truth.palette.interface_defaults");
+    let color = |name: &str| {
+        sidecar_color(defaults, name).unwrap_or_else(|| panic!("palette socket {name} missing"))
+    };
+    let _ = color; // 四色接口默认已知为全白（见 struct 注释），不再读取
+    UpstreamPalette {
+        shadow_position: defaults
+            .get("Shadow Position")
+            .and_then(serde_json::Value::as_f64)
+            .expect("palette socket Shadow Position missing") as f32,
+        daytime_shadow: json
+            .get("bevy_stylized.genshin.ground_truth")
+            .and_then(|gt| gt.get("materials"))
+            .and_then(|m| m.get("HoYoverse - Genshin Face"))
+            .and_then(|m| m.get("HoYoverse - GI Face"))
+            .and_then(|g| g.get("inputs"))
+            .and_then(|i| sidecar_color(i, "Daytime Shadow Color"))
+            .expect("face Daytime Shadow Color missing"),
+    }
+}
+
 #[derive(Resource, Clone)]
 struct TargetHolder(capture::CaptureTarget);
 
@@ -200,6 +268,79 @@ fn gpu_info(app: &App) -> (String, String) {
 }
 
 // ---------------------------------------------------------------------------
+// 侧车声明的纹理接线（export-sidecar-v1.1 ground_truth.textures +
+// gacha_upstream.golden.json 的本地 provenance）
+// ---------------------------------------------------------------------------
+
+/// Tenacity 本地 odette-npr 纹理目录（local-only，HoYoverse 派生，永不入库；
+/// 与 golden_odette 测试同一 env-gated 模式）。
+fn tenacity_npr_dir() -> Option<PathBuf> {
+    let root = std::env::var("TENACITY_ROOT")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("/home/x/Projects/Tenacity"));
+    let dir = root.join("crates/client-bevy/assets/models/odette-npr");
+    dir.is_dir().then_some(dir)
+}
+
+/// 侧车声明的纹理映射（已核实通道布局 docs/reference/07 §3.2；provenance
+/// 的 colorspace 字段决定 sRGB/线性）。
+struct SidecarTextures {
+    /// ILM：R=metal / G=AO / B=spec 抑制 / A=材质分带（Non-Color）。
+    body_lightmap: Option<bevy::prelude::Handle<Image>>,
+    /// 同上（hair 用）。
+    hair_lightmap: Option<bevy::prelude::Handle<Image>>,
+    /// Face SDF 阈值图（Non-Color）。
+    face_lightmap: Option<bevy::prelude::Handle<Image>>,
+    /// 阴影 ramp atlas（sRGB）。
+    shadow_ramp: Option<bevy::prelude::Handle<Image>>,
+    // specular_ramp / metal_map：侧车有声明，但 Use Specular Ramp=0 且
+    // Metallic 块公式与我方 matcap 语义不同源——有意不加载（见
+    // docs/reference/08 第四轮记录）。
+}
+
+fn load_png_image(
+    images: &mut Assets<Image>,
+    path: &PathBuf,
+    srgb: bool,
+) -> bevy::prelude::Handle<Image> {
+    let decoded = golden_harness::decode_png(&std::fs::read(path).expect("read texture png"))
+        .expect("decode texture png");
+    let format = if srgb {
+        bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb
+    } else {
+        bevy::render::render_resource::TextureFormat::Rgba8Unorm
+    };
+    let mut image = Image::new_fill(
+        bevy::render::render_resource::Extent3d {
+            width: decoded.width,
+            height: decoded.height,
+            depth_or_array_layers: 1,
+        },
+        bevy::render::render_resource::TextureDimension::D2,
+        &[0, 0, 0, 255],
+        format,
+        bevy::asset::RenderAssetUsages::default(),
+    );
+    image.data = Some(decoded.data);
+    image.sampler = bevy::image::ImageSampler::linear();
+    images.add(image)
+}
+
+/// 按 golden provenance 的 colorspace 声明加载侧车纹理；Tenacity 缺失时
+/// 全部 `None`（退化为纯参数对比，env-gated 与 golden_odette 一致）。
+fn load_sidecar_textures(images: &mut Assets<Image>) -> SidecarTextures {
+    let load = |images: &mut Assets<Image>, name: &str, srgb: bool| {
+        tenacity_npr_dir().map(|dir| load_png_image(images, &dir.join(name), srgb))
+    };
+    SidecarTextures {
+        body_lightmap: load(images, "body_lightmap.png", false),
+        hair_lightmap: load(images, "hair_lightmap.png", false),
+        face_lightmap: load(images, "face_lightmap.png", false),
+        shadow_ramp: load(images, "shadow_ramp.png", true),
+    }
+}
+
+// ---------------------------------------------------------------------------
 // (a) production：StylizedHeroMaterial
 // ---------------------------------------------------------------------------
 
@@ -208,40 +349,109 @@ fn adopt_production(
     ready: Res<SceneReady>,
     standard: Res<Assets<StandardMaterial>>,
     mut materials: ResMut<Assets<StylizedHeroMaterial>>,
-    meshes: Query<(bevy::prelude::Entity, &MeshMaterial3d<StandardMaterial>)>,
+    mut images: ResMut<Assets<Image>>,
+    meshes: Query<(
+        bevy::prelude::Entity,
+        &MeshMaterial3d<StandardMaterial>,
+        Option<&bevy::gltf::GltfMaterialName>,
+    )>,
     mut done: bevy::prelude::Local<bool>,
 ) {
     if !ready.0 || *done {
         return;
     }
-    for (entity, handle) in &meshes {
+    let palette = load_upstream_palette();
+    // 侧车纹理（export-sidecar-v1.1 声明 + golden provenance 的本地路径；
+    // Tenacity 缺失时全 None → 纯参数对比，env-gated）。
+    let textures = load_sidecar_textures(&mut images);
+    let textures_present = textures.body_lightmap.is_some();
+    eprintln!("[adopt] sidecar textures present: {textures_present}");
+
+    for (entity, handle, material_name) in &meshes {
         let source = standard.get(&handle.0).expect("ready");
         let factor = LinearRgba::from(source.base_color);
         let mut params = StylizedHeroParams::default();
         params.character.cel.base_color_factor =
             bevy::math::Vec4::new(factor.red, factor.green, factor.blue, 1.0);
-        params.character.cel = params.character.cel.with_shadow(0.5, 0.1, 0.3);
-        params.character.cel =
-            params
-                .character
-                .cel
-                .with_rim(3.0, 0.2, LinearRgba::new(0.5, 0.6, 0.8, 1.0));
-        // palette 近似值（authored approximation，provisional——真实值应由
-        // profile metadata 导出；lit 色承载 key light 能量，上游结构如此）：
-        // 数值按 upstream golden 亮/暗区实测比例标定。
+        // palette 取自桥提取的 upstream ground truth（export-main
+        // sidecar）。**lit 色 = fixture 太阳能量色（(1,0.956,0.898)×3.0，
+        // 线性）**：已核实上游结构中 palette lit 携带光能（shader 的
+        // diffuse 项不乘 key light 颜色/能量——energy 走 palette 通道），
+        // golden 的 rig 实际值未入任何导出物，最忠实的可溯源近似是
+        // fixture 的同名太阳常数（与 SUN_LINEAR 同源，去掉 1/π——半兰伯特
+        // 路径无 Lambert 归一）。shadow 色 = 侧车材质级 ground truth
+        //（Daytime Shadow Color (0.9,0.7,0.75)）；接口默认的白色四色
+        // 证明与 golden 不符（golden 用 rig 注入值），白色会导致整体
+        // 欠曝——这是已记录的导出物缺口（rig palette 未导出）。
+        let sun_energy = LinearRgba::new(1.0 * 3.0, 0.956 * 3.0, 0.898 * 3.0, 1.0);
         params.character = params.character.with_palette(
-            LinearRgba::new(3.45, 3.3, 3.1, 1.0),
-            LinearRgba::new(3.3, 2.55, 2.45, 1.0),
-            LinearRgba::new(1.0, 1.0, 1.0, 1.0),
-            LinearRgba::new(0.97, 0.94, 0.92, 1.0),
+            sun_energy,
+            palette.daytime_shadow,
+            LinearRgba::WHITE, // sharp lit = 白（能量只进 soft 层，避免双层相乘过曝）
+            palette.daytime_shadow,
         );
-        let material = materials.add(StylizedHeroMaterial {
-            params,
+        params.character.cel = params
+            .character
+            .cel
+            .with_shadow(palette.shadow_position, 0.1, 0.3)
+            .with_rim(3.0, 0.2, LinearRgba::new(0.5, 0.6, 0.8, 1.0));
+
+        // 按材质名接线侧车纹理（已核实 ILM 布局 R=metal/G=AO/B=spec
+        // 抑制/A=分带；docs/reference/07 §3.2）：
+        //
+        // - Head：face SDF = face_lightmap（Non-Color），face basis +Z
+        //   （fixture 头朝相机）；face_shadow（blush overlay）**生产材质无
+        //   此槽位** —— 记录在案的 wiring gap（见 docs/reference/08）；
+        // - Body/Hair：ILM lightmap + Genshin 寻址的 shadow ramp +
+        //   specular ramp + metal matcap（MetalMap 语义 = matcap）；
+        // - Ground：无纹理（场景地板）。
+        let name = material_name.map(|n| n.0.as_str()).unwrap_or("");
+        let material = StylizedHeroMaterial {
+            params: match name {
+                "FixtureMatHead" => {
+                    // 侧车 ground truth：Face Shadow Softness = 0.001
+                    //（近硬边界）。阈值不覆盖——用 head-basis 光照角导出值
+                    //（face_threshold_from_dots；bias 属 authoring 微调，
+                    // 上游 Face 组无此输入）。
+                    params.character = params.character.with_face_forward(Vec3::Z, 0.001);
+                    params
+                }
+                "FixtureMatBody" | "FixtureMatHair" => {
+                    // 侧车材质级 ground truth：Use Shadow Ramp=1（ramp width
+                    // 1.0）、Use Specular Ramp=**0**（不接线）。
+                    params = params.with_genshin_ramp(palette.shadow_position, 1.0);
+                    // Enable Metallics=1 在上游有效，但其 matcap 块公式
+                    // （dark/light tint 混合 + brightness 缩放）与我方
+                    // matcap 语义不同源——绑定 metal_map 反引入误差
+                    // （实测：不绑 17.6dB > 绑 16.7dB），**不接线**并在
+                    // docs/reference/08 记录该语义缺口。
+                    params
+                }
+                _ => params,
+            },
             base_color_texture: source.base_color_texture.clone(),
+            ilm_texture: match name {
+                "FixtureMatBody" => textures.body_lightmap.clone(),
+                "FixtureMatHair" => textures.hair_lightmap.clone(),
+                _ => None,
+            },
+            face_sdf_texture: match name {
+                "FixtureMatHead" => textures.face_lightmap.clone(),
+                _ => None,
+            },
+            ramp_texture: match name {
+                "FixtureMatBody" | "FixtureMatHair" => textures.shadow_ramp.clone(),
+                _ => None,
+            },
+            // Use Specular Ramp = 0（侧车 ground truth）→ 不绑定。
+            spec_ramp_texture: None,
+            // matcap 语义缺口（见上）：不绑定 metal_map。
+            matcap_texture: None,
             // 发卡面片等 double-sided 资产（ADR-0023 矩阵的 cull 维度）。
             double_sided: source.double_sided,
             ..StylizedHeroMaterial::default()
-        });
+        };
+        let material = materials.add(material);
         commands
             .entity(entity)
             .remove::<MeshMaterial3d<StandardMaterial>>()

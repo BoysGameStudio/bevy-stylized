@@ -21,12 +21,12 @@
  "canonical_environment_id": "genshin-festivity-gacha-setup-v1",
  "source_fixture": {
   "path": "reference_scene.blend",
-  "sha256": "98e2f05567bbbaf885076ef6b27abb8faa1fd01eb646d6dfa4d2b6d96c9084ca",
+  "sha256": "d77eeb2a709d924f89dd112e6465102f2e4217bceaadd67556191a1400e96daa",
   "role": "fixture"
  },
  "outputs": {
   "glb": "reference_scene.glb",
-  "glb_sha256": "51467fcd082845c1e2db01f459c38cc93afd608aff7f47ae51586700161dbc18",
+  "glb_sha256": "0b00b8a851d90c0c77c04ea73060d54e3592c37dec40f1a0da2544cec359a024",
   "sidecar": "export-sidecar.json",
   "node_graph_signature": "node-graph-signature.json"
  },

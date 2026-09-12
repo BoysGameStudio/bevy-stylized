@@ -1,0 +1,32 @@
+{
+  "provisional": true,
+  "iteration": "V2-gpu-driven-eval",
+  "gpu": "NVIDIA GeForce RTX 5090 (Vulkan)",
+  "notes": "gpu_submit = 结果留 GPU（生产形态：可见表直接喂 indirect draw）；gpu_readback = 含 GPU→CPU 计数往返（生产应避免，此处如实测量）；CPU 基线为同数学逐实例剔除（check_visibility 的角色）。",
+  "measurements": [
+    {
+      "instances": 10000,
+      "cpu_cull_ms": 0.2116085,
+      "gpu_submit_ms": 0.1873935,
+      "gpu_readback_ms": 0.20357405,
+      "cpu_visible": 3318,
+      "gpu_visible": 3318
+    },
+    {
+      "instances": 50000,
+      "cpu_cull_ms": 1.0217589500000002,
+      "gpu_submit_ms": 0.1487095,
+      "gpu_readback_ms": 0.16889055,
+      "cpu_visible": 16775,
+      "gpu_visible": 16775
+    },
+    {
+      "instances": 100000,
+      "cpu_cull_ms": 2.06834255,
+      "gpu_submit_ms": 0.1592211,
+      "gpu_readback_ms": 0.1714318,
+      "cpu_visible": 33577,
+      "gpu_visible": 33577
+    }
+  ]
+}

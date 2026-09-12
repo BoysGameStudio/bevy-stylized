@@ -91,6 +91,55 @@ Upstream Golden（Blender EEVEE）与 Engine Golden（Bevy runtime）的对比�
 > 工作）；③ 发卡等 per-material palette 区分（同上）。对比域 palette 为
 > 标定近似值（provisional，标注于 reference-comparison 源码）。
 > 结论：结构正确性优先于像素贴近度；草案判据不放宽。
+>
+> **Gap 闭环（2026-09-12，同日第三轮）——palette ground truth + ILM 贴图路径**：
+> ① 导出桥 sidecar 升级为 `export-sidecar-v1.1`，新增
+> `bevy_stylized.genshin.ground_truth`（main 角色）：全局 palette 的存放位置
+> 已核实为 `Global Material Properties` 内的 ShaderNodeAttribute 节点
+> （Lighting Panel rig / wizard 运行时注入；picker 默认与 interface 默认均为
+> 白色），材质级 ground truth（Daytime/Nighttime Shadow Color (0.9,0.7,0.75)、
+> 5 色 outline 等 64 项/材质实例）已可提取；`crates/dev/reference-comparison`
+> 已改为消费 sidecar palette（白色四色 + Shadow Position=0.55），标定近似值
+> （(3.45,3.3,3.1) 等）废弃。② upstream golden 重基线：`gacha_upstream` 接入
+> 真实 ILM/face-SDF/ramp 贴图（Tenacity odette-npr 本地 sidecar，永不入库；
+> 通道按 doc 07 §3.2 已核实布局接线），fixture 升 `reference_scene_v2`
+> （发卡补 UV 层）。重基线后三层对比：production_vs_upstream
+> max_nonedge=0.631 / mean=0.0772 / PSNR=16.9dB / shadow IoU=0.927 /
+> silhouette IoU=0.996；engine_reference_vs_upstream max=0.475 / mean=0.112 /
+> PSNR=14.2dB；production_vs_engine max=0.224 / mean=0.0443 / PSNR=22.8dB。
+> PSNR 较上一轮（21.1dB）下降是**预期且诚实**的：upstream golden 现在携带
+> ILM 纹理内容（AO/metal 区块），production 路径尚未消费该数据——残余误差
+> 从"palette 近似"转为"ILM 数据路径缺失"（已知偏差，待 `_NPR_*`/ILM 导入
+> 路径落地后回收）。production_vs_engine 显著收敛（11.9→22.8dB）则印证
+> palette 标定误差已被 ground truth 消除。判据不放宽，仍为 REPORT。
+>
+> **工具发现（同日）**：Blender PNG 输出**文件字节跨进程不稳定**（内嵌时间
+> 戳类元数据），像素内容则逐位一致（compare_golden max=0.0）。Golden
+> provenance 与 `[golden].revision` 因此改用**像素内容哈希**
+> （`image_pixels_sha256`，见各 `<case>.golden.json` 与
+> docs/reference/reference-toolchain.toml）；文件字节哈希仅作辅助。
+>
+> **Loop-closure（2026-09-12，同日第四轮）——production 消费 ILM/face 纹理
+> + 能量归一**：① `reference-comparison` 的 production 路径按侧车声明接线
+> 纹理（Tenacity 本地 odette-npr，env-gated 同 golden_odette）：Body/Hair ←
+> ILM lightmap + shadow ramp（Genshin 寻址，Shadow Position=0.55 /
+> width=1.0），Head ← face lightmap（SDF，softness 取侧车 ground truth
+> 0.001）；`Use Specular Ramp=0`（不接线）。② **结构性发现**：已核实上游
+> 光照结构中 diffuse 项不乘 key light 能量——**能量由 palette lit 色携带**；
+> golden 实际使用的是 rig 注入值（未入任何导出物），接口默认全白会让
+> production 整体欠曝。对比域因此把 palette lit 设为 fixture 太阳能量色
+> （(1,0.956,0.898)×3.0，与 SUN_LINEAR 同源、去掉 1/π——半兰伯特路径无
+> Lambert 归一；能量只进 soft 层，sharp lit 保持白以避免串联双乘过曝），
+> shadow 色取侧车材质级 ground truth（Daytime Shadow Color (0.9,0.7,0.75)）。
+> ③ 结果：production_vs_upstream **PSNR 16.9→21.0dB**（mean 0.0772→0.0379）；
+> shadow IoU 0.927→0.896（亮侧能量上移改变了阴影掩码边界，如实记录）；
+> production_vs_engine 22.8→14.3dB（legacy 中性 ramp 路径未做同等能量归一，
+> 预期分离）。④ 残余缺口（已知偏差，不放宽判据）：metal matcap 块公式与
+> 上游 Metallic 块语义不同源（dark/light tint 混合 + brightness 缩放），绑定
+> metal_map 实测反引入误差（16.7dB < 不绑 16.9dB）→ **不接线**，待上游
+> Metallic 块数学核实后落地；face_shadow（blush overlay）生产材质无槽位
+> （wiring gap，Face Blush Strength=0 时无影响）；无 cast shadow（结构性，
+> A 类）。
 
 ## 4. "Validated" 的定义
 
@@ -98,7 +147,7 @@ Upstream Golden（Blender EEVEE）与 Engine Golden（Bevy runtime）的对比�
 
 1. 满足 §2 的全部归一化前置条件；
 2. 所有 Golden case 通过 §3 的全部判据（或差异逐项列入已知偏差清单并按 docs/reference/04 §变化分类 A–F 归类）；
-3. 每个 case 的 `<case>.golden.json` provenance 完整（格式见 docs/reference/04 §Golden Provenance；当前实例含 `reference_toolchain`、`blender`、`gacha_setup`(+commit+digest)、`export_contract`、`profile_schema`、`fixture`(+sha256)、`renderer`、`image_sha256`、`resolution`、`color_management`、`hardware`）；
+3. 每个 case 的 `<case>.golden.json` provenance 完整（格式见 docs/reference/04 §Golden Provenance；当前实例含 `reference_toolchain`、`blender`、`gacha_setup`(+commit+digest)、`export_contract`、`profile_schema`、`fixture`(+sha256)、`renderer`、`image_sha256` + `image_pixels_sha256`（像素内容哈希，2026-09-12 起为主）、`resolution`、`color_management`、`hardware`，涉 wizard 模拟时另有 `textures` + `wizard_injection_emulated`）；
 4. 复现脚本（同层 `reproduce_golden.sh`，跨层 harness 属 It-2 `crates/dev/golden-harness`）在干净进程重跑后仍在 Tier 0 容差内。
 
 ## 5. Golden 更新纪律

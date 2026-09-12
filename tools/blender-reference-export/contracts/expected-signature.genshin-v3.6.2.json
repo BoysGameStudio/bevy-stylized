@@ -2900,5 +2900,24 @@
   ],
   "outline": [],
   "post": []
+ },
+ "ground_truth": {
+  "main": {
+   "palette_group": "Global Material Properties",
+   "material_groups": [
+    "HoYoverse - GI Body",
+    "HoYoverse - GI Face",
+    "HoYoverse - GI Outlines"
+   ],
+   "texture_groups": [
+    "Body Shadow Ramp",
+    "Hair Shadow Ramp",
+    "Face Shadow",
+    "Face Factor",
+    "Genshin Metallic",
+    "Genshin Specular"
+   ],
+   "notes": "palette_group outputs are driven by ShaderNodeAttribute nodes (runtime-injected by the Lighting Panel rig / wizard); interface defaults are the fallback ground truth. material_groups: dump unlinked instance input defaults per material. texture_groups: record image reference of each ShaderNodeTexImage (null = wizard-injected at runtime)."
+  }
  }
 }
