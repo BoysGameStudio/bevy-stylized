@@ -1,4 +1,4 @@
-//! Showcase 框架（It-9a）：14 个固定用例（docs/showcase/01 关卡表 ×
+//! Showcase 框架（It-9a）：17 个固定用例（docs/showcase/01 关卡表 ×
 //! release gate §Showcase）。
 //!
 //! 每个用例 = 固定场景构建器 + 可选 headless 捕获。职责边界：
@@ -143,7 +143,7 @@ pub fn capture_case(case: &ShowcaseCase, resources: RenderResources) -> Captured
     panic!("showcase capture timed out for {}", case.name);
 }
 
-/// 全部 14 个用例（顺序固定）。
+/// 全部 17 个用例（顺序固定）。
 pub fn all_cases() -> Vec<ShowcaseCase> {
     vec![
         ShowcaseCase {
@@ -245,6 +245,28 @@ pub fn all_cases() -> Vec<ShowcaseCase> {
             name: "lod",
             build: cases::lod,
             view: None,
+            asset_root: None,
+            tier: None,
+        },
+        // environment（V2-d）：同场景三套环境调色板（昼雾/黄昏/夜）。
+        ShowcaseCase {
+            name: "environment-day",
+            build: cases::environment,
+            view: Some(cases::environment_day),
+            asset_root: None,
+            tier: None,
+        },
+        ShowcaseCase {
+            name: "environment-dusk",
+            build: cases::environment,
+            view: Some(cases::environment_dusk),
+            asset_root: None,
+            tier: None,
+        },
+        ShowcaseCase {
+            name: "environment-night",
+            build: cases::environment,
+            view: Some(cases::environment_night),
             asset_root: None,
             tier: None,
         },

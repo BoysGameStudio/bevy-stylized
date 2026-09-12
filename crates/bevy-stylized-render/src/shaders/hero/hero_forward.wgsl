@@ -17,6 +17,7 @@
 
 #import bevy_stylized_render::common::npr_common::{
     deform_vertex, analytic_ramp, face_light_dots, face_threshold_from_dots,
+    environment_fog_apply, environment_shadow_tint,
 }
 #import bevy_pbr::{
     forward_io::{Vertex, VertexOutput, FragmentOutput},
@@ -302,9 +303,10 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
 
     // 双档光照（docs/reference/07 §3.7 已核实：sharp/soft 串联相乘 +
     // ambient，全 MULTIPLY；ramp 阴影色替代 softShadow）。
-    let soft_mix = mix(shadow_color, params.character.palette_soft_lit.rgb, lit_factor);
+    // 阴影色经环境阴影染色（V2-d；强度 0 时逐位恒等）。
+    let soft_mix = mix(environment_shadow_tint(shadow_color), params.character.palette_soft_lit.rgb, lit_factor);
     let sharp_mix = select(
-        params.character.palette_sharp_shadow.rgb,
+        environment_shadow_tint(params.character.palette_sharp_shadow.rgb),
         params.character.palette_sharp_lit.rgb,
         lit_factor > 0.5,
     );
@@ -352,6 +354,9 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
     if (char_flags & CHAR_FLAG_EMISSION) != 0u {
         color += params.character.emission.rgb * params.character.emission.w * base.a;
     }
+
+    // 环境 NPR（V2-d）：距离雾（无 DistanceFog 组件时逐位恒等）。
+    color = environment_fog_apply(color, in.world_position.xyz, view.world_position);
 
     color *= view.exposure;
 

@@ -674,3 +674,108 @@ mod tests {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// environment（V2-d）：同一场景 × 三套环境调色板（昼雾 / 黄昏 / 夜）
+// ---------------------------------------------------------------------------
+/// 共用场景：双列球体向远处递退 + 地面，雾的距离梯度可见。
+pub fn environment(app: &mut App) {
+    // 着色基色（雾/阴影染色在有色表面上才可读）。
+    let sphere_params = StylizedCelParams {
+        base_color_factor: bevy::math::Vec4::new(0.85, 0.62, 0.55, 1.0),
+        ..StylizedCelParams::default()
+    };
+    let material = app
+        .world_mut()
+        .resource_mut::<Assets<StylizedCelMaterial>>()
+        .add(StylizedCelMaterial {
+            params: sphere_params,
+            ..StylizedCelMaterial::default()
+        });
+    let ground_params = StylizedCelParams {
+        base_color_factor: bevy::math::Vec4::new(0.55, 0.6, 0.5, 1.0),
+        ..StylizedCelParams::default()
+    };
+    let ground_material = app
+        .world_mut()
+        .resource_mut::<Assets<StylizedCelMaterial>>()
+        .add(StylizedCelMaterial {
+            params: ground_params,
+            ..StylizedCelMaterial::default()
+        });
+    let mesh = sphere(app, 0.9);
+    for (i, z) in [-2.0, -6.0, -12.0, -20.0, -30.0, -45.0]
+        .into_iter()
+        .enumerate()
+    {
+        let x = if i % 2 == 0 { -1.5 } else { 1.5 };
+        app.world_mut().spawn((
+            Mesh3d(mesh.clone()),
+            MeshMaterial3d(material.clone()),
+            Transform::from_xyz(x, 0.9, z),
+        ));
+    }
+    // 地面（大 cuboid）：雾在平面上的横向梯度。
+    let ground = app.world_mut().resource_mut::<Assets<Mesh>>().add(
+        bevy::math::primitives::Cuboid::from_size(Vec3::new(60.0, 0.1, 120.0)),
+    );
+    app.world_mut().spawn((
+        Mesh3d(ground),
+        MeshMaterial3d(ground_material),
+        Transform::from_xyz(0.0, -0.05, -40.0),
+    ));
+    case_camera(app, Vec3::new(0.0, 2.5, 4.0), Vec3::new(0.0, 0.5, -15.0));
+}
+
+/// 昼：浅蓝灰雾 + 淡蓝天色 + 轻阴影染色。
+pub fn environment_day(view: &mut StylizedViewDescriptor) {
+    view.environment = StylizedEnvironment {
+        fog: StylizedFog {
+            enabled: true,
+            color: LinearRgba::new(0.58, 0.68, 0.84, 1.0),
+            start: 14.0,
+            end: 80.0,
+        },
+        shadow_tint: StylizedShadowTint {
+            color: LinearRgba::new(0.6, 0.68, 0.95, 1.0),
+            strength: 0.5,
+        },
+        zenith_tint: Some(LinearRgba::new(0.45, 0.6, 0.85, 1.0)),
+    };
+}
+
+/// 黄昏：暖橙雾 + 紫红天色 + 紫色阴影染色 + 暖 key light。
+pub fn environment_dusk(view: &mut StylizedViewDescriptor) {
+    view.key_light_color = LinearRgba::new(1.0, 0.75, 0.55, 1.0);
+    view.environment = StylizedEnvironment {
+        fog: StylizedFog {
+            enabled: true,
+            color: LinearRgba::new(0.85, 0.55, 0.38, 1.0),
+            start: 6.0,
+            end: 45.0,
+        },
+        shadow_tint: StylizedShadowTint {
+            color: LinearRgba::new(0.55, 0.4, 0.7, 1.0),
+            strength: 0.5,
+        },
+        zenith_tint: Some(LinearRgba::new(0.4, 0.25, 0.45, 1.0)),
+    };
+}
+
+/// 夜：深蓝雾 + 深蓝天色 + 强冷色阴影染色 + 夜间 ambient。
+pub fn environment_night(view: &mut StylizedViewDescriptor) {
+    view.day_night_factor = 0.0;
+    view.environment = StylizedEnvironment {
+        fog: StylizedFog {
+            enabled: true,
+            color: LinearRgba::new(0.08, 0.1, 0.2, 1.0),
+            start: 5.0,
+            end: 40.0,
+        },
+        shadow_tint: StylizedShadowTint {
+            color: LinearRgba::new(0.45, 0.5, 0.85, 1.0),
+            strength: 0.7,
+        },
+        zenith_tint: Some(LinearRgba::new(0.03, 0.05, 0.12, 1.0)),
+    };
+}

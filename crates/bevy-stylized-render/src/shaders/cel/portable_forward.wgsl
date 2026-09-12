@@ -13,7 +13,10 @@
 //   Instance 层 → mesh_functions::get_tag（MeshTag → ramp 行索引，
 //                 provisional ADR-0004 传输方案 A）
 
-#import bevy_stylized_render::common::npr_common::{deform_vertex, analytic_ramp}
+#import bevy_stylized_render::common::npr_common::{
+    deform_vertex, analytic_ramp, environment_fog_apply, environment_shadow_tint,
+    environment_shadow_tint_strength,
+}
 #import bevy_pbr::{
     forward_io::{Vertex, VertexOutput, FragmentOutput},
     mesh_functions,
@@ -165,6 +168,15 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
         let fresnel = pow(clamp(1.0 - dot(normal, view_direction), 0.0, 1.0), params.rim.x);
         color += fresnel * params.rim.y * params.rim_color.rgb;
     }
+
+    // 环境 NPR（V2-d）：阴影侧乘法 tint（背光权重加权；强度 0 时逐位
+    // 恒等）+ 距离雾（无 DistanceFog 组件时恒等）。
+    let tint_strength = environment_shadow_tint_strength();
+    if tint_strength > 0.0 {
+        let shadow_weight = 1.0 - half_lambert;
+        color = mix(color, environment_shadow_tint(color), tint_strength * shadow_weight);
+    }
+    color = environment_fog_apply(color, in.world_position.xyz, view.world_position);
 
     // View 层曝光。
     color *= view.exposure;

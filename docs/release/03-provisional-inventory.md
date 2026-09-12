@@ -21,6 +21,7 @@
 | MeshTag 位段布局（instance 传输方案 A）；StorageTable 声明未实现 | ADR-0004 | crates/bevy-stylized-render/src/instance.rs、cel/character/hero WGSL 的位段注释 | 100/1000 实例 1 draw + 逐实例差异图（`tests/instance_batching.rs`、spike 报告） |
 | Per-class fallback 链与 `*_portable_fallback` 的触发语义（tier_reduced 即应用全链） | 无专属 ADR（fallback 策略；ADR-0018 已 Accepted 不覆盖此项） | crates/bevy-stylized-core/src/capability.rs（`STYLIZED_FALLBACK_CHAINS`）、render/src/character.rs、hero.rs | 快照式 fallback 矩阵测试（3 class × 3 档 × 4 能力模型） |
 | View 层映射常数（昼夜 ambient 亮度/色温、ILM AO floor、display-transform hook 曲线） | ADR-0009 | render/src/view.rs（`NIGHT_AMBIENT_*`）、render/src/post.rs、character WGSL AO floor | view 同步单测 + character golden |
+| 环境 NPR（V2-d first cut）：DistanceFog uniform 通道复用（`directional_light_color` = 阴影染色通道）、线性雾无 height falloff、zenith = 平涂清屏色、outline 不挂雾、无 IBL/reflection | ADR-0009 | core/src/environment.rs、render/src/view.rs（`environment_distance_fog`）、npr_common.wgsl 环境段 | 3 套 showcase 环境捕获（day/dusk/night）+ 既有 golden diff=0（恒等默认）+ 映射单测 |
 | Outline 生命周期为最小副本同步（bounds/LOD/despawn 完整语义未定） | ADR-0008 | render/src/outline.rs（`StylizedOutline`/`sync_outline_replicas`）、outline WGSL | outline golden + Odette 发卡排障（顶点色宽度抑制） |
 | Screen-space 描边（V2-a）：tier 门控 + overlay 实现 + 混合模式 | ADR-0008 | render/src/screen_outline.rs、outline/screen_outline.wgsl | outline-advanced 三捕获 golden + 边缘计数断言 + gating 单测 |
 | Alpha/prepass/shadow 语义矩阵（Opaque/Mask 支持、Blend 类型层不可达、prepass/shadow 显式关闭） | ADR-0023 | render/tests/semantics_matrix.rs、docs/authoring/05 §7 矩阵表 | 矩阵数据驱动测试 + golden |
@@ -55,7 +56,7 @@
 | 0005/0006 | 1 |
 | 0007 | tier2 阈值草案校准（docs/reference/08 已记实测注记） |
 | 0008 | 1 |
-| 0009 | 1 |
+| 0009 | 2（+V2-d 环境 NPR 通道） |
 | 0010 | 1 |
 | 0018 | 1（V2-b NPR LOD） |
 | 0019 | 1 |

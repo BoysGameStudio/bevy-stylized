@@ -212,6 +212,10 @@ pub struct StylizedViewDescriptor {
     /// 相机 NPR 状态。
     #[cfg_attr(feature = "serde", serde(default))]
     pub camera: StylizedCameraNprState,
+    /// 环境模型（V2-d；additive since schema v1.1——缺省解析为恒等默认，
+    /// 既有 v1.0 payload 行为不变）。
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub environment: crate::environment::StylizedEnvironment,
 }
 
 #[cfg(feature = "serde")]
@@ -230,6 +234,7 @@ impl Default for StylizedViewDescriptor {
             exposure: 1.0,
             quality: StylizedViewQuality::default(),
             camera: StylizedCameraNprState::default(),
+            environment: crate::environment::StylizedEnvironment::default(),
         }
     }
 }

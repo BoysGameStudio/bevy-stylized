@@ -19,15 +19,18 @@
 //!   通道进入 shader，不写材质）；
 //! - `day_night_factor`（0 = 夜，1 = 昼）→ 在昼/夜环境亮度与色温之间
 //!   lerp **环境光**（不改 ramp 行——ramp 行选择属于 Instance/Profile
-//!   语义；该选择是本迭代的显式决策，见函数文档）。
+//!   语义；该选择是本迭代的显式决策，见函数文档）；
+//! - `environment`（V2-d）→ 相机 `DistanceFog` 组件（雾参数 + 阴影染色
+//!   通道，见 [`environment_distance_fog`]）与 zenith 天色清屏色。
 
 use bevy::{
-    camera::Exposure,
-    color::LinearRgba,
+    camera::{Camera, ClearColorConfig, Exposure},
+    color::{Color, LinearRgba},
     light::{AmbientLight, DirectionalLight},
+    pbr::{DistanceFog, FogFalloff},
     prelude::{Camera3d, Commands, Component, Entity, Query, Res, Resource, Transform, Vec3, With},
 };
-use bevy_stylized_core::StylizedViewDescriptor;
+use bevy_stylized_core::{StylizedEnvironment, StylizedViewDescriptor};
 
 /// View 层 NPR 状态（资源形式，帧级）。
 ///
@@ -94,6 +97,48 @@ pub fn resolve_ambient_light(descriptor: &StylizedViewDescriptor) -> AmbientLigh
     }
 }
 
+/// 环境模型 → Bevy `DistanceFog` 组件映射（V2-d，provisional pending
+/// ADR-0009）。
+///
+/// 通道约定（与 `npr_common.wgsl` 的环境段一致）：
+///
+/// - `color` = 雾色（rgb + alpha 强度）；`falloff = Linear(start, end)`；
+/// - `directional_light_color` 复用为**风格化阴影染色**通道（rgb + alpha
+///   强度）——Bevy 原生散射语义我方 shader 不消费；正式 view uniform 属
+///   ADR-0009 决策。
+///
+/// `None` = 恒等（不挂组件，shader 侧无 `DISTANCE_FOG` def，零开销）。
+/// 阴影染色强度 > 0 但雾未启用时仍挂组件（雾参数取 `f32::MAX`，因子恒 0）
+/// ——阴影染色需要这条 uniform 通道。
+#[must_use]
+pub fn environment_distance_fog(environment: &StylizedEnvironment) -> Option<DistanceFog> {
+    let fog_active = environment.fog.enabled && environment.fog.is_valid();
+    let shadow_active = environment.shadow_tint.strength > 0.0;
+    if !fog_active && !shadow_active {
+        return None;
+    }
+    let (start, end) = if fog_active {
+        (environment.fog.start, environment.fog.end)
+    } else {
+        // 不产雾：stylized_fog_factor 对 end <= start fail-closed 为 0。
+        (f32::MAX, f32::MAX)
+    };
+    let tint = environment.shadow_tint;
+    Some(DistanceFog {
+        color: Color::LinearRgba(environment.fog.color),
+        // 阴影染色通道（见函数文档的通道约定）。
+        directional_light_color: Color::LinearRgba(LinearRgba::new(
+            tint.color.red,
+            tint.color.green,
+            tint.color.blue,
+            tint.strength.clamp(0.0, 1.0),
+        )),
+        // 我方 shader 不使用散射指数。
+        directional_light_exponent: 0.0,
+        falloff: FogFalloff::Linear { start, end },
+    })
+}
+
 /// 每帧同步 View 层数据。
 ///
 /// 只写 Bevy 的 view-layer 对象（key light 实体、相机组件），不触碰任何
@@ -102,7 +147,16 @@ pub fn sync_stylized_view(
     mut commands: Commands,
     settings: Option<Res<StylizedViewSettings>>,
     mut key_lights: Query<(&mut Transform, &mut DirectionalLight), With<StylizedKeyLight>>,
-    mut cameras: Query<(Entity, Option<&mut Exposure>, Option<&mut AmbientLight>), With<Camera3d>>,
+    mut cameras: Query<
+        (
+            Entity,
+            Option<&mut Exposure>,
+            Option<&mut AmbientLight>,
+            Option<&mut DistanceFog>,
+            &mut Camera,
+        ),
+        With<Camera3d>,
+    >,
 ) {
     let descriptor = settings.map(|s| s.0.clone()).unwrap_or_default();
 
@@ -138,7 +192,10 @@ pub fn sync_stylized_view(
     // Exposure + Ambient（palette / day-night 经 ambient 通道进入 shader）。
     let exposure = exposure_component(descriptor.exposure);
     let ambient = resolve_ambient_light(&descriptor);
-    for (entity, current_exposure, current_ambient) in &mut cameras {
+    // 环境 NPR（V2-d）：DistanceFog 组件（雾 + 阴影染色通道）与 zenith
+    // 天色（清屏色）；恒等默认下 DistanceFog 移除/不挂（零开销路径）。
+    let distance_fog = environment_distance_fog(&descriptor.environment);
+    for (entity, current_exposure, current_ambient, current_fog, mut camera) in &mut cameras {
         match current_exposure {
             Some(mut current) => *current = exposure,
             None => {
@@ -154,6 +211,25 @@ pub fn sync_stylized_view(
                     entity_commands.insert(ambient.clone());
                 }
             }
+        }
+        match (&distance_fog, current_fog) {
+            (Some(fog), Some(mut current)) => *current = fog.clone(),
+            (Some(fog), None) => {
+                if let Ok(mut entity_commands) = commands.get_entity(entity) {
+                    entity_commands.insert(fog.clone());
+                }
+            }
+            (None, Some(_)) => {
+                if let Ok(mut entity_commands) = commands.get_entity(entity) {
+                    entity_commands.remove::<DistanceFog>();
+                }
+            }
+            (None, None) => {}
+        }
+        // zenith 天色 → 平涂天空（清屏色）；`None` = 不触碰（渐变天空球
+        // 超出 V2 first cut）。
+        if let Some(zenith) = descriptor.environment.zenith_tint {
+            camera.clear_color = ClearColorConfig::Custom(Color::LinearRgba(zenith));
         }
     }
 }
@@ -229,5 +305,142 @@ mod tests {
         assert!((exposure.exposure() - 1.0).abs() < 1e-5);
         let mut ambients = app.world_mut().query::<&AmbientLight>();
         assert_eq!(ambients.iter(app.world()).count(), 1);
+        // 环境恒等默认：不挂 DistanceFog，清屏色不动。
+        assert_eq!(
+            app.world_mut()
+                .query::<&DistanceFog>()
+                .iter(app.world())
+                .count(),
+            0
+        );
+    }
+
+    #[test]
+    fn environment_distance_fog_mapping() {
+        use bevy_stylized_core::{StylizedFog, StylizedShadowTint};
+
+        // 恒等 → 不挂组件。
+        assert!(environment_distance_fog(&StylizedEnvironment::default()).is_none());
+
+        // 雾启用 → Linear(start, end) + 雾色。
+        let env = StylizedEnvironment {
+            fog: StylizedFog {
+                enabled: true,
+                color: LinearRgba::new(0.5, 0.6, 0.7, 1.0),
+                start: 10.0,
+                end: 80.0,
+            },
+            ..StylizedEnvironment::default()
+        };
+        let fog = environment_distance_fog(&env).expect("fog component");
+        match fog.falloff {
+            FogFalloff::Linear { start, end } => {
+                assert_eq!((start, end), (10.0, 80.0));
+            }
+            other => panic!("expected linear falloff, got {other:?}"),
+        }
+        assert_eq!(
+            fog.color,
+            Color::LinearRgba(LinearRgba::new(0.5, 0.6, 0.7, 1.0))
+        );
+
+        // 雾参数非法（end <= start）→ fail-closed 不产雾（但阴影通道仍可
+        // 独立激活）。
+        let invalid = StylizedEnvironment {
+            fog: StylizedFog {
+                enabled: true,
+                start: 80.0,
+                end: 10.0,
+                ..StylizedFog::default()
+            },
+            ..StylizedEnvironment::default()
+        };
+        assert!(environment_distance_fog(&invalid).is_none());
+
+        // 纯阴影染色 → 仍挂组件，雾参数取 MAX（因子恒 0），染色经
+        // directional_light_color（rgb + alpha 强度）。
+        let shadow_only = StylizedEnvironment {
+            shadow_tint: StylizedShadowTint {
+                color: LinearRgba::new(0.4, 0.4, 0.6, 1.0),
+                strength: 0.5,
+            },
+            ..StylizedEnvironment::default()
+        };
+        let fog = environment_distance_fog(&shadow_only).expect("shadow tint channel");
+        match fog.falloff {
+            FogFalloff::Linear { start, end } => {
+                assert_eq!(start, f32::MAX);
+                assert_eq!(end, f32::MAX);
+            }
+            other => panic!("expected linear falloff, got {other:?}"),
+        }
+        let LinearRgba {
+            red,
+            green,
+            blue,
+            alpha,
+        } = LinearRgba::from(fog.directional_light_color);
+        assert!((red - 0.4).abs() < 1e-6);
+        assert!((blue - 0.6).abs() < 1e-6);
+        assert!((alpha - 0.5).abs() < 1e-6);
+        let _ = green;
+    }
+
+    #[test]
+    fn view_sync_manages_fog_component_and_zenith_clear_color() {
+        use bevy::prelude::*;
+        use bevy_stylized_core::{StylizedFog, StylizedShadowTint};
+        let mut app = App::new();
+        app.add_plugins(bevy::app::TaskPoolPlugin::default());
+        app.init_resource::<StylizedViewSettings>();
+        app.add_systems(PostUpdate, sync_stylized_view);
+        let camera = app.world_mut().spawn(Camera3d::default()).id();
+        app.update();
+        // 恒等默认：无 fog 组件。
+        assert!(
+            app.world().entity(camera).get::<DistanceFog>().is_none(),
+            "identity default must not attach fog"
+        );
+
+        // 开雾 + 阴影染色 + zenith → 组件出现、清屏色更新。
+        app.world_mut().resource_mut::<StylizedViewSettings>().0 = StylizedViewDescriptor {
+            environment: StylizedEnvironment {
+                fog: StylizedFog {
+                    enabled: true,
+                    ..StylizedFog::default()
+                },
+                shadow_tint: StylizedShadowTint {
+                    strength: 0.6,
+                    ..StylizedShadowTint::default()
+                },
+                zenith_tint: Some(LinearRgba::new(0.2, 0.3, 0.6, 1.0)),
+            },
+            ..StylizedViewDescriptor::default()
+        };
+        app.update();
+        assert!(app.world().entity(camera).get::<DistanceFog>().is_some());
+        let clear = &app
+            .world()
+            .entity(camera)
+            .get::<Camera>()
+            .unwrap()
+            .clear_color;
+        match clear {
+            ClearColorConfig::Custom(Color::LinearRgba(color)) => {
+                let expected = LinearRgba::new(0.2, 0.3, 0.6, 1.0);
+                assert!((color.red - expected.red).abs() < 1e-6);
+                assert!((color.blue - expected.blue).abs() < 1e-6);
+            }
+            other => panic!("expected custom zenith clear color, got {other:?}"),
+        }
+
+        // 回到恒等 → fog 组件移除。
+        app.world_mut().resource_mut::<StylizedViewSettings>().0 =
+            StylizedViewDescriptor::default();
+        app.update();
+        assert!(
+            app.world().entity(camera).get::<DistanceFog>().is_none(),
+            "identity must remove the fog component (zero-cost path)"
+        );
     }
 }

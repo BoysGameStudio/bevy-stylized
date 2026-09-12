@@ -119,6 +119,21 @@ fn cases() -> Vec<Case> {
             cases.push(Case { path, defs });
         }
     }
+    // 环境 NPR（V2-d）：DISTANCE_FOG def 打开时 fog uniform binding 才存在
+    // （view 层 DistanceFog 组件驱动），单独覆盖该组合。
+    const FOGGED: &[&str] = &[
+        "VERTEX_POSITIONS",
+        "VERTEX_NORMALS",
+        "VERTEX_UVS_A",
+        "DISTANCE_FOG",
+    ];
+    for path in [
+        CHARACTER_PORTABLE_FORWARD_SHADER_PATH,
+        CEL_PORTABLE_FORWARD_SHADER_PATH,
+        HERO_FORWARD_SHADER_PATH,
+    ] {
+        cases.push(Case { path, defs: FOGGED });
+    }
     // 全屏后处理 shader：无 mesh def（guard 在 compose 循环里）。
     for path in FULLSCREEN_CASES {
         cases.push(Case { path, defs: &[] });

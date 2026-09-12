@@ -27,7 +27,10 @@ pub const SCHEMA_ID_MATERIAL_V1: StylizedSchemaId =
     StylizedSchemaId::new("bevy_stylized.material", 1, 0);
 
 /// View domain v1 的完整 schema 标识。
-pub const SCHEMA_ID_VIEW_V1: StylizedSchemaId = StylizedSchemaId::new("bevy_stylized.camera", 1, 0);
+///
+/// minor 1.1（additive）：新增可选 `environment` 字段（V2-d 环境模型，
+/// 缺省解析为恒等默认）。
+pub const SCHEMA_ID_VIEW_V1: StylizedSchemaId = StylizedSchemaId::new("bevy_stylized.camera", 1, 1);
 
 /// `bevy_stylized.*` namespace 内某一 domain 的版本化 schema 标识。
 ///

@@ -75,7 +75,10 @@ pub use screen_outline::{
     SCREEN_OUTLINE_SHADER_PATH, StylizedOutlineMode, StylizedScreenOutline,
     StylizedScreenOutlineMaterial, StylizedScreenOutlineParams, resolve_outline_mode,
 };
-pub use view::{StylizedKeyLight, StylizedViewSettings, exposure_component, resolve_ambient_light};
+pub use view::{
+    StylizedKeyLight, StylizedViewSettings, environment_distance_fog, exposure_component,
+    resolve_ambient_light,
+};
 
 use bevy::{
     app::{App, Plugin, PostUpdate},
