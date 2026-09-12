@@ -41,17 +41,31 @@ pub const HERO_FLAG_MATCAP: u32 = 1 << 2;
 pub const HERO_FLAG_SPEC_RAMP: u32 = 1 << 3;
 /// Hero@Portable fallback 生效（matcap / spec ramp / packed normal 关闭）。
 pub const HERO_FLAG_PORTABLE_FALLBACK: u32 = 1 << 4;
+/// Genshin-profile ramp 寻址（docs/reference/07 §3.1 已核实公式）启用位；
+/// 未设置时走通用 MeshTag 行寻址。
+pub const HERO_FLAG_GENSHIN_RAMP: u32 = 1 << 5;
 
-/// Hero 材质 GPU uniform：character 参数 + hero 扩展 2×vec4
-/// （packed 单 UBO，160B）。
-#[derive(Clone, Copy, Debug, Default, PartialEq, Reflect, ShaderType)]
+/// Hero 材质 GPU uniform：character 参数 + hero 扩展 2×vec4（packed 单
+/// UBO，240B）。
+#[derive(Clone, Copy, Debug, PartialEq, Reflect, ShaderType)]
 pub struct StylizedHeroParams {
-    /// Character 层参数（face/hair/emission/cel 基础）。
+    /// Character 层参数（face/hair/emission/cel 基础 + palette + face up）。
     pub character: StylizedCharacterParams,
-    /// x = matcap 强度，y = spec ramp 强度，z = ramp atlas 行数，w 预留。
+    /// x = matcap 强度，y = spec ramp 强度，z = shadow position（已核实
+    /// ramp 公式的 ShadowPosition），w = ramp width（ShadowRampWidth）。
     pub hero_a: bevy::math::Vec4,
     /// rgb = matcap 染色（线性），w = 位标志（bitcast u32，见 `HERO_FLAG_*`）。
     pub hero_b: bevy::math::Vec4,
+}
+
+impl Default for StylizedHeroParams {
+    fn default() -> Self {
+        Self {
+            character: StylizedCharacterParams::default(),
+            hero_a: bevy::math::Vec4::new(0.0, 0.0, 0.5, 1.0),
+            hero_b: bevy::math::Vec4::new(1.0, 1.0, 1.0, 0.0),
+        }
+    }
 }
 
 impl StylizedHeroParams {
@@ -74,10 +88,21 @@ impl StylizedHeroParams {
         self
     }
 
-    /// authored ramp atlas 行数（profile_index 行选择除数）。
+    /// 通用 ramp 路径的 atlas 行数（MeshTag 行选择除数；存于 cel 参数
+    /// 的 ramp 行字段。Genshin 寻址启用时不使用该路径）。
     #[must_use]
     pub fn with_ramp_rows(mut self, rows: f32) -> Self {
-        self.hero_a.z = rows.max(1.0);
+        self.character.cel = self.character.cel.with_ramp_rows(rows);
+        self
+    }
+
+    /// 启用 Genshin-profile ramp 寻址（已核实公式，docs/reference/07 §3.1）：
+    /// `shadow_position` = ShadowPosition，`ramp_width` = ShadowRampWidth。
+    #[must_use]
+    pub fn with_genshin_ramp(mut self, shadow_position: f32, ramp_width: f32) -> Self {
+        self.hero_a.z = shadow_position.clamp(0.01, 1.0);
+        self.hero_a.w = ramp_width.max(0.01);
+        self.set_flag(HERO_FLAG_GENSHIN_RAMP, true);
         self
     }
 

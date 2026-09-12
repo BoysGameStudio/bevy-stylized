@@ -20,11 +20,13 @@ struct StylizedFullscreenEffect {
 
 @group(0) @binding(2) var<uniform> settings: StylizedFullscreenEffect;
 
-// 占位 display transform hook（简单 filmic-ish 压缩；正式曲线属
-// profile/ADR-0009）。
+// Display transform hook：上游 Genshin Tonemapper 的固定有理曲线
+// （docs/reference/07 §3.8 已核实，逐节点转储）：
+// f(x) = x·(1.36·x + 0.047) / (x·(0.93·x + 0.56) + 0.14)，clamp。
 fn simple_compress(x: vec3<f32>) -> vec3<f32> {
-    return clamp(x * (1.2 * x + vec3<f32>(0.05)) / (x * (x + vec3<f32>(0.6)) + vec3<f32>(0.2)),
-        vec3<f32>(0.0), vec3<f32>(1.0));
+    let numerator = x * (1.36 * x + vec3<f32>(0.047));
+    let denominator = x * (0.93 * x + vec3<f32>(0.56)) + vec3<f32>(0.14);
+    return clamp(numerator / denominator, vec3<f32>(0.0), vec3<f32>(1.0));
 }
 
 @fragment

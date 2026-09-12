@@ -9,8 +9,13 @@
 //! - **Face SDF 用共享材质 + per-instance 状态**：阈值/侧选择经
 //!   [`crate::instance::StylizedInstanceData`]（MeshTag 通道）逐实例传入，
 //!   绝不为此克隆 unique material（rendering/02 的禁令）；
-//! - **预算**：3 纹理 / 3 sampler / 1 UBO（base + ILM + face SDF），
-//!   ILM 通道约定 R=AO、G=hair mask、A=emission mask；
+//! - **预算**：3 纹理 / 3 sampler / 1 UBO（base + ILM + face SDF）；
+//!   ILM 通道布局（docs/reference/07 §3.2，已核实）：**R = 金属遮罩
+//!   （>0.9 阈值）、G = AO、B = 高光抑制（因子 1.03−B）、A = 材质分带
+//!   ID**（ramp 分带阈值 0.2/0.4/0.6/0.8）；顶点色层：R = vertex AO、
+//!   G = ramp 阴影宽度缩放。Emission mask 走 base color alpha（上游经
+//!   alpha switch `0=Emission,1=Transparency` 路由——我们没有 ILM
+//!   emission 通道；此决策为 provisional，pending ADR-0023 矩阵）；
 //! - **Character@Portable fallback**（显式降级定义，非静默）：
 //!   - Face SDF 缺失或 fallback 标志 → 半兰伯特 step 近似（复用 Cel 阴影）；
 //!   - Hair 高光缺失/关闭 → rim 近似（用 rim 通道补偿）。
@@ -39,7 +44,8 @@ pub const CHARACTER_PORTABLE_FORWARD_SHADER_PATH: &str =
 pub const CHAR_FLAG_ILM_TEXTURE: u32 = 1 << 0;
 /// `face_misc.y` 位标志：Face SDF 纹理存在。
 pub const CHAR_FLAG_FACE_SDF_TEXTURE: u32 = 1 << 1;
-/// `face_misc.y` 位标志：Hair 高光启用（ILM.G 为 mask）。
+/// `face_misc.y` 位标志：Hair 高光启用（mask = 顶点色 G？否——
+/// ILM 无 hair 通道；hair mask 取 ILM.A? 见 shader 注释）。
 pub const CHAR_FLAG_HAIR_SPECULAR: u32 = 1 << 2;
 /// `face_misc.y` 位标志：Emission 启用（ILM.A 为 mask）。
 pub const CHAR_FLAG_EMISSION: u32 = 1 << 3;
@@ -48,10 +54,18 @@ pub const CHAR_FLAG_EMISSION: u32 = 1 << 3;
 /// 见 [`apply_character_portable_fallback`]。
 pub const CHAR_FLAG_PORTABLE_FALLBACK: u32 = 1 << 4;
 
-/// Character 材质 GPU uniform（2 个 UBO 中的第 1 个；与 cel 同构的
-/// 基础参数 + character 扩展，packed，禁止 per-feature UBO）。
+/// Character 材质 GPU uniform（cel 基础 + character 扩展，packed，
+/// 禁止 per-feature UBO）。
 ///
-/// 布局：cel 基础 4×vec4 + character 扩展 4×vec4 = 128B，单 UBO。
+/// 布局（13×vec4 = 208B，单 UBO）：cel 基础 4 + face_forward/face_misc/
+/// hair/emission 4 + palette 4（sharp/soft × lit/shadow）+ face_up。
+///
+/// Palette 语义（docs/reference/07 §3.7，已核实）：sharp/soft 双档光色与
+/// 双档阴影色为**串联相乘**结构——soft = lerp(softShadow, softLit,
+/// litFactor)，sharp = (litFactor > 0.5) ? sharpLit : sharpShadow，
+/// 最终 = base × soft × sharp × ambient。上游这些色值是 authored 全局
+/// 材质属性（`Global Material Properties` 节点组），故放材质层（静态，
+/// 非 per-frame 写）。
 #[derive(Clone, Copy, Debug, PartialEq, Reflect, ShaderType)]
 pub struct StylizedCharacterParams {
     /// 与 [`StylizedCelParams`] 相同语义的基础参数（base/rim/alpha mask）。
@@ -59,12 +73,26 @@ pub struct StylizedCharacterParams {
     /// face basis：xyz = 局部空间 face forward，w = face SDF 软过渡宽度。
     pub face_forward_softness: bevy::math::Vec4,
     /// x = 材质级 face 阈值基准，y = 位标志（bitcast u32，见
-    /// `CHAR_FLAG_*`），z = side 强制模式（0 自动 / 1 翻转），w 预留。
+    /// `CHAR_FLAG_*`），z = side 强制模式（0 自动 / 1 翻转），
+    /// w = day/night 因子（上游为材质属性 `Global Material
+    /// Properties.Day/Night`——docs/reference/07 §3.1；材质静态携带，
+    /// 昼夜对 ramp 行分带生效）。
     pub face_misc: bevy::math::Vec4,
     /// x = hair 高光幂次，y = hair 高光强度，zw 预留。
     pub hair: bevy::math::Vec4,
     /// rgb = emission 颜色，w = emission 强度。
     pub emission: bevy::math::Vec4,
+    /// Palette：soft 档受光色。
+    pub palette_soft_lit: bevy::math::Vec4,
+    /// Palette：soft 档阴影色。
+    pub palette_soft_shadow: bevy::math::Vec4,
+    /// Palette：sharp 档受光色。
+    pub palette_sharp_lit: bevy::math::Vec4,
+    /// Palette：sharp 档阴影色。
+    pub palette_sharp_shadow: bevy::math::Vec4,
+    /// face basis 的 up 向量（head basis：headright =
+    /// normalize(cross(forward, up))，docs/reference/07 §3.3 已核实）。
+    pub face_up: bevy::math::Vec4,
 }
 
 impl Default for StylizedCharacterParams {
@@ -72,16 +100,36 @@ impl Default for StylizedCharacterParams {
         Self {
             cel: StylizedCelParams::default(),
             face_forward_softness: bevy::math::Vec4::new(0.0, 0.0, 1.0, 0.02),
-            face_misc: bevy::math::Vec4::new(0.5, 0.0, 0.0, 0.0),
+            face_misc: bevy::math::Vec4::new(0.5, 0.0, 0.0, 1.0),
             hair: bevy::math::Vec4::new(24.0, 0.0, 0.0, 0.0),
             emission: bevy::math::Vec4::ZERO,
+            // 中性默认：lit=白；shadow=中灰（视觉效果接近旧 ambient+lit 结构，
+            // golden 重捕获以此为准）。
+            palette_soft_lit: bevy::math::Vec4::ONE,
+            palette_soft_shadow: bevy::math::Vec4::new(0.55, 0.55, 0.62, 1.0),
+            palette_sharp_lit: bevy::math::Vec4::ONE,
+            palette_sharp_shadow: bevy::math::Vec4::new(0.7, 0.7, 0.75, 1.0),
+            face_up: bevy::math::Vec4::Y,
         }
     }
 }
 
 impl StylizedCharacterParams {
-    /// 设置 face basis（局部空间 forward，自动归一化到 XZ 投影）与 SDF
-    /// 软过渡宽度。
+    /// 设置 face basis（局部空间 forward + up）与 SDF 软过渡宽度。
+    #[must_use]
+    pub fn with_face_basis(
+        mut self,
+        forward: bevy::math::Vec3,
+        up: bevy::math::Vec3,
+        softness: f32,
+    ) -> Self {
+        self.face_forward_softness =
+            bevy::math::Vec4::new(forward.x, forward.y, forward.z, softness.max(0.0001));
+        self.face_up = bevy::math::Vec4::new(up.x, up.y, up.z, 0.0);
+        self
+    }
+
+    /// 设置 face basis（仅 forward；up 默认 +Y）。
     #[must_use]
     pub fn with_face_forward(mut self, forward: bevy::math::Vec3, softness: f32) -> Self {
         self.face_forward_softness =
@@ -96,6 +144,31 @@ impl StylizedCharacterParams {
         self
     }
 
+    /// 设置 day/night 因子（材质静态携带；上游为材质属性，见
+    /// `face_misc` 文档）。
+    #[must_use]
+    pub fn with_day_night(mut self, factor: f32) -> Self {
+        self.face_misc.w = factor.clamp(0.0, 1.0);
+        self
+    }
+
+    /// 设置 palette 四色（sharp/soft × lit/shadow）。
+    #[must_use]
+    pub fn with_palette(
+        mut self,
+        soft_lit: bevy::color::LinearRgba,
+        soft_shadow: bevy::color::LinearRgba,
+        sharp_lit: bevy::color::LinearRgba,
+        sharp_shadow: bevy::color::LinearRgba,
+    ) -> Self {
+        let v = |c: bevy::color::LinearRgba| bevy::math::Vec4::new(c.red, c.green, c.blue, 1.0);
+        self.palette_soft_lit = v(soft_lit);
+        self.palette_soft_shadow = v(soft_shadow);
+        self.palette_sharp_lit = v(sharp_lit);
+        self.palette_sharp_shadow = v(sharp_shadow);
+        self
+    }
+
     /// 设置 hair 高光（强度 0 即关闭）。
     #[must_use]
     pub fn with_hair_specular(mut self, power: f32, intensity: f32) -> Self {
@@ -105,7 +178,8 @@ impl StylizedCharacterParams {
         self
     }
 
-    /// 设置 emission（ILM.A 为 mask）。
+    /// 设置 emission（mask 通道 = base color alpha，见 emission 文档与
+    /// ILM 布局注记）。
     #[must_use]
     pub fn with_emission(mut self, color: bevy::color::LinearRgba, intensity: f32) -> Self {
         self.emission =

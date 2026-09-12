@@ -77,6 +77,20 @@ Upstream Golden（Blender EEVEE）与 Engine Golden（Bevy runtime）的对比�
 > max_nonedge=0.475 / mean=0.124 / PSNR=13.9dB。草案判据仍未通过
 > （未放宽任何阈值），残余差距主要在 palette/ramp 语义近似与无阴影投射
 > （已知偏差，A 类）。
+>
+> **It-5 契约核实修复（2026-09-12 同日，doc 07 §3 全量核实后）**：
+> 生产渲染器按已核实数学重构——ILM 通道改上游布局（R=metal/G=AO/B=高光
+> 抑制/A=材质分带）、sharp/soft 双档串联相乘光照、head-basis face SDF、
+> Genshin ramp 寻址公式、上游 tonemap 有理曲线入 post hook。重构后
+> production_vs_upstream：max_nonedge=1.000 / mean=0.0385 / PSNR=21.1dB /
+> shadow IoU=0.939 / silhouette IoU=0.996（production_vs_engine：
+> max=0.541 / mean=0.157 / PSNR=11.9dB；engine_vs_upstream 不变）。
+> 残余误差集中于：① 地面投影区域（V1 无 cast shadow，结构性，A 类）；
+> ② 下颌阴影色调（上游 face 路径的粉色阴影色是 authored 数据，导出桥
+> 尚未把 palette/ramp 元数据带入 fixture——属 docs/reference/06 的后续
+> 工作）；③ 发卡等 per-material palette 区分（同上）。对比域 palette 为
+> 标定近似值（provisional，标注于 reference-comparison 源码）。
+> 结论：结构正确性优先于像素贴近度；草案判据不放宽。
 
 ## 4. "Validated" 的定义
 

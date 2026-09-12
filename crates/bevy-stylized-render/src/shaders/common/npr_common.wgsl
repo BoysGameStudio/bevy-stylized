@@ -68,26 +68,30 @@ fn analytic_ramp(half_lambert: f32, threshold: f32, softness: f32, floor_: f32) 
     return mix(floor_, 1.0, t);
 }
 
-// Face SDF 通用光位计算（v1 假定角色直立，face basis 取水平面 XZ 投影）。
-// 返回 (forward_dot, right_dot)；light 退化（近似垂直）时返回 (1, 0)。
-fn face_light_dots(direction_to_light: vec3<f32>, face_forward_world: vec3<f32>) -> vec2<f32> {
-    let light_xz = direction_to_light.xz;
-    let light_len_sq = dot(light_xz, light_xz);
+// Face SDF 光位计算：head basis（headright = normalize(cross(forward, up))）
+// + 归一化光向量的点积（docs/reference/07 §3.3 已核实：上游用头部
+// forward/up 场景标记传递，3D 基向量直接点积，非平面投影）。
+// 返回 (forward_dot, right_dot)；输入退化时返回 (1, 0)。
+fn face_light_dots(
+    direction_to_light: vec3<f32>,
+    face_forward_world: vec3<f32>,
+    face_up_world: vec3<f32>,
+) -> vec2<f32> {
+    let light_len_sq = dot(direction_to_light, direction_to_light);
     if light_len_sq <= 1e-8 {
         return vec2<f32>(1.0, 0.0);
     }
-    let light_dir = light_xz * inverseSqrt(light_len_sq);
-    let forward_xz = face_forward_world.xz;
-    let forward_len_sq = dot(forward_xz, forward_xz);
+    let light = direction_to_light * inverseSqrt(light_len_sq);
+    let forward_len_sq = dot(face_forward_world, face_forward_world);
     if forward_len_sq <= 1e-8 {
         return vec2<f32>(1.0, 0.0);
     }
-    let forward = forward_xz * inverseSqrt(forward_len_sq);
-    // right = forward 在水平面上逆时针 90°（Y-up 右手系）。
-    let right = vec2<f32>(forward.y, -forward.x);
+    let forward = face_forward_world * inverseSqrt(forward_len_sq);
+    let up = normalize(face_up_world);
+    let right = normalize(cross(forward, up));
     return vec2<f32>(
-        clamp(dot(forward, light_dir), -1.0, 1.0),
-        clamp(dot(right, light_dir), -1.0, 1.0),
+        clamp(dot(forward, light), -1.0, 1.0),
+        clamp(dot(right, light), -1.0, 1.0),
     );
 }
 

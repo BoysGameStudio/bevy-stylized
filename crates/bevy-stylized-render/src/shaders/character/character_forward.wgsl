@@ -35,12 +35,20 @@ struct CharacterParams {
     cel: CharacterCelParams,
     // xyz: 局部空间 face forward, w: SDF 软过渡宽度
     face_forward_softness: vec4<f32>,
-    // x: 材质级 face 阈值基准, y: 位标志（bitcast u32）, z: side 强制模式
+    // x: 材质级 face 阈值基准, y: 位标志（bitcast u32）, z: side 强制模式,
+    // w: day/night 因子（上游为材质属性，docs/reference/07 §3.1）
     face_misc: vec4<f32>,
     // x: hair 高光幂次, y: hair 高光强度
     hair: vec4<f32>,
     // rgb: emission 颜色, w: 强度
     emission: vec4<f32>,
+    // palette（docs/reference/07 §3.7 已核实：sharp/soft 双档 × lit/shadow）
+    palette_soft_lit: vec4<f32>,
+    palette_soft_shadow: vec4<f32>,
+    palette_sharp_lit: vec4<f32>,
+    palette_sharp_shadow: vec4<f32>,
+    // face basis 的 up（headright = normalize(cross(forward, up))）
+    face_up: vec4<f32>,
 }
 
 const CEL_FLAG_ALPHA_MASK: u32 = 8u;
@@ -140,24 +148,24 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
     let normal = normalize(in.world_normal);
     let half_lambert = clamp(dot(normal, light_direction) * 0.5 + 0.5, 0.0, 1.0);
 
-    // ILM decode once（R=AO, G=hair mask, A=emission mask）。
-    // AO 通道带 readability floor（通用 NPR 保底亮度，非 profile 常数；
-    // provisional pending ADR-0009）：ao = mix(0.5, 1.0, ilm.r)。
-    var ilm = vec3<f32>(1.0, 0.0, 0.0);
+    // ILM decode once（docs/reference/07 §3.2 已核实布局）：
+    // R=metal mask(>0.9) / G=AO / B=高光抑制(1.03−B) / A=材质分带 ID。
+    // AO 通道带 readability floor（provisional pending ADR-0009）。
+    var ao = 1.0;
+    var spec_suppress = 1.03;
+    var band_id = 0.0;
 #ifdef VERTEX_UVS_A
     if (flags & CHAR_FLAG_ILM_TEXTURE) != 0u {
         let packed = textureSample(ilm_texture, ilm_sampler, in.uv);
-        ilm = vec3<f32>(mix(0.5, 1.0, packed.r), packed.g, packed.a);
+        ao = mix(0.5, 1.0, packed.g);
+        spec_suppress = 1.03 - packed.b;
+        band_id = packed.a;
     }
 #endif
 
-    // 基础 cel 阴影（解析 ramp）。
-    var lit = analytic_ramp(
-        half_lambert,
-        params.cel.shading.x,
-        params.cel.shading.y,
-        params.cel.shading.z,
-    );
+    // LitFactor：half-lambert 经 AO 门控（docs/reference/07 §3.1 已核实：
+    // lerp(0, half_lambert, smoothstep(0.01, 0.4, ao))）。
+    var lit_factor = half_lambert * smoothstep(0.01, 0.4, ao);
 
     // Face SDF：有纹理时替换 cel 阴影；per-instance 阈值/侧选择经 MeshTag。
 #ifdef VERTEX_UVS_A
@@ -172,7 +180,11 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
             (mesh_functions::get_world_from_local(in.instance_index)
                 * vec4<f32>(params.face_forward_softness.xyz, 0.0)).xyz
         );
-        let dots = face_light_dots(light_direction, face_forward_world);
+        let face_up_world = normalize(
+            (mesh_functions::get_world_from_local(in.instance_index)
+                * vec4<f32>(params.face_up.xyz, 0.0)).xyz
+        );
+        let dots = face_light_dots(light_direction, face_forward_world, face_up_world);
         // 阈值：材质基准；MeshTag 携带时逐实例覆盖（量化 1..=255 → 0..=1）。
         var threshold = face_threshold_from_dots(dots.x);
         let tag_threshold = (tag >> TAG_FACE_THRESHOLD_SHIFT) & 0xFFu;
@@ -193,23 +205,31 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
         let softness = params.face_forward_softness.w;
         if (flags & CHAR_FLAG_PORTABLE_FALLBACK) != 0u {
             // Portable fallback：硬 step（少一次 smoothstep 精度开销）。
-            lit = step(threshold, sdf);
+            lit_factor = step(threshold, sdf);
         } else {
-            lit = smoothstep(threshold - softness, threshold + softness, sdf);
+            lit_factor = smoothstep(threshold - softness, threshold + softness, sdf);
         }
     }
 #endif
 
+    // 双档光照（docs/reference/07 §3.7 已核实：sharp/soft 串联相乘 +
+    // ambient，全 MULTIPLY；palette 为材质静态 authored 数据）。
+    let soft_mix = mix(params.palette_soft_shadow.rgb, params.palette_soft_lit.rgb, lit_factor);
+    let sharp_mix = select(
+        params.palette_sharp_shadow.rgb,
+        params.palette_sharp_lit.rgb,
+        lit_factor > 0.5,
+    );
     let ambient = lights.ambient_color.rgb;
-    var color = base.rgb * (ambient + light_color * lit) * ilm.r;
+    var color = base.rgb * soft_mix * sharp_mix * max(ambient, vec3<f32>(0.05));
 
-    // Hair 高光（cheap Blinn 半角 + ILM.G mask）；Portable fallback 下
-    // 由 rim 补偿（材质层已换入，此处 specular 标志保持关闭）。
+    // Hair 高光（cheap Blinn 半角 × ILM.B 高光抑制；Portable fallback 下
+    // 由 rim 补偿）。
     if (flags & CHAR_FLAG_HAIR_SPECULAR) != 0u {
         let view_direction = normalize(view.world_position - in.world_position.xyz);
         let half_vector = normalize(light_direction + view_direction);
         let specular = pow(clamp(dot(normal, half_vector), 0.0, 1.0), params.hair.x);
-        color += specular * params.hair.y * ilm.g * light_color;
+        color += specular * params.hair.y * spec_suppress * light_color;
     }
 
     // Rim。
@@ -219,9 +239,11 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
         color += fresnel * params.cel.rim.y * params.cel.rim_color.rgb;
     }
 
-    // Emission（ILM.A mask）。
+    // Emission（mask = base color alpha；上游经 alpha switch 路由
+    // emission/transparency——无 ILM emission 通道，此决策 provisional
+    // pending ADR-0023）。
     if (flags & CHAR_FLAG_EMISSION) != 0u {
-        color += params.emission.rgb * params.emission.w * ilm.z;
+        color += params.emission.rgb * params.emission.w * base.a;
     }
 
     color *= view.exposure;

@@ -198,11 +198,11 @@ pub fn face(app: &mut App) {
 // ---------------------------------------------------------------------------
 pub fn hair(app: &mut App) {
     let mesh = sphere(app, 0.9);
-    // ILM：R=AO=1，G=hair mask 全 1。
+    // ILM（上游布局）：R=metal(0)，G=AO(255)，B=高光抑制(0)，A=band(0)。
     let (w, h) = (16usize, 16usize);
     let mut data = Vec::with_capacity(w * h * 4);
     for _ in 0..w * h {
-        data.extend_from_slice(&[255, 255, 0, 0]);
+        data.extend_from_slice(&[0, 255, 0, 0]);
     }
     let mut ilm = Image::new_fill(
         Extent3d {
@@ -277,10 +277,10 @@ pub fn metal(app: &mut App) {
     );
     matcap.data = Some(data);
     let matcap = app.world_mut().resource_mut::<Assets<Image>>().add(matcap);
-    // ILM：B=metal mask 全 1。
+    // ILM（上游布局）：R=metal mask 全 1，G=AO 全 1。
     let mut ilm_data = Vec::new();
     for _ in 0..16 * 16 {
-        ilm_data.extend_from_slice(&[255, 0, 255, 0]);
+        ilm_data.extend_from_slice(&[255, 255, 0, 0]);
     }
     let mut ilm = Image::new_fill(
         Extent3d {

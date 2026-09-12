@@ -38,11 +38,17 @@ struct HeroCharacterParams {
     face_misc: vec4<f32>,
     hair: vec4<f32>,
     emission: vec4<f32>,
+    palette_soft_lit: vec4<f32>,
+    palette_soft_shadow: vec4<f32>,
+    palette_sharp_lit: vec4<f32>,
+    palette_sharp_shadow: vec4<f32>,
+    face_up: vec4<f32>,
 }
 
 struct HeroParams {
     character: HeroCharacterParams,
-    // x: matcap 强度, y: spec ramp 强度, z: ramp atlas 行数, w: 预留
+    // x: matcap 强度, y: spec ramp 强度, z: shadow position（ramp 公式
+    // ShadowPosition）, w: ramp width（ShadowRampWidth）
     hero_a: vec4<f32>,
     // rgb: matcap 染色, w: 位标志（bitcast u32）
     hero_b: vec4<f32>,
@@ -58,6 +64,8 @@ const HERO_FLAG_PACKED_NORMAL: u32 = 2u;
 const HERO_FLAG_MATCAP: u32 = 4u;
 const HERO_FLAG_SPEC_RAMP: u32 = 8u;
 const HERO_FLAG_PORTABLE_FALLBACK: u32 = 16u;
+// Genshin-profile ramp 寻址（已核实公式）启用位；否则走 MeshTag 行寻址。
+const HERO_FLAG_GENSHIN_RAMP: u32 = 32u;
 
 // MeshTag 位段（与 instance.rs 一致；provisional pending ADR-0004）。
 const TAG_FACE_THRESHOLD_SHIFT: u32 = 8u;
@@ -179,29 +187,64 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
 
     let half_lambert = clamp(dot(normal, light_direction) * 0.5 + 0.5, 0.0, 1.0);
 
-    // ILM decode once（R=AO[带 floor], G=hair mask, B=metal mask, A=emission）。
-    var ilm = vec4<f32>(1.0, 0.0, 0.0, 0.0);
+    // ILM decode once（docs/reference/07 §3.2 已核实布局）：
+    // R=metal mask(>0.9) / G=AO / B=高光抑制(1.03−B) / A=材质分带 ID。
+    var metal_mask = 0.0;
+    var ao = 1.0;
+    var spec_suppress = 1.03;
+    var band = 1.0;
 #ifdef VERTEX_UVS_A
     if (char_flags & CHAR_FLAG_ILM_TEXTURE) != 0u {
         let packed = textureSample(ilm_texture, ilm_sampler, in.uv);
-        ilm = vec4<f32>(mix(0.5, 1.0, packed.r), packed.g, packed.b, packed.a);
+        metal_mask = step(0.9, packed.r);
+        ao = mix(0.5, 1.0, packed.g);
+        spec_suppress = 1.03 - packed.b;
+        // 分带阈值（已核实：≤0.2→1, (0.2,0.4]→2, (0.4,0.6]→3, (0.6,0.8]→4, >0.8→5）
+        band = 1.0 + f32(packed.a > 0.2) + f32(packed.a > 0.4)
+            + f32(packed.a > 0.6) + f32(packed.a > 0.8);
     }
 #endif
 
-    // 阴影：authored ramp（行 = MeshTag profile_index）优先，缺失时解析 ramp。
-    var lit = vec3<f32>(analytic_ramp(
-        half_lambert,
-        params.character.cel.shading.x,
-        params.character.cel.shading.y,
-        params.character.cel.shading.z,
-    ));
+    // LitFactor：half-lambert 经 AO 门控（docs/reference/07 §3.1 已核实）。
+    var lit_factor = half_lambert * smoothstep(0.01, 0.4, ao);
+
+    // 阴影色：authored ramp 优先。
+    var shadow_color = params.character.palette_soft_shadow.rgb;
     if (hero_flags & HERO_FLAG_RAMP_TEXTURE) != 0u {
-        var row = 0.0;
-#ifdef VERTEX_OUTPUT_INSTANCE_INDEX
-        row = f32(mesh_functions::get_tag(in.instance_index) & 0xFFu);
+        if (hero_flags & HERO_FLAG_GENSHIN_RAMP) != 0u {
+            // 已核实 ramp 寻址（docs/reference/07 §3.1）：
+            // X = 1 − (ShadowPosition − LitFactor_AO) / (ShadowPosition
+            //     × (vcolG × 2) × RampWidth)
+            // Y = 夜带（0.05+0.1×(band−1)，下半行）；昼 = +0.5（上半行）；
+            // 我方 day_night 约定 1=昼（face_misc.w，材质静态）。
+            var vcol_g = 1.0;
+#ifdef VERTEX_COLORS
+            vcol_g = max(in.color.g, 0.01);
 #endif
-        let ramp_v = (row + 0.5) / max(params.hero_a.z, 1.0);
-        lit = textureSample(ramp_texture, ramp_sampler, vec2<f32>(half_lambert, ramp_v)).rgb;
+            let shadow_position = max(params.hero_a.z, 0.01);
+            let ramp_width = max(params.hero_a.w, 0.01);
+            let ramp_x = 1.0
+                - (shadow_position - lit_factor)
+                    / (shadow_position * vcol_g * 2.0 * ramp_width);
+            let night_row = 0.05 + 0.1 * (band - 1.0);
+            let day_night = clamp(params.character.face_misc.w, 0.0, 1.0);
+            let ramp_v = night_row + 0.5 * day_night;
+            shadow_color = textureSample(
+                ramp_texture, ramp_sampler,
+                vec2<f32>(clamp(ramp_x, 0.0, 1.0), ramp_v),
+            ).rgb;
+        } else {
+            // 通用 ramp 路径（保留）：MeshTag 行寻址。
+            var row = 0.0;
+#ifdef VERTEX_OUTPUT_INSTANCE_INDEX
+            row = f32(mesh_functions::get_tag(in.instance_index) & 0xFFu);
+#endif
+            let ramp_v = (row + 0.5) / max(params.character.cel.rim.z, 1.0);
+            shadow_color = textureSample(
+                ramp_texture, ramp_sampler,
+                vec2<f32>(half_lambert, ramp_v),
+            ).rgb;
+        }
     }
 
     // Face SDF（与 character 一致；共享材质 + MeshTag 实例数据）。
@@ -215,7 +258,11 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
             (mesh_functions::get_world_from_local(in.instance_index)
                 * vec4<f32>(params.character.face_forward_softness.xyz, 0.0)).xyz
         );
-        let dots = face_light_dots(light_direction, face_forward_world);
+        let face_up_world = normalize(
+            (mesh_functions::get_world_from_local(in.instance_index)
+                * vec4<f32>(params.character.face_up.xyz, 0.0)).xyz
+        );
+        let dots = face_light_dots(light_direction, face_forward_world, face_up_world);
         var threshold = face_threshold_from_dots(dots.x);
         let tag_threshold = (tag >> TAG_FACE_THRESHOLD_SHIFT) & 0xFFu;
         if tag_threshold != 0u {
@@ -234,41 +281,50 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
         let sdf = textureSample(face_sdf_texture, face_sdf_sampler, vec2<f32>(uv_x, in.uv.y)).r;
         let softness = params.character.face_forward_softness.w;
         if (hero_flags & HERO_FLAG_PORTABLE_FALLBACK) != 0u {
-            lit = vec3<f32>(step(threshold, sdf));
+            lit_factor = step(threshold, sdf);
         } else {
-            lit = vec3<f32>(smoothstep(threshold - softness, threshold + softness, sdf));
+            lit_factor = smoothstep(threshold - softness, threshold + softness, sdf);
         }
     }
 #endif
 
+    // 双档光照（docs/reference/07 §3.7 已核实：sharp/soft 串联相乘 +
+    // ambient，全 MULTIPLY；ramp 阴影色替代 softShadow）。
+    let soft_mix = mix(shadow_color, params.character.palette_soft_lit.rgb, lit_factor);
+    let sharp_mix = select(
+        params.character.palette_sharp_shadow.rgb,
+        params.character.palette_sharp_lit.rgb,
+        lit_factor > 0.5,
+    );
     let ambient = lights.ambient_color.rgb;
-    var color = base.rgb * (ambient + light_color * lit) * ilm.r;
+    var color = base.rgb * soft_mix * sharp_mix * max(ambient, vec3<f32>(0.05));
 
-    // Hair 高光（cheap Blinn × ILM.G）。
+    // Hair 高光（cheap Blinn × ILM.B 高光抑制）。
     if (char_flags & CHAR_FLAG_HAIR_SPECULAR) != 0u {
         let view_direction = normalize(view.world_position - in.world_position.xyz);
         let half_vector = normalize(light_direction + view_direction);
         let specular = pow(clamp(dot(normal, half_vector), 0.0, 1.0), params.character.hair.x);
-        color += specular * params.character.hair.y * ilm.g * light_color;
+        color += specular * params.character.hair.y * spec_suppress * light_color;
     }
 
-    // Spec ramp（半角高光强度为坐标采样 ramp；Portable fallback 下关闭）。
+    // Spec ramp（半角高光 × ILM.B 抑制；Portable fallback 下关闭）。
     if (hero_flags & HERO_FLAG_SPEC_RAMP) != 0u {
         let view_direction = normalize(view.world_position - in.world_position.xyz);
         let half_vector = normalize(light_direction + view_direction);
         let spec_coord = clamp(dot(normal, half_vector), 0.0, 1.0);
         let spec = textureSample(spec_ramp_texture, spec_ramp_sampler, vec2<f32>(spec_coord, 0.5)).rgb;
-        color += spec * params.hero_a.y * light_color;
+        color += spec * params.hero_a.y * spec_suppress * light_color;
     }
 
-    // Metal matcap（view-space normal 查找 × ILM.B metal mask；fallback 关闭）。
+    // Metal matcap（view-space normal 查找 × ILM.R metal mask（>0.9）；
+    // fallback 关闭）。
     if (hero_flags & HERO_FLAG_MATCAP) != 0u {
         let view_normal = normalize(
             (view.view_from_world * vec4<f32>(normal, 0.0)).xyz
         );
         let matcap_uv = view_normal.xy * 0.5 + vec2<f32>(0.5);
         let matcap = textureSample(matcap_texture, matcap_sampler, matcap_uv).rgb;
-        color = mix(color, color * params.hero_b.rgb + matcap * params.hero_a.x, ilm.b);
+        color = mix(color, color * params.hero_b.rgb + matcap * params.hero_a.x, metal_mask);
     }
 
     // Rim。
@@ -278,9 +334,10 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
         color += fresnel * params.character.cel.rim.y * params.character.cel.rim_color.rgb;
     }
 
-    // Emission（ILM.A mask）。
+    // Emission（mask = base color alpha；上游 alpha switch 语义，
+    // provisional pending ADR-0023）。
     if (char_flags & CHAR_FLAG_EMISSION) != 0u {
-        color += params.character.emission.rgb * params.character.emission.w * ilm.a;
+        color += params.character.emission.rgb * params.character.emission.w * base.a;
     }
 
     color *= view.exposure;

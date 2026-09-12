@@ -226,6 +226,15 @@ fn adopt_production(
                 .character
                 .cel
                 .with_rim(3.0, 0.2, LinearRgba::new(0.5, 0.6, 0.8, 1.0));
+        // palette 近似值（authored approximation，provisional——真实值应由
+        // profile metadata 导出；lit 色承载 key light 能量，上游结构如此）：
+        // 数值按 upstream golden 亮/暗区实测比例标定。
+        params.character = params.character.with_palette(
+            LinearRgba::new(3.45, 3.3, 3.1, 1.0),
+            LinearRgba::new(3.3, 2.55, 2.45, 1.0),
+            LinearRgba::new(1.0, 1.0, 1.0, 1.0),
+            LinearRgba::new(0.97, 0.94, 0.92, 1.0),
+        );
         let material = materials.add(StylizedHeroMaterial {
             params,
             base_color_texture: source.base_color_texture.clone(),
@@ -251,13 +260,8 @@ pub fn capture_production(resources: RenderResources) -> CapturedImage {
             key_light_color: SUN_LINEAR,
             exposure: 1.0,
             day_night_factor: 1.0,
-            // palette[0] → ambient 颜色；补偿 day 亮度基准得到 world 色。
-            palette: vec![LinearRgba::new(
-                WORLD_LINEAR.red / 0.35,
-                WORLD_LINEAR.green / 0.35,
-                WORLD_LINEAR.blue / 0.35,
-                1.0,
-            )],
+            // ambient 为白色昼间亮度；背景色由 ClearColor 承担（world 色）。
+            palette: vec![LinearRgba::WHITE],
             ..StylizedViewDescriptor::default()
         });
     app.finish();

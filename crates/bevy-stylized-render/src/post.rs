@@ -37,8 +37,8 @@ pub enum StylizedDisplayTransform {
     /// 直通（LDR 默认）。
     #[default]
     None,
-    /// 简单 filmic-ish 压缩 hook（占位实现；正式曲线 pending ADR-0009 /
-    /// profile）。
+    /// 上游 Genshin Tonemapper 有理曲线（docs/reference/07 §3.8 已核实；
+    /// 命名保持 hook 形态，profile 级变体 pending ADR-0009）。
     SimpleCompress,
 }
 
@@ -55,7 +55,8 @@ pub struct StylizedPostProcess {
     pub vignette_softness: f32,
     /// Chromatic aberration（归一化 UV 偏移；0 = 单采样）。
     pub chromatic_aberration: f32,
-    /// Display transform hook。
+    /// Display transform hook（`SimpleCompress` 的曲线已按
+    /// docs/reference/07 §3.8 核实的上游有理函数实现）。
     pub display_transform: StylizedDisplayTransform,
 }
 

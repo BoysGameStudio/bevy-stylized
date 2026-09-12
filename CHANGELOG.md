@@ -9,6 +9,13 @@ Semantic Versioning applies once the first release is published.
 
 ### Added
 
+- 行为契约核实修复（docs/reference/07 §3 全量核实后的对齐）——
+  - ILM 通道改上游布局：R=metal 遮罩（>0.9）/G=AO/B=高光抑制（1.03−B）/A=材质分带 ID（分带阈值 0.2/0.4/0.6/0.8）；cel/character/hero 三个 shader 同步；emission mask 改走 base color alpha（上游 alpha switch 语义，provisional）；
+  - sharp/soft 双档串联相乘光照（palette 四色为材质静态 authored 参数，上游 `Global Material Properties` 对应）；
+  - face SDF 改 head-basis 公式（headright = normalize(cross(forward, up))，forward+up 材质参数；阈值/侧选择仍走 MeshTag 实例通道）；
+  - Genshin-profile ramp 寻址（hero 的 `with_genshin_ramp`：X 公式 + ILM.A 分带 + 材质静态 day/night 行带；通用 MeshTag 行寻址保留）；
+  - post 的 display-transform hook 换上游已核实有理曲线 x(1.36x+0.047)/(x(0.93x+0.56)+0.14)；
+  - 新增 alpha mask GPU 证据测试（quad 左红右 discard）；golden 重捕获（character-portable / showcase）并逐张目检；三层对比重构后 production_vs_upstream PSNR 21.1dB（残余误差=cast shadow 结构性缺失 + authored palette 未入导出桥，如实记录于 docs/reference/08）。
 - It-10：冻结清扫（可由 agent 关闭的部分）——
   - 渲染语义补全：alpha/prepass/shadow 契约测试（Blend 类型层不可达 + prepass/shadow 显式关闭钉死）、发布矩阵表（docs/authoring/05 §7）、morph/skinning 渲染测试（`tests/morph_skinning.rs`，蒙皮/morph 形变真实可见）；
   - 形态目标支持补齐到 `npr_common.wgsl` 共享形变路径（此前 shader 静默忽略 morph——冻结前修掉）；

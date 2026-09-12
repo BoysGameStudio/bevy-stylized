@@ -130,11 +130,12 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
     let normal = normalize(in.world_normal);
     let half_lambert = clamp(dot(normal, light_direction) * 0.5 + 0.5, 0.0, 1.0);
 
-    // Material 层：ILM R 通道 AO（decode once）。
+    // Material 层：ILM G 通道 AO（decode once；布局 docs/reference/07
+    // §3.2 已核实：R=metal/G=AO/B=高光抑制/A=材质分带 ID）。
     var ao = 1.0;
 #ifdef VERTEX_UVS_A
     if (flags & FLAG_ILM_TEXTURE) != 0u {
-        ao = textureSample(ilm_texture, ilm_sampler, in.uv).r;
+        ao = textureSample(ilm_texture, ilm_sampler, in.uv).g;
     }
 #endif
 

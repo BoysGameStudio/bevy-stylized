@@ -199,6 +199,14 @@ Golden 对比。
 
 ## 迁移状态记录
 
+### 2026-09-12：Reference-parity 修正（行为合同核查后续）
+
+- 行为合同 9 项待核实全部经节点级证据核实（`tools/blender-reference-export/inspect_node_math.py` 转储 42 个节点组）；新发现：上游 blend 含 Blender 5.2.1 不可解析节点（cast-shadow / curvature-rim 为锁定环境下的死路径，upstream Golden 已反映该状态）。
+- 修正 production 与上游的五处矛盾：ILM 通道布局（R=metal/G=AO/B=高光抑制/A=分带 ID，emission 改走 base alpha）、post display-transform 曲线常数、Genshin ramp 寻址（X 公式 + 昼夜半行分带）、sharp×soft 串联光照结构、face SDF head-basis 公式。
+- 对比域归一化修复（Lambert 1/π 能量 + 背景色对齐）：production vs upstream PSNR 13.9dB → 22.5dB（parity 修正后 21.1dB，残余差距为 cast shadow 缺失与 palette 标定近似，如实记录于 docs/reference/08）。
+- TRACEABILITY.md 29 条需求证据回填（7 ✅ / 21 🧪 / 1 ❌ R-021 web）；provisional 清单修正一处 ADR-0018 误标。
+- 全部受影响 golden 按纪律重捕获并目检；71 suite 全绿。
+
 ### 2026-09-12：It-10 完成——冻结收尾（agent 可关闭部分）
 
 - 渲染语义补全：Blend 在 V1 类型层面不可达（fail-closed，测试钉死）；alpha 支持矩阵发布于 `docs/authoring/05-integration-guide.md` §7；prepass/shadow 契约测试；morph/skinning GPU 测试——过程中发现并修复真 bug（新渲染器此前静默忽略 morph targets，已补进共享形变路径并重捕获受影响 golden）。

@@ -76,7 +76,7 @@ fn headless_app(resources: RenderResources, asset_root: &str) -> (App, capture::
     app.insert_resource(bevy::prelude::ClearColor(Color::srgb(0.105, 0.12, 0.13)));
     *app.world_mut().resource_mut::<StylizedViewSettings>() =
         StylizedViewSettings(StylizedViewDescriptor {
-            key_light_direction: Vec3::new(0.8, 0.2, 0.35).normalize(),
+            key_light_direction: Vec3::new(0.95, 0.25, 0.1).normalize(),
             key_light_color: LinearRgba::WHITE,
             exposure: 1.0,
             day_night_factor: 1.0,
@@ -186,19 +186,16 @@ fn procedural_face_sdf() -> Image {
     image
 }
 
-/// ILM：R=AO=1（不遮挡），G=hair mask 横向条纹，A=emission 中心块。
+/// ILM（上游布局，docs/reference/07 §3.2）：R=metal(0)，G=AO（上亮下半
+/// 暗条纹），B=高光抑制(0)，A=材质分带(0=band1)。emission 演示经 base
+/// alpha（见 emission_mask 注记）。
 fn procedural_ilm() -> Image {
     let (w, h) = (64usize, 64usize);
     let mut data = Vec::with_capacity(w * h * 4);
     for y in 0..h {
-        for x in 0..w {
-            let hair = if y < h / 2 { 255u8 } else { 0 };
-            let emission = if x > w / 4 && x < w * 3 / 4 && y > h / 4 && y < h * 3 / 4 {
-                255u8
-            } else {
-                0
-            };
-            data.extend_from_slice(&[255, hair, 0, emission]);
+        for _x in 0..w {
+            let ao = if y < h / 2 { 255u8 } else { 128 };
+            data.extend_from_slice(&[0, ao, 0, 0]);
         }
     }
     let mut image = Image::new_fill(
@@ -219,6 +216,38 @@ fn procedural_ilm() -> Image {
 
 /// 合成用例：三个球共享一个 Character 材质，MeshTag 携带不同 face 阈值
 /// （中间球用材质默认；左右球逐实例阈值），外加 hair/emission ILM。
+/// base 纹理：灰底 + 中心 alpha 块（emission mask，docs/character.rs 的
+/// emission 通道约定）。
+fn procedural_base_with_emission_mask() -> Image {
+    let (w, h) = (64usize, 64usize);
+    let mut data = Vec::with_capacity(w * h * 4);
+    for y in 0..h {
+        for x in 0..w {
+            // 小球 UV 把纹理中心块铺满可见半球——用小块才能看出是"块"。
+            let emission = if x > w * 9 / 20 && x < w * 11 / 20 && y > h * 9 / 20 && y < h * 11 / 20
+            {
+                255u8
+            } else {
+                0
+            };
+            data.extend_from_slice(&[200, 200, 200, emission]);
+        }
+    }
+    let mut image = Image::new_fill(
+        Extent3d {
+            width: w as u32,
+            height: h as u32,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        &[0, 0, 0, 255],
+        TextureFormat::Rgba8UnormSrgb,
+        RenderAssetUsages::default(),
+    );
+    image.data = Some(data);
+    image
+}
+
 fn synthetic_character_scene(app: &mut App) {
     let face_sdf = app
         .world_mut()
@@ -228,6 +257,10 @@ fn synthetic_character_scene(app: &mut App) {
         .world_mut()
         .resource_mut::<Assets<Image>>()
         .add(procedural_ilm());
+    let base = app
+        .world_mut()
+        .resource_mut::<Assets<Image>>()
+        .add(procedural_base_with_emission_mask());
     let material = app
         .world_mut()
         .resource_mut::<Assets<StylizedCharacterMaterial>>()
@@ -235,9 +268,15 @@ fn synthetic_character_scene(app: &mut App) {
             params: StylizedCharacterParams::default()
                 .with_face_forward(Vec3::Z, 0.05)
                 .with_face_threshold_bias(0.5)
+                .with_palette(
+                    LinearRgba::WHITE,
+                    LinearRgba::new(0.25, 0.25, 0.35, 1.0),
+                    LinearRgba::WHITE,
+                    LinearRgba::new(0.45, 0.45, 0.55, 1.0),
+                )
                 .with_hair_specular(24.0, 0.6)
                 .with_emission(LinearRgba::new(1.0, 0.6, 0.2, 1.0), 2.0),
-            base_color_texture: None,
+            base_color_texture: Some(base),
             ilm_texture: Some(ilm),
             face_sdf_texture: Some(face_sdf),
             ..StylizedCharacterMaterial::default()
