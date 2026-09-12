@@ -268,3 +268,23 @@
 | It-9a | Release/Governance → ★"Showcase suite complete" |
 | It-9b | Release/Governance → "Migration notes / changelog complete"、★"CLI validate/inspect shipped" |
 | It-10 | 全部残留行（Architecture decisions 全段、Authoring → "`_NPR_*` glTF attribute schema frozen"、Rendering semantics 全段、Release/Governance → "License/provenance ADR closed" 与 "Bevy compatibility matrix published"） |
+
+---
+
+## 8. V2 迭代序列（2026-09-12 增补，v4）
+
+V1 代码面已完成（It-0~It-10），V1 Blocker ADR 的确认与 provisional 解除属维护者动作，不阻塞 V2 的**增量、可选路径**开发（provisional 规则不变；V2 特性不得破坏 Portable 不变量，高端能力必须落在 Standard/High 且有 fallback）。
+
+| 迭代 | 主题 | 对应 roadmap V2 项 | 依赖 |
+|---|---|---|---|
+| V2-a | 高级描边（depth/normal 屏幕空间描边 + hull 混合） | Advanced Outline | render 后处理设施 |
+| V2-b | NPR LOD（Class×Tier 距离规则 + geometry/material/shader feature LOD） | NPR LOD | 三轴 resolver |
+| V2-c | Dynamic Quality（迟滞/冷却/可观测的 tier 调节器） | Dynamic Quality | capability 生命周期 |
+| V2-d | Environment NPR（风格化 fog / IBL tint / 简化 stylized shadow） | Environment NPR | view 层 |
+| V2-e | GPU Instance Database（High tier storage 路径 + 实测对比） | GPU Instance Database / Bindless Production | ADR-0004 spike 证据 |
+| V2-f | Asset Compiler 骨架（`bevy-stylized compile`：ILM 打包 + 校验 + runtime descriptor 生成） | Asset Compiler | tools crate |
+| V2-g | 回归/性能实验室（Count × Resolution × Tier × Backend × Pose × Lighting sweep） | Full Regression/Performance Lab | benchmarks + showcase |
+
+GPU-driven rendering（GPU culling / indirect draw / meshlet）按 roadmap 要求"以实际 Bevy/wgpu 能力和 Benchmark 为前提"，排在本批之后单独评估；V3（SDK/编辑器/声明式 Profile）不在本批。
+
+每个 V2 迭代的退出条件：功能 + 测试 + golden/showcase 证据 + CHANGELOG + 迁移记录条目；涉及公共契约的变更同步相应子系统文档（provisional 标注）。

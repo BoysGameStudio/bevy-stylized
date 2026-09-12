@@ -132,6 +132,302 @@ fn missing_file_exits_2() {
     assert_eq!(code, 2, "io error must exit 2: {out}");
 }
 
+// ---------------------------------------------------------------------------
+// compile（V2-f Asset Compiler 骨架）
+// ---------------------------------------------------------------------------
+
+/// 合成带 `bevy_stylized.material/v1` + `bevy_stylized.compile/v1` extras 的
+/// 单 material glTF，以及四张 2x2 单通道 ILM 源 PNG（每通道不同像素值）。
+fn write_synthetic_with_ilm(dir: &Path) -> std::path::PathBuf {
+    let tex = dir.join("tex");
+    std::fs::create_dir_all(&tex).expect("mkdir tex");
+    // 每通道 2x2 不同值，行主序。
+    let channels: [(&str, [u8; 4]); 4] = [
+        ("metal", [0, 64, 128, 255]),
+        ("ao", [10, 20, 30, 40]),
+        ("spec", [1, 2, 3, 4]),
+        ("id", [50, 100, 150, 200]),
+    ];
+    for (name, pixels) in channels {
+        let image = image::GrayImage::from_raw(2, 2, pixels.to_vec()).expect("gray image");
+        image::DynamicImage::ImageLuma8(image)
+            .save(tex.join(format!("{name}.png")))
+            .expect("write png");
+    }
+    let gltf = serde_json::json!({
+        "asset": { "version": "2.0" },
+        "scene": 0,
+        "scenes": [{ "nodes": [0] }],
+        "nodes": [{ "mesh": 0 }],
+        "meshes": [{
+            "primitives": [{
+                "attributes": { "POSITION": 0 },
+                "mode": 4,
+                "material": 0
+            }]
+        }],
+        "materials": [{
+            "name": "SynthMat",
+            "extras": {
+                "bevy_stylized.material/v1": { "surface_class": "hero" },
+                "bevy_stylized.compile/v1": {
+                    "schema_version": { "major": 1, "minor": 0 },
+                    "packs": [{
+                        "name": "synth_ilm",
+                        "kind": "ilm",
+                        "channels": {
+                            "metal": "tex/metal.png",
+                            "ao": "tex/ao.png",
+                            "specular_suppression": "tex/spec.png",
+                            "material_id": "tex/id.png"
+                        }
+                    }]
+                }
+            }
+        }],
+        "buffers": [{ "uri": "data.bin", "byteLength": 36 }],
+        "bufferViews": [{ "buffer": 0, "byteOffset": 0, "byteLength": 36 }],
+        "accessors": [
+            { "bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3",
+              "min": [0.0, 0.0, 0.0], "max": [1.0, 1.0, 0.0] }
+        ]
+    });
+    let path = dir.join("asset.gltf");
+    std::fs::write(&path, serde_json::to_string_pretty(&gltf).expect("json")).expect("write gltf");
+    path
+}
+
+#[test]
+fn compile_fixture_emits_parseable_descriptors() {
+    let fixture = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../fixtures/reference/reference_scene.glb"
+    );
+    let dir = tempfile::tempdir().expect("tempdir");
+    let out = dir.path().join("out");
+    let (code, text) = run_cli(&["compile", "--out", out.to_str().expect("utf8"), fixture]);
+    assert_eq!(code, 0, "fixture compile must succeed: {text}");
+
+    // 4 个 fixture material 各自产出 descriptor，且能经 core serde 路径解析。
+    let materials_dir = out.join("materials");
+    let mut names: Vec<String> = std::fs::read_dir(&materials_dir)
+        .expect("materials dir")
+        .map(|entry| {
+            entry
+                .expect("entry")
+                .file_name()
+                .to_string_lossy()
+                .into_owned()
+        })
+        .collect();
+    names.sort();
+    assert_eq!(names.len(), 4, "one descriptor per material: {names:?}");
+    for file in &names {
+        let json = std::fs::read_to_string(materials_dir.join(file)).expect("read descriptor");
+        let descriptor: bevy_stylized_core::StylizedMaterialDescriptor =
+            serde_json::from_str(&json).expect("descriptor must parse via core serde path");
+        assert_eq!(
+            descriptor.schema_version,
+            bevy_stylized_core::StylizedSchemaVersion::new(1, 0)
+        );
+        assert_eq!(descriptor.name, file.trim_end_matches(".json"));
+    }
+}
+
+#[test]
+fn compile_packs_ilm_and_rewrites_texture_ref() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let input = write_synthetic_with_ilm(dir.path());
+    let out = dir.path().join("out");
+    let (code, text) = run_cli(&[
+        "compile",
+        "--json",
+        "--out",
+        out.to_str().expect("utf8"),
+        input.to_str().expect("utf8"),
+    ]);
+    assert_eq!(code, 0, "compile must succeed: {text}");
+
+    // --json 报告：产物清单 + sha256。
+    let report: serde_json::Value = serde_json::from_str(&text).expect("valid json report");
+    assert_eq!(report["command"], "compile");
+    assert_eq!(report["violation"], false);
+    let emitted = report["emitted"].as_array().expect("emitted array");
+    let ilm = emitted
+        .iter()
+        .find(|e| e["path"] == "textures/synth_ilm.png")
+        .expect("packed ILM emitted");
+    assert_eq!(ilm["kind"], "texture");
+    assert_eq!(ilm["sha256"].as_str().expect("hash").len(), 64);
+    assert!(
+        emitted
+            .iter()
+            .any(|e| e["path"] == "materials/SynthMat.json" && e["kind"] == "material")
+    );
+
+    // packed ILM 通道内容：R=metal / G=AO / B=spec / A=id（逐像素）。
+    let packed = image::open(out.join("textures/synth_ilm.png"))
+        .expect("decode packed")
+        .to_rgba8();
+    assert_eq!(packed.dimensions(), (2, 2));
+    let expected = [
+        [0, 10, 1, 50],
+        [64, 20, 2, 100],
+        [128, 30, 3, 150],
+        [255, 40, 4, 200],
+    ];
+    for (index, want) in expected.iter().enumerate() {
+        let (x, y) = (index as u32 % 2, index as u32 / 2);
+        assert_eq!(packed.get_pixel(x, y).0, *want, "pixel ({x},{y})");
+    }
+
+    // descriptor 回读：schema 版本 + ContinuousMask 引用相对输出目录。
+    let json = std::fs::read_to_string(out.join("materials/SynthMat.json")).expect("descriptor");
+    let descriptor: bevy_stylized_core::StylizedMaterialDescriptor =
+        serde_json::from_str(&json).expect("parse via core serde");
+    assert_eq!(
+        descriptor.surface_class,
+        bevy_stylized_core::StylizedSurfaceClass::Hero
+    );
+    assert!(
+        descriptor
+            .textures
+            .iter()
+            .any(|t| t.uri == "textures/synth_ilm.png"
+                && t.semantic == bevy_stylized_core::StylizedTextureSemantic::ContinuousMask),
+        "packed ILM ref must be in descriptor: {:?}",
+        descriptor.textures
+    );
+}
+
+#[test]
+fn compile_missing_pack_source_fails_closed() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let input = write_synthetic_with_ilm(dir.path());
+    std::fs::remove_file(dir.path().join("tex/ao.png")).expect("remove ao");
+    let out = dir.path().join("out");
+    let (code, text) = run_cli(&[
+        "compile",
+        "--out",
+        out.to_str().expect("utf8"),
+        input.to_str().expect("utf8"),
+    ]);
+    assert_eq!(code, 1, "missing ILM source must exit 1: {text}");
+    assert!(
+        text.contains("AO(G)"),
+        "diagnostic should name the channel: {text}"
+    );
+    // fail-closed：不写出任何产物。
+    assert!(
+        !out.join("materials/SynthMat.json").exists(),
+        "no partial artifacts on violation"
+    );
+}
+
+#[test]
+fn compile_contract_violation_blocks_emission() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    // _NPR_MASK 形态错误 → validate 违规 → compile 蕴含 validate，exit 1 且不产出。
+    let path = write_synthetic(dir.path(), 5126, "VEC3");
+    let out = dir.path().join("out");
+    let (code, text) = run_cli(&[
+        "compile",
+        "--out",
+        out.to_str().expect("utf8"),
+        path.to_str().expect("utf8"),
+    ]);
+    assert_eq!(code, 1, "compile implies validate: {text}");
+    assert!(!out.exists(), "no output dir on validation failure");
+}
+
+#[test]
+fn compile_out_flag_rejected_for_other_commands() {
+    let (code, _) = run_cli(&["validate", "--out", "x", "no/such/file.glb"]);
+    assert_eq!(code, 2, "--out is compile-only");
+}
+
+#[test]
+fn compile_directives_from_sidecar() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    // 合成 glTF 不带 compile extras，指令走 sidecar 顶层 `compile` 键。
+    let gltf = serde_json::json!({
+        "asset": { "version": "2.0" },
+        "scene": 0,
+        "scenes": [{ "nodes": [0] }],
+        "nodes": [{ "mesh": 0 }],
+        "meshes": [{
+            "primitives": [{ "attributes": { "POSITION": 0 }, "mode": 4, "material": 0 }]
+        }],
+        "materials": [{ "name": "Body" }],
+        "buffers": [{ "uri": "data.bin", "byteLength": 36 }],
+        "bufferViews": [{ "buffer": 0, "byteOffset": 0, "byteLength": 36 }],
+        "accessors": [
+            { "bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3",
+              "min": [0.0, 0.0, 0.0], "max": [1.0, 1.0, 0.0] }
+        ]
+    });
+    let input = dir.path().join("asset.gltf");
+    std::fs::write(&input, serde_json::to_string_pretty(&gltf).expect("json")).expect("write gltf");
+    let tex = dir.path().join("tex");
+    std::fs::create_dir_all(&tex).expect("mkdir tex");
+    for (name, value) in [("metal", 7u8), ("ao", 8), ("spec", 9), ("id", 10)] {
+        let image = image::GrayImage::from_raw(1, 1, vec![value]).expect("gray");
+        image::DynamicImage::ImageLuma8(image)
+            .save(tex.join(format!("{name}.png")))
+            .expect("png");
+    }
+    let sidecar = serde_json::json!({
+        "schema": "bevy-stylized.sidecar/v1",
+        "materials": { "Body": { "surface_class": "character" } },
+        "compile": {
+            "Body": {
+                "packs": [{
+                    "name": "side_ilm",
+                    "kind": "ilm",
+                    "channels": {
+                        "metal": "tex/metal.png",
+                        "ao": "tex/ao.png",
+                        "specular_suppression": "tex/spec.png",
+                        "material_id": "tex/id.png"
+                    }
+                }]
+            }
+        }
+    });
+    // asset.gltf → sidecar 为 asset.npr.json。
+    std::fs::write(
+        dir.path().join("asset.npr.json"),
+        serde_json::to_string_pretty(&sidecar).expect("json"),
+    )
+    .expect("write sidecar");
+
+    let out = dir.path().join("out");
+    let (code, text) = run_cli(&[
+        "compile",
+        "--out",
+        out.to_str().expect("utf8"),
+        input.to_str().expect("utf8"),
+    ]);
+    assert_eq!(code, 0, "sidecar compile must succeed: {text}");
+    let packed = image::open(out.join("textures/side_ilm.png"))
+        .expect("decode packed")
+        .to_rgba8();
+    assert_eq!(packed.get_pixel(0, 0).0, [7, 8, 9, 10]);
+    let json = std::fs::read_to_string(out.join("materials/Body.json")).expect("descriptor");
+    let descriptor: bevy_stylized_core::StylizedMaterialDescriptor =
+        serde_json::from_str(&json).expect("parse via core serde");
+    assert_eq!(
+        descriptor.surface_class,
+        bevy_stylized_core::StylizedSurfaceClass::Character
+    );
+    assert!(
+        descriptor
+            .textures
+            .iter()
+            .any(|t| t.uri == "textures/side_ilm.png")
+    );
+}
+
 #[test]
 fn usage_error_exits_2() {
     let (code, _) = run_cli(&["frobnicate"]);

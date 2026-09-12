@@ -46,3 +46,9 @@ serde_path_to_error = "0.1"
 thiserror = "2"
 tempfile = "3"
 gltf = { version = "=1.4.1", features = ["extensions"] }
+# Asset Compiler（bevy-stylized-tools compile）：ILM 打包需要 PNG 解码/编码
+# （gltf crate 不解码图片；仅启用 png feature，保持 CLI 依赖面最小）。
+image = { version = "0.25", default-features = false, features = ["png"] }
+# compile --json 报告要求产物内容哈希；与 fixtures 既有 sha256 provenance
+# 约定一致（见 fixtures/reference/export-sidecar.json）。
+sha2 = "0.10"

@@ -9,6 +9,26 @@ Semantic Versioning applies once the first release is published.
 
 ### Added
 
+- V2-a Advanced Outline（provisional pending ADR-0008）——
+  - `StylizedScreenOutline`（per-camera opt-in）+ `StylizedScreenOutlineMaterial`：screen-space depth/normal 边缘检测 overlay（Transparent3d + Blend，无深度写，屏幕覆盖三角形直出 clip）；
+  - `StylizedOutlineMode`（Hull/ScreenSpace/Hybrid）+ `resolve_outline_mode` tier 门控（Standard+ 才允许 screen-space，回落 hull；core 登记 `StylizedFallbackStep::ScreenOutlineToHull`）；
+  - 主材质 prepass 能力开启（成本门控在相机 DepthPrepass/NormalPrepass 组件，默认相机零成本；语义矩阵测试已更新契约）；
+  - golden 证据 `fixtures/golden-local/outline-advanced/`（hull-only / screen-only / hybrid 三捕获 + 边缘像素语义断言：hull=229 < screen=342 < hybrid=442）；
+  - showcase 新增 `outline-advanced` 用例。
+- 行为契约核实修复（docs/reference/07 §3 全量核实后的对齐）——
+- V2-c：Dynamic Quality（迟滞/冷却/可观测的 tier 调节器）——
+  - core：新增 `governor` 模块 `StylizedQualityGovernor`（纯逻辑状态机，零 Bevy App 依赖）：每 tick 消费 `QualitySignals`（帧时/分辨率/场景复杂度/可选热压力与电量），产出 `QualityDecision`（目标 tier + 次级调整建议 `QualityAdjustment` + reason + 信号快照）；EMA 帧时平滑 + 严格迟滞带（升档阈值 < 降档阈值，构造时 fail-closed 校验）+ 升/降独立冷却 + 升档资格计数，单次 transition 只移动一档；transition 历史为固定容量环形缓冲；热路径零分配（reason 为 `&'static str`，历史构造时预分配）；11 个单元测试（阈值穿越、迟滞带、冷却窗口、LCG 抖动抗振荡、快慢帧交替单调性、热/电强制降档、复杂度预算、环形历史、确定性双跑）；
+  - facade：新增 `StylizedDynamicQualityPlugin`（opt-in，默认关闭；未装 FrameTimeDiagnosticsPlugin 时自动补装）+ `StylizedDynamicQuality` 资源 + `dynamic_quality_system`（PostUpdate）：FrameTimeDiagnostics 帧时（或 `gpu_frame_time_override_ms` 注入点）喂入 governor，tier 变更写入 `StylizedTierOverride` 并发出 `StylizedQualityDecisionEvent`（buffered message）；Stage B 解析档经 `set_ceiling` 同步为升档上限；决策到实际渲染 variant 切换的落地属于 V2-b（LOD）工作；
+  - 5 个 facade 集成测试（`tests/dynamic_quality.rs`）：opt-in 默认关闭、合成喂入降档/回升全链路 + 事件、Stage B Portable 兜底钳制上限、disabled 冻结、真实 DiagnosticsStore 喂入。
+
+- V2-f：Asset Compiler 骨架——`bevy-stylized compile [--json] [--out DIR] <FILE.glb|FILE.gltf>...`（crates/bevy-stylized-tools，默认输出 `<input-stem>.compiled/`）——
+  - compile 蕴含 validate（fail-closed：契约违规 exit 1 且不产出任何文件；先规划后落盘，无部分写入）；
+  - **Runtime Material**：每个 glTF material 一份 `StylizedMaterialDescriptor` JSON（`materials/<name>.json`，schema 固定 `bevy_stylized.material/v1` v1.0）；extras/sidecar 双通道经 `import_material` 合并，冲突升级为 error（ADR-0020 未定优先级，拒绝静默取舍）；无元数据的 material 产出默认 descriptor；
+  - **Packed Maps**：ILM 打包——extras `bevy_stylized.compile/v1` 键（或 sidecar 顶层 `compile` 键）声明四张单通道 PNG 源，合成一张 RGBA8 PNG（R=metal / G=AO / B=specular-suppression / A=material-ID，上游已核实布局 docs/reference/07 §3.2），以 `ContinuousMask` 语义引用写回 descriptor；该 compile payload 为 provisional schema，major 不符 fail-closed；
+  - **纹理引用改写**：descriptor 已声明纹理与 glTF baseColorTexture（外部 URI 复制 / 嵌入 blob 导出）统一落 `textures/`，uri 改写为相对输出目录；目标名冲突显式报错；
+  - `--json` 报告含每个产物的 kind/路径/字节数/SHA-256（与 fixtures provenance 约定一致）；exit code 与 validate/inspect 一致（0/1/2）；
+  - 新增 workspace 依赖 `image`（仅 png feature：ILM 打包的 PNG 解码/编码，gltf crate 不解码图片）与 `sha2`（报告哈希）；round-trip 测试：fixture GLB descriptor 经 core serde 路径回读 + 合成四通道 ILM 源逐像素断言。
+
 - 行为契约核实修复（docs/reference/07 §3 全量核实后的对齐）——
   - ILM 通道改上游布局：R=metal 遮罩（>0.9）/G=AO/B=高光抑制（1.03−B）/A=材质分带 ID（分带阈值 0.2/0.4/0.6/0.8）；cel/character/hero 三个 shader 同步；emission mask 改走 base color alpha（上游 alpha switch 语义，provisional）；
   - sharp/soft 双档串联相乘光照（palette 四色为材质静态 authored 参数，上游 `Global Material Properties` 对应）；

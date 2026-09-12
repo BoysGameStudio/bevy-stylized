@@ -12,6 +12,7 @@
 //! 最小出图路径（≤10 行 setup，`render` feature）：
 //!
 //! ```no_run
+//! # #[cfg(feature = "render")] {
 //! use bevy::prelude::*;
 //! use bevy_stylized::prelude::*;
 //!
@@ -22,6 +23,7 @@
 //!         commands.spawn((Camera3d::default(), Transform::from_xyz(0.0, 0.0, 4.0)));
 //!     })
 //!     .run();
+//! # }
 //! ```
 //!
 //! **注意（ADR-0028，provisional）**：DefaultPlugins 自带的 `GltfPlugin`
@@ -30,12 +32,13 @@
 //! `GltfPlugin`（见该函数文档）。
 
 mod capability;
+mod dynamic_quality;
 
 pub mod prelude {
     //! 常用类型的一站式导出。
     #[cfg(feature = "render")]
     pub use crate::stylized_render::*;
-    pub use crate::{StylizedPlugin, capability::*, stylized_core::prelude::*};
+    pub use crate::{StylizedPlugin, capability::*, dynamic_quality::*, stylized_core::prelude::*};
     #[cfg(feature = "gltf")]
     pub use crate::{stylized_gltf::*, stylized_gltf_plugin};
 }
@@ -43,6 +46,10 @@ pub mod prelude {
 pub use capability::{
     StylizedCapabilityConfig, StylizedResolvedCapabilities, requested_wgpu_features,
     stylized_capabilities_from_wgpu,
+};
+pub use dynamic_quality::{
+    StylizedDynamicQuality, StylizedDynamicQualityPlugin, StylizedQualityDecisionEvent,
+    StylizedTierOverride, dynamic_quality_system,
 };
 
 /// core crate 的整体 re-export（facade 不复制逻辑）。

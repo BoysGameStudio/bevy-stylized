@@ -13,8 +13,10 @@ path = "src/main.rs"
 bevy-stylized-core = { path = "../bevy-stylized-core" }
 bevy-stylized-gltf = { path = "../bevy-stylized-gltf" }
 gltf.workspace = true
+image.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 
 [dev-dependencies]
 serde_json.workspace = true

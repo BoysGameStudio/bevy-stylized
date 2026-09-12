@@ -106,6 +106,10 @@ ADR-0020（glTF Extras vs Sidecar Precedence）仍为 Proposed，因此本合同
 2. 两种输出的字段集在 v1 保持一致（sidecar 为正本，extras 为随包副本）。
 3. **消费方优先级与冲突解决规则显式推迟到 ADR-0020**；在该 ADR 关闭前，runtime 导入器不得对二者冲突做静默取舍，遇到不一致必须以诊断/错误暴露。
 
+### 5.1 编译期指令键（provisional，V2-f 引入）
+
+`bevy_stylized.compile/v1`：材质 extras 或 sidecar 顶层 `compile` 键（按材质名索引）可声明资产编译指令（当前唯一指令：ILM 四通道打包的源贴图映射，通道布局 R=metal / G=AO / B=specular-suppression / A=material-ID，见 docs/reference/07-gacha-setup-behavior-contract-v1.md §3.2）。payload 必须带 `schema_version`，major 不符则编译 fail-closed。消费方为 `bevy-stylized compile`（crates/bevy-stylized-tools）；冲突诊断规则同 §5 第 3 条。该键的语义在 ADR-0012/0020 关闭前为 provisional。
+
 ## 6. Export Manifest 字段
 
 `export-manifest.json` 正本 schema：`tools/blender-reference-export/contracts/manifest.schema.json`（`schema_version="export-manifest-v1"`，`additionalProperties=false`）。字段覆盖 docs/reference/03-blender-export-contract.md §Export Artifact Manifest 的全部要求：

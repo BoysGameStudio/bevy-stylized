@@ -1,6 +1,10 @@
-//! `bevy-stylized` CLI：validate / inspect（release gate §Tools）。
+//! `bevy-stylized` CLI：validate / inspect / compile（release gate §Tools、
+//! roadmap V2-f Asset Compiler 骨架）。
 //!
-//! 纯 glTF 解析（`gltf` crate），不需要 Bevy App / GPU。
+//! 纯 glTF 解析（`gltf` crate）+ PNG 打包（`image` crate），
+//! 不需要 Bevy App / GPU。
+
+mod compile;
 
 use std::{
     env,
@@ -19,7 +23,12 @@ const HELP: &str = "bevy-stylized - bevy-stylized asset tooling\n\n\
 Usage:\n  \
 bevy-stylized validate [--json] <FILE.glb|FILE.gltf>...\n  \
 bevy-stylized inspect  [--json] <FILE.glb|FILE.gltf>...\n  \
+bevy-stylized compile  [--json] [--out DIR] <FILE.glb|FILE.gltf>...\n  \
 bevy-stylized --help\n\n\
+compile: Asset Compiler 骨架 — 先 validate（fail-closed），再输出 runtime\n\
+material descriptors（materials/*.json，bevy_stylized.material/v1）与 packed\n\
+maps（textures/*.png；ILM: R=metal G=AO B=specular-suppression A=material-ID）。\n\
+默认输出目录：<input-stem>.compiled/\n\n\
 Exit codes: 0 = ok / clean report, 1 = contract violations, 2 = usage or IO error\n";
 
 // ---------------------------------------------------------------------------
@@ -33,39 +42,70 @@ enum Format {
     Json,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Command {
+    Validate,
+    Inspect,
+    Compile,
+}
+
 #[derive(Debug)]
 enum Action {
     Help,
     Run {
-        validate: bool,
+        command: Command,
         format: Format,
+        out: Option<PathBuf>,
         paths: Vec<PathBuf>,
     },
 }
 
 fn parse(arguments: &[OsString]) -> Result<Action, String> {
     let mut format = Format::default();
-    let mut command: Option<&str> = None;
+    let mut command: Option<Command> = None;
+    let mut out: Option<PathBuf> = None;
     let mut paths = Vec::new();
-    for arg in arguments {
+    let mut args = arguments.iter();
+    while let Some(arg) = args.next() {
         let arg = arg.to_str().ok_or("non-UTF8 argument")?;
         match arg {
             "--json" => format = Format::Json,
             "-h" | "--help" => return Ok(Action::Help),
-            "validate" | "inspect" if command.is_none() => command = Some(arg),
+            "--out" => {
+                let value = args
+                    .next()
+                    .ok_or("--out requires a directory argument")?
+                    .to_str()
+                    .ok_or("non-UTF8 --out argument")?;
+                out = Some(PathBuf::from(value));
+            }
+            _ if let Some(value) = arg.strip_prefix("--out=") => {
+                out = Some(PathBuf::from(value));
+            }
+            "validate" | "inspect" | "compile" if command.is_none() => {
+                command = Some(match arg {
+                    "validate" => Command::Validate,
+                    "inspect" => Command::Inspect,
+                    _ => Command::Compile,
+                });
+            }
             _ if arg.starts_with('-') => return Err(format!("unknown flag: {arg}")),
             _ => paths.push(PathBuf::from(arg)),
         }
     }
     let Some(command) = command else {
-        return Err("missing command (validate|inspect)".to_string());
+        return Err("missing command (validate|inspect|compile)".to_string());
     };
+    if out.is_some() && command != Command::Compile {
+        return Err("--out is only valid for compile".to_string());
+    }
     if paths.is_empty() {
         return Err("missing input file".to_string());
     }
     Ok(Action::Run {
-        validate: command == "validate",
+        command,
         format,
+        out,
         paths,
     })
 }
@@ -78,16 +118,34 @@ fn main() -> ExitCode {
             ExitCode::SUCCESS
         }
         Ok(Action::Run {
-            validate,
+            command,
             format,
+            out,
             paths,
         }) => {
             let mut violations = false;
             for path in &paths {
-                match run_one(path, validate) {
-                    Ok(report) => {
+                let result = match command {
+                    Command::Validate | Command::Inspect => {
+                        run_one(path, command == Command::Validate).map(|report| {
+                            violations |= report.violation;
+                            write_report(&report, format)
+                        })
+                    }
+                    Command::Compile => compile::compile_path(path, out.as_deref()).map(|report| {
                         violations |= report.violation;
-                        let _ = write_report(&report, format);
+                        compile::write_report(&report, format)
+                    }),
+                };
+                match result {
+                    Ok(Ok(())) => {}
+                    Ok(Err(error)) => {
+                        let _ = writeln!(
+                            io::stderr().lock(),
+                            "bevy-stylized: {}: report write failed: {error}",
+                            path.display()
+                        );
+                        return ExitCode::from(2);
                     }
                     Err(error) => {
                         let _ = writeln!(
@@ -118,9 +176,9 @@ fn main() -> ExitCode {
 
 /// 单条诊断。
 #[derive(Clone, Debug, serde::Serialize)]
-struct Diagnostic {
-    severity: &'static str, // "error" | "warning" | "info"
-    message: String,
+pub(crate) struct Diagnostic {
+    pub severity: &'static str, // "error" | "warning" | "info"
+    pub message: String,
 }
 
 /// 单文件报告。
@@ -226,7 +284,7 @@ fn legacy_alias_note(loader_key: &str) -> Option<&'static str> {
         .map(|alias| alias.npr_semantic)
 }
 
-fn run_one(path: &Path, validate: bool) -> Result<FileReport, String> {
+pub(crate) fn run_one(path: &Path, validate: bool) -> Result<FileReport, String> {
     let bytes = std::fs::read(path).map_err(|e| format!("read: {e}"))?;
     let gltf =
         gltf::Gltf::from_slice_without_validation(&bytes).map_err(|e| format!("parse: {e}"))?;

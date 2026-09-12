@@ -5,7 +5,10 @@
 use bevy::prelude::*;
 use bevy_stylized::prelude::*;
 use bevy_stylized::stylized_render::{
-    StylizedOutlineReplica, outline::sync_outline_replicas, post::StylizedFullscreenEffect,
+    StylizedOutlineReplica,
+    outline::sync_outline_replicas,
+    post::StylizedFullscreenEffect,
+    screen_outline::{StylizedScreenOutlineOverlay, sync_screen_outline},
 };
 
 /// 无 `StylizedOutline` 组件时，outline 副本系统不得产生任何副本实体。
@@ -90,4 +93,31 @@ fn post_sync_is_noop_without_post_component() {
     }
     let mut effects = app.world_mut().query::<&StylizedFullscreenEffect>();
     assert_eq!(effects.iter(app.world()).count(), 0);
+}
+
+/// 无 `StylizedScreenOutline` 组件时：无 overlay、无 prepass 组件插入
+///（prepass 成本零）。
+#[test]
+fn screen_outline_absent_means_zero_prepass_work() {
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins)
+        .add_plugins(bevy::asset::AssetPlugin {
+            meta_check: bevy::asset::AssetMetaCheck::Never,
+            ..Default::default()
+        })
+        .add_plugins(bevy::mesh::MeshPlugin);
+    app.init_resource::<Assets<
+        bevy_stylized::stylized_render::screen_outline::StylizedScreenOutlineMaterial,
+    >>();
+    app.add_systems(PostUpdate, sync_screen_outline);
+    app.world_mut().spawn(Camera3d::default());
+    for _ in 0..3 {
+        app.update();
+    }
+    let mut overlays = app.world_mut().query::<&StylizedScreenOutlineOverlay>();
+    assert_eq!(overlays.iter(app.world()).count(), 0);
+    let mut prepass = app
+        .world_mut()
+        .query::<&bevy::core_pipeline::prepass::DepthPrepass>();
+    assert_eq!(prepass.iter(app.world()).count(), 0);
 }

@@ -501,3 +501,50 @@ pub fn performance(app: &mut App) {
     benchmarks::build_portable_instances(app, 100);
     case_camera(app, Vec3::new(0.0, 4.0, 20.0), Vec3::ZERO);
 }
+
+// ---------------------------------------------------------------------------
+// outline-advanced（V2-a）：hybrid = hull 剪影 + screen-space 内部边缘
+// ---------------------------------------------------------------------------
+pub fn outline_advanced(app: &mut App) {
+    let material = cel_material(app);
+    let outline = app
+        .world_mut()
+        .resource_mut::<Assets<StylizedOutlineMaterial>>()
+        .add(StylizedOutlineMaterial {
+            params: StylizedOutlineParams::default()
+                .with_color(LinearRgba::new(0.02, 0.02, 0.04, 1.0))
+                .with_width(2.5),
+        });
+    let big_box = app.world_mut().resource_mut::<Assets<Mesh>>().add(
+        bevy::math::primitives::Cuboid::from_size(Vec3::new(2.0, 0.8, 1.6)),
+    );
+    let small_box = app.world_mut().resource_mut::<Assets<Mesh>>().add(
+        bevy::math::primitives::Cuboid::from_size(Vec3::new(0.9, 0.9, 0.9)),
+    );
+    let ball = app
+        .world_mut()
+        .resource_mut::<Assets<Mesh>>()
+        .add(Sphere::new(0.55));
+    for (mesh, translation) in [
+        (big_box, Vec3::new(0.0, -0.4, 0.0)),
+        (small_box.clone(), Vec3::new(0.0, 0.45, 0.0)),
+        (small_box, Vec3::new(0.35, 0.45, 0.2)),
+        (ball, Vec3::new(0.7, 0.55, 0.1)),
+    ] {
+        app.world_mut().spawn((
+            Mesh3d(mesh),
+            MeshMaterial3d(material.clone()),
+            StylizedOutline::new(outline.clone()),
+            Transform::from_translation(translation),
+        ));
+    }
+    case_camera(app, Vec3::new(2.2, 1.6, 3.4), Vec3::new(0.0, 0.3, 0.0));
+    // per-camera opt-in：screen-space 内部边缘（Standard+）。
+    let mut cameras = app
+        .world_mut()
+        .query_filtered::<bevy::prelude::Entity, With<Camera3d>>();
+    let camera = cameras.single(app.world()).expect("camera");
+    app.world_mut()
+        .entity_mut(camera)
+        .insert(bevy_stylized::stylized_render::screen_outline::StylizedScreenOutline::default());
+}

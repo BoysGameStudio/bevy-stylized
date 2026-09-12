@@ -244,34 +244,30 @@ fn blend_is_unreachable_in_v1_materials() {
     }
 }
 
-/// Shadow/prepass/outline 契约（provisional pending ADR-0023）：
+/// Shadow/prepass/outline 契约（provisional pending ADR-0023；V2-a 修订）：
 ///
-/// - 全部四个材质 `enable_prepass() == false` 且 `enable_shadows() == false`
-///   （显式关闭，不是默认声称支持）；
-/// - hull outline 不依赖任何 prepass（golden 用例已证；此处钉死材质级
-///   契约），也无 shadow 投射。
+/// - 主材质 `enable_prepass() == true`（**能力**开启；成本门控在相机——
+///   只有带 DepthPrepass/NormalPrepass 组件的相机产生 prepass 开销，
+///   见 `StylizedScreenOutline` 的 per-camera opt-in）；
+/// - `enable_shadows() == false` 不变（V1 无阴影投射）；
+/// - hull outline 不依赖任何 prepass（golden 用例已证）；
+/// - overlay 材质自身不进 prepass。
 #[test]
 fn prepass_and_shadow_contract_is_explicit() {
     use bevy::pbr::Material;
-    for (prepass, shadows) in [
-        (
-            StylizedCelMaterial::enable_prepass(),
-            StylizedCelMaterial::enable_shadows(),
-        ),
-        (
-            StylizedCharacterMaterial::enable_prepass(),
-            StylizedCharacterMaterial::enable_shadows(),
-        ),
-        (
-            StylizedHeroMaterial::enable_prepass(),
-            StylizedHeroMaterial::enable_shadows(),
-        ),
-        (
-            StylizedOutlineMaterial::enable_prepass(),
-            StylizedOutlineMaterial::enable_shadows(),
-        ),
+    for shadows in [
+        StylizedCelMaterial::enable_shadows(),
+        StylizedCharacterMaterial::enable_shadows(),
+        StylizedHeroMaterial::enable_shadows(),
+        StylizedOutlineMaterial::enable_shadows(),
+        StylizedScreenOutlineMaterial::enable_shadows(),
     ] {
-        assert!(!prepass, "V1 slice must not claim prepass");
-        assert!(!shadows, "V1 slice must not claim shadows");
+        assert!(!shadows, "V1 must not claim shadows");
     }
+    // 主材质 prepass 能力开启（成本由相机组件门控）；overlay 关闭。
+    assert!(StylizedCelMaterial::enable_prepass());
+    assert!(StylizedCharacterMaterial::enable_prepass());
+    assert!(StylizedHeroMaterial::enable_prepass());
+    assert!(!StylizedOutlineMaterial::enable_prepass());
+    assert!(!StylizedScreenOutlineMaterial::enable_prepass());
 }

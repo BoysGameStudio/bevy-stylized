@@ -297,6 +297,10 @@ pub enum StylizedFallbackStep {
     FaceSdfHardStep,
     /// Hair 高光关闭，rim 补偿。
     HairSpecularToRim,
+    /// Screen-space 描边不可用（tier < Standard）→ 仅 hull 描边。
+    /// （View/相机级步骤，不属于 class 链；由 render 侧
+    /// `resolve_outline_mode` 判定，此处仅登记语义。）
+    ScreenOutlineToHull,
 }
 
 /// Per-class fallback 链（docs/rendering/01 的 class fallback 定义，

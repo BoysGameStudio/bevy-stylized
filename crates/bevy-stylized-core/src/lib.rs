@@ -10,6 +10,8 @@
 //!   确定性 [`resolve_variant`](capability::resolve_variant)；
 //! - 质量政策（[`quality`]）与 Profile 契约（[`profile`]，ADR-0025：
 //!   版本化 API/Schema，不承诺 ABI）；
+//! - 动态质量调节器（[`governor`]，V2-c）：迟滞/冷却/可观测的 tier 调节
+//!   状态机，纯逻辑、零 Bevy App 依赖；
 //! - Schema 版本化（[`schema`]）：`bevy_stylized.*` 命名空间的版本载体。
 //!
 //! 依赖边界：仅 `bevy_math` / `bevy_color` / `bevy_reflect` / `serde`；
@@ -19,6 +21,7 @@ pub mod axis;
 pub mod budget;
 pub mod capability;
 pub mod descriptor;
+pub mod governor;
 pub mod profile;
 pub mod quality;
 pub mod schema;
@@ -39,6 +42,10 @@ pub use descriptor::{
     StylizedMaterialFlags, StylizedTextureRef, StylizedTextureSemantic, StylizedViewDescriptor,
     StylizedViewQuality,
 };
+pub use governor::{
+    QualityAdjustment, QualityDecision, QualitySignals, QualityTransition, StylizedQualityGovernor,
+    StylizedQualityGovernorConfig,
+};
 pub use profile::{StylizedProfile, StylizedProfileMetadata};
 pub use quality::StylizedQualityPolicy;
 pub use schema::{
@@ -57,6 +64,10 @@ pub mod prelude {
         StylizedCameraNprState, StylizedInstanceDescriptor, StylizedMaterialDescriptor,
         StylizedMaterialFlags, StylizedTextureRef, StylizedTextureSemantic, StylizedViewDescriptor,
         StylizedViewQuality,
+    };
+    pub use crate::governor::{
+        QualityAdjustment, QualityDecision, QualitySignals, QualityTransition,
+        StylizedQualityGovernor, StylizedQualityGovernorConfig,
     };
     pub use crate::profile::{StylizedProfile, StylizedProfileMetadata};
     pub use crate::quality::StylizedQualityPolicy;

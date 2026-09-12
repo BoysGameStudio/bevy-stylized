@@ -20,7 +20,7 @@ use bevy::{
 use bevy_stylized_render::{
     CEL_PORTABLE_FORWARD_SHADER_PATH, CHARACTER_PORTABLE_FORWARD_SHADER_PATH,
     OUTLINE_PORTABLE_SHADER_PATH, StylizedRenderPlugin, hero::HERO_FORWARD_SHADER_PATH,
-    post::STYLIZED_FULLSCREEN_SHADER_PATH,
+    post::STYLIZED_FULLSCREEN_SHADER_PATH, screen_outline::SCREEN_OUTLINE_SHADER_PATH,
 };
 
 /// 纯 WGSL import 模块（无 pipeline 引用）。
@@ -123,6 +123,11 @@ fn cases() -> Vec<Case> {
     for path in FULLSCREEN_CASES {
         cases.push(Case { path, defs: &[] });
     }
+    // screen-space 描边 overlay：mesh material + prepass defs。
+    cases.push(Case {
+        path: SCREEN_OUTLINE_SHADER_PATH,
+        defs: &["VERTEX_POSITIONS", "DEPTH_PREPASS", "NORMAL_PREPASS"],
+    });
     cases
 }
 

@@ -33,6 +33,7 @@ pub mod instance;
 pub mod material;
 pub mod outline;
 pub mod post;
+pub mod screen_outline;
 pub mod view;
 
 pub use budget::{
@@ -63,6 +64,10 @@ pub use post::{
     STYLIZED_FULLSCREEN_SHADER_PATH, StylizedDisplayTransform, StylizedFullscreenEffect,
     StylizedPostProcess,
 };
+pub use screen_outline::{
+    SCREEN_OUTLINE_SHADER_PATH, StylizedOutlineMode, StylizedScreenOutline,
+    StylizedScreenOutlineMaterial, StylizedScreenOutlineParams, resolve_outline_mode,
+};
 pub use view::{StylizedKeyLight, StylizedViewSettings, exposure_component, resolve_ambient_light};
 
 use bevy::{
@@ -88,17 +93,20 @@ impl Plugin for StylizedRenderPlugin {
         embedded_asset!(app, "shaders/common/npr_common.wgsl");
         embedded_asset!(app, "shaders/hero/hero_forward.wgsl");
         embedded_asset!(app, "shaders/post/stylized_fullscreen.wgsl");
+        embedded_asset!(app, "shaders/outline/screen_outline.wgsl");
         app.add_plugins((
             MaterialPlugin::<StylizedCelMaterial>::default(),
             MaterialPlugin::<StylizedOutlineMaterial>::default(),
             MaterialPlugin::<StylizedCharacterMaterial>::default(),
             MaterialPlugin::<StylizedHeroMaterial>::default(),
+            MaterialPlugin::<screen_outline::StylizedScreenOutlineMaterial>::default(),
         ));
         post::register(app);
         app.register_type::<StylizedCelMaterial>()
             .register_type::<StylizedOutlineMaterial>()
             .register_type::<StylizedCharacterMaterial>()
             .register_type::<StylizedHeroMaterial>()
+            .register_type::<screen_outline::StylizedScreenOutline>()
             .register_type::<outline::StylizedOutline>()
             .register_type::<instance::StylizedInstanceData>();
         // Instance 传输通道：依 Stage B 解析结果选择（当前恒 MeshTagBits，
@@ -117,6 +125,7 @@ impl Plugin for StylizedRenderPlugin {
                 character::sync_character_material_flags.after(bevy::asset::AssetEventSystems),
                 hero::sync_hero_material_flags.after(bevy::asset::AssetEventSystems),
                 outline::sync_outline_replicas,
+                screen_outline::sync_screen_outline,
                 instance::sync_instance_tags,
             ),
         );

@@ -249,8 +249,11 @@ impl Material for StylizedCelMaterial {
 
     // Cel@Portable 切片：不启用 prepass / shadow 路径（语义矩阵 pending
     // ADR-0023；此处显式关闭而不是默认声称支持）。
+    // prepass 参与在类型级开启（默认 prepass shader 即可）；**成本门控在
+    // 相机**：只有带 DepthPrepass/NormalPrepass 组件的相机才产生 prepass
+    // 开销（StylizedScreenOutline 的 per-camera opt-in），默认相机零成本。
     fn enable_prepass() -> bool {
-        false
+        true
     }
 
     fn enable_shadows() -> bool {

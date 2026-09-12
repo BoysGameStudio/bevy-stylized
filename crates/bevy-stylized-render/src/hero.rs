@@ -282,8 +282,11 @@ impl Material for StylizedHeroMaterial {
         }
     }
 
+    // prepass 参与在类型级开启（默认 prepass shader 即可）；**成本门控在
+    // 相机**：只有带 DepthPrepass/NormalPrepass 组件的相机才产生 prepass
+    // 开销（StylizedScreenOutline 的 per-camera opt-in），默认相机零成本。
     fn enable_prepass() -> bool {
-        false
+        true
     }
 
     fn enable_shadows() -> bool {

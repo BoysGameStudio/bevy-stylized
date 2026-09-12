@@ -42,10 +42,23 @@ pub struct ShowcaseCase {
     pub view: Option<fn(&mut StylizedViewDescriptor)>,
     /// 资产根（None = "assets" 占位；reference 用例指向 fixtures/reference）。
     pub asset_root: Option<&'static str>,
+    /// 请求的执行档位（screen-space 描边等 Standard+ 特性用）。
+    pub tier: Option<StylizedExecutionTier>,
 }
 
-fn headless_app(resources: RenderResources, asset_root: &str) -> App {
+fn headless_app(
+    resources: RenderResources,
+    asset_root: &str,
+    tier: Option<StylizedExecutionTier>,
+) -> App {
     let mut app = App::new();
+    if let Some(tier) = tier {
+        // 必须在 StylizedPlugin 之前（Stage B 在 finish 时读该配置）。
+        app.insert_resource(StylizedCapabilityConfig {
+            requested_tier: tier,
+            ..StylizedCapabilityConfig::default()
+        });
+    }
     app.add_plugins(
         DefaultPlugins
             .set(AssetPlugin {
@@ -104,7 +117,7 @@ fn default_view(app: &mut App) {
 /// headless 跑一个用例并捕获；返回捕获图。
 pub fn capture_case(case: &ShowcaseCase, resources: RenderResources) -> CapturedImage {
     let asset_root = case.asset_root.unwrap_or("assets");
-    let mut app = headless_app(resources, asset_root);
+    let mut app = headless_app(resources, asset_root, case.tier);
     default_view(&mut app);
     if let Some(view) = case.view {
         let mut settings = app.world_mut().resource_mut::<StylizedViewSettings>();
@@ -138,60 +151,70 @@ pub fn all_cases() -> Vec<ShowcaseCase> {
             build: cases::overview,
             view: None,
             asset_root: None,
+            tier: None,
         },
         ShowcaseCase {
             name: "ramp",
             build: cases::ramp,
             view: None,
             asset_root: None,
+            tier: None,
         },
         ShowcaseCase {
             name: "lighting",
             build: cases::lighting,
             view: None,
             asset_root: None,
+            tier: None,
         },
         ShowcaseCase {
             name: "face",
             build: cases::face,
             view: None,
             asset_root: None,
+            tier: None,
         },
         ShowcaseCase {
             name: "hair",
             build: cases::hair,
             view: None,
             asset_root: None,
+            tier: None,
         },
         ShowcaseCase {
             name: "metal",
             build: cases::metal,
             view: None,
             asset_root: None,
+            tier: None,
         },
         ShowcaseCase {
             name: "outline",
             build: cases::outline,
             view: None,
             asset_root: None,
+            tier: None,
         },
         ShowcaseCase {
             name: "animation",
             build: cases::animation,
             view: None,
             asset_root: None,
+            tier: None,
         },
         ShowcaseCase {
             name: "post",
             build: cases::post,
             view: None,
             asset_root: None,
+            tier: None,
         },
         ShowcaseCase {
             name: "stress",
             build: cases::stress,
             view: None,
             asset_root: None,
+            tier: None,
         },
         ShowcaseCase {
             name: "reference",
@@ -201,12 +224,22 @@ pub fn all_cases() -> Vec<ShowcaseCase> {
                 env!("CARGO_MANIFEST_DIR"),
                 "/../../../fixtures/reference"
             )),
+            tier: None,
         },
         ShowcaseCase {
             name: "performance",
             build: cases::performance,
             view: None,
             asset_root: None,
+            tier: None,
+        },
+        ShowcaseCase {
+            name: "outline-advanced",
+            build: cases::outline_advanced,
+            view: None,
+            asset_root: None,
+            // screen-space 描边是 Standard+ 特性。
+            tier: Some(StylizedExecutionTier::Standard),
         },
     ]
 }
