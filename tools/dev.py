@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 from project import Project
 
-from task_runner import CheckFailed, ResourceBlocked, run_tests, require_suites, invoke
+from task_runner import CheckFailed, ResourceBlocked, run_tests, require_suites, invoke, validate_gpu_suites
 
 
 def run(project, command, env=None):
@@ -147,7 +147,7 @@ def execute(project, args):
         env = dict(os.environ, STYLIZED_REQUIRE_GPU='1')
         suites = json.loads((project.root/'tests/suites.json').read_text())
         states = []
-        for binary, identities in suites['gpu'].items():
+        for binary, identities in validate_gpu_suites(suites['gpu']).items():
             states.append(run_tests(project, binary,
                 ['cargo','test','--locked','-p','stylized-integration-tests','--test',binary], identities, env))
         from task_runner import aggregate

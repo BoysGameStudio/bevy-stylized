@@ -67,7 +67,8 @@ use `--required` to enforce the domain parity gate, and retain that domain repor
 ## Required tests
 
 `tests/suites.json` owns required case names. GPU binary keys also select the binaries;
-there is no second hard-coded GPU list. The runner lists the filtered ignored tests
+there is no second hard-coded GPU list. Empty registries or invalid/empty binary
+case lists are rejected before any test process starts. The runner lists the filtered ignored tests
 of each binary and compares the exact set, including duplicates. It then runs each
 case using stable libtest `--exact`, `--ignored`, `--nocapture`, one thread, and checks
 both the case identity and test summary. No nightly JSON harness is required.

@@ -110,7 +110,7 @@ pub(super) fn update(
         serde_json::to_vec_pretty(&p.recipe).map_err(|e| e.to_string())?,
     )
     .map_err(|e| e.to_string())?;
-    let report = serde_json::json!({"schema":"bevy_stylized.inspector-capture/v1","status":"PASS","scope":"current live A/B capture, not upstream parity or an accepted baseline","generation":p.generation,"revision":p.revision,"retired_captures":state.retired,"ready_render_frames":state.stable,"material_primitives_per_view":runtime.input.meshes,"msaa":4,"supersampling":false,"images":image_hashes,"files":p.recipe.files,"renderer_version":env!("CARGO_PKG_VERSION"),"device":world.get_resource::<bevy::render::renderer::RenderAdapterInfo>().map(|info|format!("{:?}",info.0)),"inspector_source_sha256":asset::sha(concat!(include_str!("mod.rs"),include_str!("state.rs"),include_str!("asset.rs"),include_str!("capture.rs"),include_str!("panel.rs")).as_bytes())});
+    let report = serde_json::json!({"schema":"bevy_stylized.inspector-capture/v1","status":"PASS","scope":"current live A/B capture, not upstream parity or an accepted baseline","generation":p.generation,"revision":p.revision,"retired_captures":state.retired,"ready_render_frames":state.stable,"material_primitives_per_view":runtime.input.meshes,"msaa":4,"supersampling":false,"images":image_hashes,"files":p.recipe.files,"renderer_version":env!("CARGO_PKG_VERSION"),"device":world.get_resource::<bevy::render::renderer::RenderAdapterInfo>().map(|info|format!("{:?}",info.0)),"inspector_source_sha256":super::source_sha256(),"inspector_source_policy":"module-sources/v2"});
     std::fs::write(
         directory.join("capture.json"),
         serde_json::to_vec_pretty(&report).map_err(|e| e.to_string())?,

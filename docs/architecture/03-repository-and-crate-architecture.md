@@ -91,6 +91,8 @@ The tools crate keeps its CLI/report entry in
 Compile reads and parses the glTF input once and shares document inspection with
 validate/inspect. Source files must remain unchanged during compilation; this is
 not a snapshot transaction over every external texture/sidecar. Existing schema,
-metadata precedence, diagnostics and file naming stay unchanged. Validation errors
+metadata precedence and file naming stay unchanged. Output paths have one owner:
+identical shared texture bytes are deduplicated, while material-name collisions or
+different bytes targeting one path are errors. Validation errors
 prevent the plan from reaching publication; output directories remain new candidates.
 Moving source changes the build cache key, not the runtime bundle format.

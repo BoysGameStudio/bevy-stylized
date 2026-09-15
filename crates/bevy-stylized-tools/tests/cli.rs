@@ -504,3 +504,116 @@ fn unavailable_profile_cannot_fall_back_to_generic_compile() {
     assert_eq!(output.status.code(), Some(2));
     assert!(String::from_utf8_lossy(&output.stderr).contains("profile-genshin"));
 }
+
+#[test]
+fn compile_rejects_material_filename_collisions_without_output() {
+    for names in [["A B", "A_B"], ["Same", "Same"]] {
+        let temp = tempfile::tempdir().unwrap();
+        let input = temp.path().join("asset.gltf");
+        let out = temp.path().join("out");
+        std::fs::write(
+            &input,
+            serde_json::to_vec(&serde_json::json!({
+                "asset":{"version":"2.0"},
+                "materials":names.map(|name| serde_json::json!({"name":name}))
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let (code, report) = run_cli(&[
+            "compile",
+            "--json",
+            "--out",
+            out.to_str().unwrap(),
+            input.to_str().unwrap(),
+        ]);
+        assert_eq!(code, 1, "{report}");
+        assert!(report.contains("output path collision"), "{report}");
+        assert!(!out.exists());
+    }
+}
+
+fn embedded_colors(dir: &Path, different: bool) -> std::path::PathBuf {
+    let mut blob = Vec::new();
+    let mut views = Vec::new();
+    let mut images = Vec::new();
+    for index in 0..if different { 2 } else { 1 } {
+        let color = if index == 0 {
+            [255, 0, 0, 255]
+        } else {
+            [0, 0, 255, 255]
+        };
+        let mut png = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgba8(image::RgbaImage::from_pixel(1, 1, image::Rgba(color)))
+            .write_to(&mut png, image::ImageFormat::Png)
+            .unwrap();
+        let bytes = png.into_inner();
+        views
+            .push(serde_json::json!({"buffer":0,"byteOffset":blob.len(),"byteLength":bytes.len()}));
+        images.push(serde_json::json!({"bufferView":index,"mimeType":"image/png","name":"shared"}));
+        blob.extend(bytes);
+        while !blob.len().is_multiple_of(4) {
+            blob.push(0);
+        }
+    }
+    let mut json = serde_json::to_vec(&serde_json::json!({
+        "asset":{"version":"2.0"},"buffers":[{"byteLength":blob.len()}],
+        "bufferViews":views,"images":images,
+        "textures":[{"source":0},{"source":if different {1} else {0}}],
+        "materials":[
+            {"name":"Left","pbrMetallicRoughness":{"baseColorTexture":{"index":0}}},
+            {"name":"Right","pbrMetallicRoughness":{"baseColorTexture":{"index":1}}}
+        ]
+    }))
+    .unwrap();
+    while !json.len().is_multiple_of(4) {
+        json.push(b' ');
+    }
+    let mut glb = b"glTF".to_vec();
+    glb.extend(2_u32.to_le_bytes());
+    glb.extend(((28 + json.len() + blob.len()) as u32).to_le_bytes());
+    glb.extend((json.len() as u32).to_le_bytes());
+    glb.extend(b"JSON");
+    glb.extend(json);
+    glb.extend((blob.len() as u32).to_le_bytes());
+    glb.extend(b"BIN\0");
+    glb.extend(blob);
+    let path = dir.join("asset.glb");
+    std::fs::write(&path, glb).unwrap();
+    path
+}
+
+#[test]
+fn compile_deduplicates_shared_embedded_texture_but_rejects_different_bytes() {
+    for different in [false, true] {
+        let temp = tempfile::tempdir().unwrap();
+        let input = embedded_colors(temp.path(), different);
+        let out = temp.path().join("out");
+        let (code, report) = run_cli(&[
+            "compile",
+            "--json",
+            "--out",
+            out.to_str().unwrap(),
+            input.to_str().unwrap(),
+        ]);
+        assert_eq!(code, if different { 1 } else { 0 }, "{report}");
+        if different {
+            assert!(report.contains("output path collision"));
+            assert!(!out.exists());
+        } else {
+            let report: serde_json::Value = serde_json::from_str(&report).unwrap();
+            assert_eq!(
+                report["emitted"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .filter(|f| f["kind"] == "texture")
+                    .count(),
+                1
+            );
+            assert!(out.join("materials/Left.json").is_file());
+            assert!(out.join("materials/Right.json").is_file());
+            assert!(out.join("textures/shared.png").is_file());
+        }
+    }
+}

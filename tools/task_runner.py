@@ -54,6 +54,19 @@ def classify_case(output, code, identity):
     return 'FAIL', 'test-failed'
 
 
+def validate_gpu_suites(suites):
+    if not isinstance(suites, dict) or not suites:
+        raise CheckFailed('required GPU registry must contain test binaries')
+    for binary, names in suites.items():
+        if not isinstance(binary, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', binary):
+            raise CheckFailed('invalid GPU binary identity')
+        if (not isinstance(names, list) or not names
+                or any(not isinstance(n, str) or not re.fullmatch(r'[\w:]+', n) for n in names)
+                or len(names) != len(set(names))):
+            raise CheckFailed(f'{binary}: required suite needs unique, nonempty identities')
+    return suites
+
+
 def run_tests(project, name, command, expected, env):
     """Check the filtered ignored-test inventory, then execute each exact identity.
 

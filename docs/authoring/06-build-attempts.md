@@ -11,7 +11,8 @@ The input digest owns the content key. New work lives under
 `assets/local/PACK/builds/KEY/attempts/ATTEMPT_ID`. Each attempt has a unique ID;
 failed/interrupted directories remain untouched. A completed legacy build directly
 under KEY remains readable. Completed attempts are reused only after manifest
-input equality and artifact hash verification. Corruption is a failure, not a
+schema/nonempty file-map validation, input equality, contained relative paths and
+artifact hash verification. Corruption is a failure, not a
 reason to quietly select another candidate.
 
 `build-manifest.json` is the completion marker. It is written atomically only after

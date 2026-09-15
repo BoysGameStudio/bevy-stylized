@@ -87,3 +87,20 @@ class Attempts(unittest.TestCase):
             finish(root, {'source': 'original'})
             with self.assertRaisesRegex(ValueError, 'inputs differ'):
                 completed_or_new(root, {'source': 'changed'}, verify_run)
+
+    def test_corrupt_completion_manifest_cannot_be_reused(self):
+        import hashlib
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp)
+            (root/'data').write_bytes(b'valid')
+            digest=hashlib.sha256(b'valid').hexdigest()
+            for manifest in [
+                {'schema':'wrong','inputs':{},'files':{'data':digest}},
+                {'schema':'bevy_stylized.build/v1','inputs':{},'files':{}},
+                {'schema':'bevy_stylized.build/v1','inputs':{},'files':{'../outside':digest}},
+                {'schema':'bevy_stylized.build/v1','inputs':{},'files':{'data':'not-a-hash'}},
+                {'schema':'bevy_stylized.build/v1','inputs':{},'files':{'missing':digest}},
+            ]:
+                (root/'build-manifest.json').write_text(json.dumps(manifest))
+                with self.assertRaises(ValueError):completed_or_new(root,{},verify_run)
+            self.assertEqual((root/'data').read_bytes(),b'valid')

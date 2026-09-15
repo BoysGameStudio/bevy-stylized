@@ -185,3 +185,21 @@ class ProcessAndInputs(unittest.TestCase):
             with patch.object(dev,'invoke',side_effect=child),contextlib.redirect_stdout(io.StringIO()):
                 with self.assertRaises(ResourceBlocked):dev.run(project,['reference'])
             self.assertEqual(project.records['command-0']['status'],'BLOCKED')
+
+class RegistryValidation(unittest.TestCase):
+    def test_empty_gpu_registry_cannot_pass_via_synthetic_import(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project=make_project(tmp)
+            (project.root/'tests').mkdir()
+            (project.root/'tests/suites.json').write_text(json.dumps({'gpu':{},'synthetic-import':['synthetic']}))
+            with patch.object(dev,'Project',return_value=project), patch.object(sys,'argv',['dev.py','--run-id','empty','check','--lane','gpu']), patch.object(dev,'run_tests',return_value={'status':'PASS'}) as run, contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(dev.main(),1)
+                run.assert_not_called()
+            self.assertEqual(project.read_report('gpu','empty')['status'],'FAIL')
+
+    def test_registry_validates_all_entries_before_execution(self):
+        from task_runner import validate_gpu_suites
+        for value in [[], {}, {'one':[]}, {'one':['a','a']}, {'one':[1]}, {'../one':['a']}]:
+            with self.assertRaises(CheckFailed):validate_gpu_suites(value)
+        valid={'one':['a','module::b']}
+        self.assertEqual(validate_gpu_suites(valid),valid)

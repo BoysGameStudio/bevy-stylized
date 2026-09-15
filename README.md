@@ -92,6 +92,10 @@ records the later complete isolation and regression checks. The
 [platform support matrix](docs/platforms/SUPPORT_MATRIX.md). Historical records
 retain their original results and version scope.
 
+Subsequent [precommit review](docs/plans/project-precommit-review-2026-09-15.md)
+records additional boundary fixes and their validation; earlier isolation records
+retain their original source identities.
+
 ## Layout and contracts
 
 - `crates/`: six product crates; shaders belong to the render crate.

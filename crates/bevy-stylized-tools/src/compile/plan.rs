@@ -219,7 +219,30 @@ pub(super) fn build(
             bytes: serde_json::to_vec_pretty(&sidecar).map_err(|e| e.to_string())?,
         });
     }
-    Ok(CompilePlan { files: pending })
+    // Every published path has one owner. Shared embedded textures may repeat
+    // the same bytes; distinct materials or differing bytes must never overwrite.
+    let mut files: Vec<PendingWrite> = Vec::new();
+    let mut destinations = BTreeMap::new();
+    for file in pending {
+        if let Some(&index) = destinations.get(&file.rel_path) {
+            let previous: &PendingWrite = &files[index];
+            if file.kind == "texture" && previous.kind == "texture" && file.bytes == previous.bytes
+            {
+                continue;
+            }
+            diagnostics.push(Diagnostic {
+                severity: "error",
+                message: format!(
+                    "compiled output path collision: {}",
+                    file.rel_path.display()
+                ),
+            });
+        } else {
+            destinations.insert(file.rel_path.clone(), files.len());
+            files.push(file);
+        }
+    }
+    Ok(CompilePlan { files })
 }
 
 /// descriptor → `materials/<name>.json` 规划项。

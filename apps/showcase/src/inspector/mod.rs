@@ -199,3 +199,61 @@ pub fn run(args: &[String]) -> Result<(), String> {
     }
     Ok(())
 }
+
+// Keep compile-time provenance explicit; the test checks it against the module tree.
+const SOURCES: &[(&str, &str)] = &[
+    ("asset.rs", include_str!("asset.rs")),
+    ("capture.rs", include_str!("capture.rs")),
+    ("mod.rs", include_str!("mod.rs")),
+    ("options.rs", include_str!("options.rs")),
+    ("panel.rs", include_str!("panel.rs")),
+    ("runtime.rs", include_str!("runtime.rs")),
+    ("state.rs", include_str!("state.rs")),
+    ("validation.rs", include_str!("validation.rs")),
+];
+
+fn source_sha256() -> String {
+    use sha2::{Digest, Sha256};
+    let mut hash = Sha256::new();
+    for (name, source) in SOURCES {
+        hash.update(name.as_bytes());
+        hash.update(b"\0");
+        hash.update(source.as_bytes());
+        hash.update(b"\0");
+    }
+    format!("{:x}", hash.finalize())
+}
+
+#[cfg(test)]
+mod provenance_tests {
+    use super::*;
+
+    #[test]
+    fn source_provenance_covers_each_inspector_module() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/inspector");
+        fn collect(root: &std::path::Path, modules: &mut Vec<std::path::PathBuf>) {
+            for entry in std::fs::read_dir(root).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    collect(&path, modules);
+                } else if path.extension().is_some_and(|e| e == "rs") {
+                    modules.push(path);
+                }
+            }
+        }
+        let mut modules = Vec::new();
+        collect(&root, &mut modules);
+        modules.sort();
+        let names: Vec<_> = modules
+            .iter()
+            .map(|p| p.strip_prefix(&root).unwrap().to_str().unwrap())
+            .collect();
+        assert_eq!(
+            names,
+            SOURCES.iter().map(|(name, _)| *name).collect::<Vec<_>>()
+        );
+        for ((_, embedded), path) in SOURCES.iter().zip(modules) {
+            assert_eq!(*embedded, std::fs::read_to_string(path).unwrap());
+        }
+    }
+}

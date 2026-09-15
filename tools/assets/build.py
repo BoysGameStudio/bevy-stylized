@@ -5,6 +5,7 @@ from project import Project
 import hashlib
 import json
 import os
+import re
 import shutil
 from .prepare import verify, unpack_archive, digest
 from .attempt import completed_or_new
@@ -21,9 +22,26 @@ def prepared(project, name):
 
 
 def verify_run(path):
-    record=json.loads((path/'build-manifest.json').read_text())
-    for name,expected in record['files'].items():
-        if digest(path/name)!=expected:raise ValueError(f'generated artifact changed: {path/name}')
+    path = Path(path).resolve(strict=True)
+    record = json.loads((path / 'build-manifest.json').read_text())
+    if (not isinstance(record, dict)
+            or record.get('schema') != 'bevy_stylized.build/v1'
+            or not isinstance(record.get('inputs'), dict)
+            or not isinstance(record.get('files'), dict)
+            or not record['files']):
+        raise ValueError('invalid or empty build completion manifest')
+    for name, expected in record['files'].items():
+        if (not isinstance(name, str) or not Path(name).parts
+                or Path(name).is_absolute() or '..' in Path(name).parts
+                or not isinstance(expected, str)
+                or not re.fullmatch(r'[0-9a-f]{64}', expected)):
+            raise ValueError('invalid build artifact path/hash')
+        artifact = path / name
+        if (artifact.is_symlink() or not artifact.resolve().is_relative_to(path)
+                or not artifact.is_file()):
+            raise ValueError(f'missing/unsafe build artifact: {name}')
+        if digest(artifact) != expected:
+            raise ValueError(f'generated artifact changed: {artifact}')
     return path
 
 

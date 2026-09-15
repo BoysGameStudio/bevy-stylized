@@ -16,6 +16,9 @@
 | 性能 | SMOKE_ONLY | 隔离内 60 帧 instrumented 检查；不建立发布预算或优化声明 |
 | 远程 CI | 未执行 | 工作流已接入并通过本地对应检查，未新增/运行远程 GPU runner |
 
+后续[提交前审查](project-precommit-review-2026-09-15.md)补充四项边界修复与验证；
+本记录保留 R6 完成时的源码与隔离范围。
+
 ## R5：有依据地保留渲染边界
 
 审查了材质参数、descriptor 映射、specialization、事件同步、instance/table、

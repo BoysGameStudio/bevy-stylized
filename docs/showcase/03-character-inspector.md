@@ -105,3 +105,9 @@ ordering, MSAA, warm-up counts and request retirement.
 
 Its input policy remains separate from the fixed reference package; see
 [reference/inspector input boundaries](../testing/03-capture-input-boundaries.md).
+
+Capture metadata uses `inspector_source_policy = module-sources/v2`. Its SHA-256
+includes every inspector module in lexical relative-path order, hashing each
+filename and source with NUL separators. A source inventory test guards newly
+added modules. This corrects the old incomplete source list; screenshot pixels
+and generation/revision rules are unchanged.
