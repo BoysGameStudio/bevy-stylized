@@ -18,6 +18,9 @@ and [release gates](docs/release/V1_RELEASE_CHECKLIST.md).
 
 ## Build and test
 
+Validation runs locally; GitHub Actions is disabled and pushes do not launch CI.
+Use `tools/dev.py` for checks, including inspector, consumer and GPU lanes.
+
 Use the Rust toolchain in `rust-toolchain.toml` and Python 3.11+. Ordinary builds
 and CPU tests need neither Blender nor third-party character assets.
 

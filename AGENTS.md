@@ -20,6 +20,9 @@ The repository is the maintained source of these workflows. Personal skill copie
 must not override current project paths or contracts. Every task remains executable
 through documented tools without an AI client, Blender MCP or a personal skill.
 
+Validation is local-only. Do not enable GitHub Actions or launch remote CI.
+Historical workflow definitions live under docs/history and are not active tasks.
+
 Use `tools/dev.py` for standard tasks. Serialize Cargo builds and GPU/performance
 runs. Required GPU/asset/baseline absence is BLOCKED, not PASS. Keep engineering
 independence, image regression and upstream parity as distinct reported outcomes.

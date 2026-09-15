@@ -168,7 +168,7 @@ CPU 原始日志本轮位于 `/tmp/stylized-refactor-cpu.log`，属于临时产�
 10. [独立化执行记录](../plans/independent-project-execution.md)。
 11. [静态角色旧计划](../plans/static-character-reference-plan.md)、[reference 工具链说明](../reference/02-reference-toolchain-lock.md)。
 12. [Provisional 清单](../release/03-provisional-inventory.md)、[facade](../../crates/bevy-stylized/src/lib.rs)、[render 入口](../../crates/bevy-stylized-render/src/lib.rs)。
-13. [Rust CI](../../.github/workflows/rust.yml)、[showcase feature](../../apps/showcase/Cargo.toml)、[独立 consumer](../../tools/checks/consumers.py)。
+13. [Archived Rust CI](../history/remote-ci-retired-2026-09-15/rust.yml)、[showcase feature](../../apps/showcase/Cargo.toml)、[独立 consumer](../../tools/checks/consumers.py)。
 14. Rust/Cargo 官方，[Dependency Resolution](https://doc.rust-lang.org/cargo/reference/resolver.html)，2026-09-15 查阅。
 15. [inspector 输入](../../apps/showcase/src/inspector/asset.rs)、[inspector 编排](../../apps/showcase/src/inspector/mod.rs)。
 16. [Character](../../crates/bevy-stylized-render/src/character.rs)、[Hero](../../crates/bevy-stylized-render/src/hero.rs)、[Cel](../../crates/bevy-stylized-render/src/material.rs)。

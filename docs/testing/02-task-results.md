@@ -85,18 +85,19 @@ precedence in aggregation. The GPU command also checks synthetic import. Require
 resource absence cannot silently skip a test. `GOLDEN_REBASELINE` is removed from
 the required-test environment; baseline acceptance stays a separate explicit task.
 
-## CPU and continuous checks
+## Local CPU checks
 
 `check --lane cpu` retains ordinary workspace CPU tests and no external character
 requirement. `check --lane inspector-cpu` runs the optional inspector's library tests
-and all-target clippy (including binary compilation). The Rust CI installs its
-X11/Wayland development prerequisites and runs this same entrypoint.
+and all-target clippy (including binary compilation). Install the feature's
+X11/Wayland development prerequisites on the local validation machine.
 
 `check --lane consumers --fetch` explicitly allows dependency preparation for each
 independent consumer, followed by offline validation. Without `--fetch`, a missing
 Cargo cache is BLOCKED and a compile error is FAIL. This command never prepares art.
-CPU CI now invokes this lane. Actual remote CI execution is separate evidence from
-workflow definition or local success; no new GPU runner is implied.
+GitHub Actions is disabled by project policy. Run these checks locally; remote
+CI is not a completion requirement. Previous remote workflow definitions and
+execution records are historical evidence.
 
 Serialize Cargo and GPU/performance work on one workspace/device. Each GPU case now
 starts its own test process; these gate timings are not comparable performance

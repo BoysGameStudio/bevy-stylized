@@ -4,6 +4,12 @@ Read the current architecture and the specification for the affected subsystem.
 Use Python 3.11+ for project tooling and the checked-in Rust toolchain. A renderer
 change needs rendering evidence; a documentation change needs document validation.
 
+## Local validation policy
+
+Run validation locally through the commands below. GitHub Actions is disabled;
+do not add remote CI as a required step or re-enable workflows. Retired workflow
+definitions are preserved under docs/history.
+
 ## Common commands
 
 ```sh
