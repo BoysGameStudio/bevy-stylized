@@ -31,7 +31,7 @@ edition = "2024"
 rust-version = "1.98"
 repository = "https://github.com/BoysGameStudio/bevy-stylized"
 # License intentionally unset at the workspace level: pending ADR-0017 /
-# provenance review. Legacy crates carry their original license fields.
+# provenance review; historical attribution remains under docs/history.
 
 [workspace.lints.clippy]
 # Bevy-inherent: ECS queries are complex types and systems take many

@@ -1,5 +1,11 @@
 # 静态角色同条件渲染对比实施计划
 
+> Current applicability (2026-09-15): the current authoring target is pinned in
+> [gacha-authoring.json](../../assets/sources/gacha-authoring.json). Historical v3.6.2
+> examples or continuation requirements below are opt-in evidence, not current gates.
+> [Current static qualification](../quality/realtime-validation-2026-09-15.json)
+> records the later scope; original dated outcomes below are preserved.
+
 > 版本：v2，2026-09-14。状态：用户已授权执行；验证与剩余资格见执行报告。
 > 依据：当前源代码、独立化实现审查及既有验收规范。本文件保留批准时的目标与出口条件。
 

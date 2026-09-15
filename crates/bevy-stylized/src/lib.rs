@@ -1,13 +1,13 @@
-//! `bevy-stylized`：对外稳定 facade（docs/architecture/03）。
+//! `bevy-stylized`：对外 facade（公共 API/profile 决策仍 provisional）（docs/architecture/03）。
 //!
 //! Facade 只负责：Re-export、Plugin 装配、编译能力路由（ADR-0024）、
-//! 稳定公共 API；不复制 core 的任何逻辑。
+//! 公共 API 与可选场景接入；不复制 core 的任何逻辑。
 //!
 //! - [`StylizedPlugin`]：装配 core 领域类型与能力管线的入口插件；
 //! - [`capability`]：ADR-0022 两阶段能力生命周期（Stage A 配置 +
 //!   Stage B 只读解析）；
 //! - `gltf` feature（默认开启）：`_NPR_*` glTF 导入层；
-//! - `render` feature（默认开启）：Cel@Portable 渲染切片（It-3b）。
+//! - `render` feature（默认开启）：Cel/Character/Hero 与实例、view、描边等运行时。
 //!
 //! 最小出图路径（≤10 行 setup，`render` feature）：
 //!
@@ -89,7 +89,7 @@ pub use bevy_stylized_profile_genshin as profile_genshin;
 #[cfg(feature = "profile-genshin")]
 pub use bevy_stylized_profile_genshin::GenshinProfile;
 
-/// Cel@Portable 渲染切片的整体 re-export（`render` feature）。
+/// 运行时渲染 crate 的整体 re-export（`render` feature）。
 #[cfg(feature = "render")]
 pub use bevy_stylized_render as stylized_render;
 #[cfg(feature = "render")]
@@ -106,7 +106,7 @@ use bevy::{prelude::*, render::renderer::RenderDevice};
 ///   `StylizedQualityPolicy` 资源；
 /// - `finish`：ADR-0022 Stage B——若 RenderPlugin 已创建 `RenderDevice`，
 ///   读取其实际 features/limits 并解析 variant；否则写入 Portable 基线的
-///   CPU 兜底。It-3b 的渲染切片将消费
+///   CPU 兜底。运行时渲染将消费
 ///   [`StylizedResolvedCapabilities`](capability::StylizedResolvedCapabilities)。
 #[derive(Default)]
 pub struct StylizedPlugin {

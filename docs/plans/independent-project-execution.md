@@ -1,5 +1,11 @@
 # Independent project execution
 
+> Current applicability (2026-09-15): the current authoring target is pinned in
+> [gacha-authoring.json](../../assets/sources/gacha-authoring.json). Historical v3.6.2
+> examples or continuation requirements below are opt-in evidence, not current gates.
+> [Current static qualification](../quality/realtime-validation-2026-09-15.json)
+> records the later scope; original dated outcomes below are preserved.
+
 The user authorized plan v4 on 2026-09-14. Implementation is in the working tree;
 no Git commit, registry publication or hosted runner provisioning was performed.
 

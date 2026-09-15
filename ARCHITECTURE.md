@@ -5,7 +5,7 @@
 
 ## Architecture status
 
-- Current state: **Independent implementation; visual/release qualification remains open**
+- Current state: **Independent implementation; supported static scope qualified, broader visual/release decisions remain open**
 - Bevy baseline: **0.19.1**
 - Reference family currently targeted for V1: **Genshin / Gacha Setup locked reference family**
 - Facade Cargo package: **`bevy-stylized`**
@@ -13,6 +13,11 @@
 - Project/workspace directory: **`bevy-stylized/`**
 - Rust crate identifier: **`bevy_stylized`**
 - Public license: **Pending ADR-0017 / provenance review**
+
+Current evidence is linked from [README](README.md#current-evidence-and-open-decisions).
+Use the [current provisional inventory](docs/release/03-provisional-inventory.md)
+for implementation locations, and individual ADRs for decision status. Dated
+history does not define current acceptance requirements.
 
 ## Core architecture
 

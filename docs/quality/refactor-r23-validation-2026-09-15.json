@@ -1,0 +1,156 @@
+{
+  "schema": "bevy_stylized.refactor-validation/v1",
+  "date": "2026-09-15",
+  "scope": "R2/R3 local validation",
+  "status": "PASS",
+  "source_sha256": "c0592ea6fb8fac538a45714c43444adb7e8b15845406df02584c0be4c0dcc327",
+  "runs": [
+    {
+      "run_id": "refactor-r23-cpu",
+      "lane": "cpu",
+      "status": "PASS",
+      "source_sha256": "c0592ea6fb8fac538a45714c43444adb7e8b15845406df02584c0be4c0dcc327",
+      "report": "target/stylized/runs/refactor-r23-cpu/cpu.json"
+    },
+    {
+      "run_id": "refactor-r23-consumers",
+      "lane": "consumers",
+      "status": "PASS",
+      "source_sha256": "c0592ea6fb8fac538a45714c43444adb7e8b15845406df02584c0be4c0dcc327",
+      "report": "target/stylized/runs/refactor-r23-consumers/consumers.json"
+    }
+  ],
+  "cpu": {
+    "rust_passed": 166,
+    "rust_ignored": 33,
+    "python_passed": 28
+  },
+  "strict_profile_cli": {
+    "passed": 14
+  },
+  "consumers": {
+    "configurations": 5
+  },
+  "clippy": "workspace/all-targets/all-features -D warnings PASS",
+  "fmt": "PASS",
+  "artifact_equivalence": [
+    {
+      "case": "reference",
+      "files": 5,
+      "file_hashes_identical": true,
+      "report_identical_except_output_path": true,
+      "hashes": {
+        "compile-manifest.json": "b4369044235df6701559c0fab3b39d5519ea3d4be7ea2628ab0b4208793ceea1",
+        "materials/FixtureMatHair.json": "66e2353ca4221dac44971e8510d8b8c1336a38b018e93f5858e1ac6d739ad34f",
+        "materials/FixtureMatHead.json": "275ea7658c61494d7c515a153402f49588f4902f03f4d30799607487980d31a7",
+        "materials/FixtureMatBody.json": "0c479b52827cc83e3bd6dae060bbd295e8c571907932c2dd28cad8bf981b59d9",
+        "materials/FixtureMatGround.json": "0f0673eac5c77a08de4cedc91b611e2b1715ec1ee21f15e58534e424081a25fc"
+      }
+    },
+    {
+      "case": "synthetic-character",
+      "files": 4,
+      "file_hashes_identical": true,
+      "report_identical_except_output_path": true,
+      "hashes": {
+        "compile-manifest.json": "a571acca9423dc9a12b7cecb20922ccb031141ec95f07b131a3cbc3a9d884c12",
+        "materials/hair.json": "aa6fd93fa2f91a7b0f45abb37e339408737aa9e52e5c734c62f70eb4ea2d9989",
+        "materials/face.json": "0c0d763155cf7d20562abe4c3738ed8b3e228bb8a7247020c8b0bada41e41e12",
+        "materials/body.json": "88b749a7e623c65eec3aafd28cab851889c786f3b18d8a273c39e1e41621eb64"
+      }
+    },
+    {
+      "case": "current-character",
+      "files": 34,
+      "file_hashes_identical": true,
+      "report_identical_except_output_path": true,
+      "hashes": {
+        "character.view.json": "3f9c7913e5f833e662db7740339da2a71553bd943e2b0efa7efaf1c1b0628c57",
+        "compile-manifest.json": "8a9aca01909fd2e7a8d9cf0d10698c16f4b1856e421a4d3a6a410fc763bdbdad",
+        "character.npr.json": "a736e772ae340b06940aad48b87e77da022cd5db06e0187a6c199b40a73e6e41",
+        "character.glb": "d9cbbf0e60c58fd859dfe0e7c27a30b3f9f2a8098c273cdbaddc1769411c1fc6",
+        "materials/runtime_HoYoverse___Odette_New_Pupil.json": "d4fe08d84b11d54c86f572de74c14bcf5b2b202cd93be35953da78852c328d9e",
+        "materials/runtime_HoYoverse___Odette_Body01.json": "1df5ebb21be4b34c2d86234f85913755e8453cc602323e7d3725b62ae4d29c62",
+        "materials/runtime_HoYoverse___Odette_Dress.json": "be4e346b3f6e1078602dc4847661c68eb50879a45349f801355047c22c847b05",
+        "materials/runtime_HoYoverse___Odette_Dress01.json": "a4fbefd9b7152f4bdfe2c6503b98671e1e9c2c90a418f0b6ccdccdf3293c1ddd",
+        "materials/runtime_HoYoverse___Odette_Face.json": "a397484a3b98daa43a4ed2aae4870f421f252efbd73ad8a6ff2bfd60391160b9",
+        "materials/runtime_HoYoverse___Odette_Body.json": "0fcd8569d137c29d836f22c21f16234ab11148b9420c5c13c69b30e2ed0a2565",
+        "materials/runtime_HoYoverse___Odette_Brow.json": "79221e124b043fbf5f2c7e724751e4312008bf3c9bb2182e62ad5d9f350ad81c",
+        "materials/runtime_HoYoverse___Odette_Hair.json": "b5cd5a1dc7461a80db6834d6e4f9a19b63dce6cf57054dacc33826e17364de1f",
+        "textures/HoYoverse___Odette_Dress01_ramp.png": "54d598a9adcd3d5b0558fe0cfbb36f185b272fe8209a55b31ed5d84f6ee43bc6",
+        "textures/HoYoverse___Odette_Body_color.png": "9fa33611318389e9292723c202a23b694d21358f284b6557f5819ecc492bb4bc",
+        "textures/pupil_highlight.png": "4631f8a375706026ddf3c4f9e30d777e2b9daf2bb3d20991077855883de72551",
+        "textures/HoYoverse___Odette_Dress_ilm.png": "d3b431b7bd0c80d23aaa22c1176b8b23e7f064f6132f46f7db2240471336273b",
+        "textures/HoYoverse___Odette_Body01_color.png": "4e675db67a4ae3779f633bed38b8c8899c82276ff42841aa248c682a2209492d",
+        "textures/HoYoverse___Odette_Hair_color.png": "4866297f1474b97ee34c3f38e7a3a0210c29edf61ef01d10ab2881d7c73248d0",
+        "textures/face_lightmap.png": "3a3d0130276d406cb6d8e8286d57aae504993d9354109d9b33f4a00c6978dd51",
+        "textures/HoYoverse___Odette_Dress01_ilm.png": "193bb14da0b86fb82a397bd8337ea1e507b2b2cd89cf8109b01db6a64a574b9a",
+        "textures/HoYoverse___Odette_Body_ramp.png": "f15d48495091815af0bb8984facd5836bd9f7816d1711c295d3464b74441043c",
+        "textures/HoYoverse___Odette_Dress01_color.png": "171d1666ba6e2b5f8b5e38c1917f08e45321ebd4a997274b1fd7357a904f27d2",
+        "textures/HoYoverse___Odette_Brow_color.png": "c9cddb5a5e5f333305d100e716638dbfcf8880789a02a7e3f13ddfa6ddf43d33",
+        "textures/HoYoverse___Odette_Body01_ilm.png": "193bb14da0b86fb82a397bd8337ea1e507b2b2cd89cf8109b01db6a64a574b9a",
+        "textures/HoYoverse___Odette_Hair_ramp.png": "09927758f9a4e3becdaee62c97f610b79e805d98bf0ed43e54e618847261628d",
+        "textures/HoYoverse___Odette_Brow_ilm.png": "d969fa0e09921fe3045896e3c99f76871cc6e542b101be04fb608cd02bd2c6d0",
+        "textures/HoYoverse___Odette_Hair_ilm.png": "d3b431b7bd0c80d23aaa22c1176b8b23e7f064f6132f46f7db2240471336273b",
+        "textures/HoYoverse___Odette_Dress_color.png": "a081ed5c18cc698a253c8f8f760584fb8fbfab1dd3a5f20893137c6a6fbd9fe3",
+        "textures/HoYoverse___Odette_New_Pupil_color.png": "04b01a7dcda943a2fe3d2296992eca37f0fbc8f67062a562d9900bc532357177",
+        "textures/HoYoverse___Odette_Dress_ramp.png": "09927758f9a4e3becdaee62c97f610b79e805d98bf0ed43e54e618847261628d",
+        "textures/HoYoverse___Odette_Body_ilm.png": "0dc8db1272378190b42aeb27f3f40e251d32a5dc84001d57839e783700c6d5ac",
+        "textures/HoYoverse___Odette_Body01_ramp.png": "54d598a9adcd3d5b0558fe0cfbb36f185b272fe8209a55b31ed5d84f6ee43bc6",
+        "textures/face_shadow.png": "5cfe198bb0f199268e051a3d0367bb6b82a37e52c2946322d89fa6ce978c77e7",
+        "textures/HoYoverse___Odette_Face_color.png": "a91878e0d0396d8e72b75362023fd8e667ecdcce44874133821d792bf52c002a"
+      }
+    }
+  ],
+  "diagnostic_equivalence": [
+    {
+      "case": "pack",
+      "exit_code": 0,
+      "diagnostics_identical": true,
+      "outputs_identical": true,
+      "no_partial_outputs": false
+    },
+    {
+      "case": "missing-channel",
+      "exit_code": 1,
+      "diagnostics_identical": true,
+      "outputs_identical": true,
+      "no_partial_outputs": true
+    },
+    {
+      "case": "unsupported-pack",
+      "exit_code": 1,
+      "diagnostics_identical": true,
+      "outputs_identical": true,
+      "no_partial_outputs": true
+    },
+    {
+      "case": "future-schema",
+      "exit_code": 1,
+      "diagnostics_identical": true,
+      "outputs_identical": true,
+      "no_partial_outputs": true
+    },
+    {
+      "case": "sidecar-conflict",
+      "exit_code": 1,
+      "diagnostics_identical": true,
+      "outputs_identical": true,
+      "no_partial_outputs": true
+    },
+    {
+      "case": "duplicate-pack",
+      "exit_code": 1,
+      "diagnostics_identical": true,
+      "outputs_identical": true,
+      "no_partial_outputs": true
+    }
+  ],
+  "protected_fixture_shader_schema_source_locks": "UNCHANGED",
+  "history_inventory": "byte-identical copy of original",
+  "current_character_source_lock": "verified matching v3.6.4 manifest digest",
+  "gpu": "NOT_EXECUTED",
+  "upstream_parity": "NOT_EXECUTED",
+  "full_isolation": "NOT_EXECUTED",
+  "performance": "NOT_EXECUTED"
+}

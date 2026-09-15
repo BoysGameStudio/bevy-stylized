@@ -1,0 +1,196 @@
+{
+  "schema": "bevy_stylized.refactor-validation/v1",
+  "date": "2026-09-15",
+  "scope": "R0\u2013R6 final local qualification",
+  "status": "PASS",
+  "source_sha256": "eebb30625f3dc44cbb203bd9bf0afeed6e3a674cde73d449818e7dc60015caac",
+  "snapshot_sha256": "77ad2646e1c7167a28889145cb2f514bc4ace8d6c7b9ef52102639e9e0c45cbd",
+  "source_copy": "/tmp/stylized-independent-j32esqvd/source with spaces",
+  "isolation_report": "target/stylized/runs/refactor-r6-independence/independence-execution.json",
+  "engineering_status": "PASS",
+  "image_regression_status": "PASS",
+  "current_upstream_parity": "PASS",
+  "gacha_release": "v3.6.4",
+  "gpu": {
+    "status": "PASS",
+    "expected": 20,
+    "executed": 20,
+    "passed": 20,
+    "failed": 0,
+    "blocked": 0
+  },
+  "synthetic_import": {
+    "status": "PASS",
+    "expected": 1,
+    "executed": 1,
+    "passed": 1
+  },
+  "negative_resources": {
+    "missing-gpu-is-blocked": {
+      "status": "BLOCKED",
+      "expected": 20,
+      "passed": 0,
+      "failed": 0,
+      "blocked": 20
+    },
+    "missing-baseline-is-blocked": {
+      "status": "BLOCKED",
+      "expected": 20,
+      "passed": 18,
+      "failed": 0,
+      "blocked": 2
+    }
+  },
+  "cpu": {
+    "rust_passed": 166,
+    "rust_ignored": 33,
+    "python_passed": 34
+  },
+  "current_parity": {
+    "cases": 6,
+    "status": "PASS",
+    "device": {
+      "backend": "Vulkan",
+      "driver": "NVIDIA",
+      "driver_info": "615.71.09",
+      "name": "NVIDIA GeForce RTX 5090"
+    }
+  },
+  "host_return_checks": [
+    {
+      "run_id": "refactor-r6-host-cpu",
+      "lane": "cpu",
+      "status": "PASS"
+    },
+    {
+      "run_id": "refactor-r6-consumers",
+      "lane": "consumers",
+      "status": "PASS"
+    }
+  ],
+  "consumers": {
+    "configurations": 5
+  },
+  "inspector_cpu": {
+    "passed": 7
+  },
+  "clippy": "workspace/all-targets/all-features PASS",
+  "fmt": "PASS",
+  "performance_status": "SMOKE_ONLY",
+  "performance_note": "isolated instrumented 60-frame smoke only; no new accepted performance budget or optimization claim",
+  "remote_ci": "NOT_EXECUTED",
+  "test_identity_count": 20,
+  "protected_shader_fixture_schema_source_files_unchanged": 53,
+  "renderer_disposition": "R5 assessed: retain implementations; only comments corrected",
+  "steps": [
+    {
+      "name": "prepare-genshin-odette",
+      "run_id": "eb4930ea834e4a55845060f092f3895c",
+      "exit_code": 0,
+      "expected": 0,
+      "report_status": "PASS",
+      "source_identity_verified": true
+    },
+    {
+      "name": "prepare-gacha-authoring",
+      "run_id": "86cfca0c172445d893dc3dbf6ffd7cd0",
+      "exit_code": 0,
+      "expected": 0,
+      "report_status": "PASS",
+      "source_identity_verified": true
+    },
+    {
+      "name": "synthetic-rebuild",
+      "run_id": "2ec06d9e998a4c89a8906aa615384ea6",
+      "exit_code": 0,
+      "expected": 0,
+      "report_status": "PASS",
+      "source_identity_verified": true
+    },
+    {
+      "name": "cpu",
+      "run_id": "bf126b4069864012b116de20c6a8f0ef",
+      "exit_code": 0,
+      "expected": 0,
+      "report_status": "PASS",
+      "source_identity_verified": true
+    },
+    {
+      "name": "missing-gpu-is-blocked",
+      "run_id": "e39cc11e01e74312a1f6e8598b5b2073",
+      "exit_code": 2,
+      "expected": 2,
+      "report_status": "BLOCKED",
+      "source_identity_verified": true
+    },
+    {
+      "name": "missing-baseline-is-blocked",
+      "run_id": "667ec1d63bf2456da145608bc44d0a2f",
+      "exit_code": 2,
+      "expected": 2,
+      "report_status": "BLOCKED",
+      "source_identity_verified": true
+    },
+    {
+      "name": "gpu",
+      "run_id": "dbc1cbc79b744dd7934ef576825257f6",
+      "exit_code": 0,
+      "expected": 0,
+      "report_status": "PASS",
+      "source_identity_verified": true
+    },
+    {
+      "name": "asset-integration",
+      "run_id": "1531447bdb7345408df26f12a1ac031f",
+      "exit_code": 0,
+      "expected": 0,
+      "report_status": "PASS",
+      "source_identity_verified": true
+    },
+    {
+      "name": "inspector-unit",
+      "run_id": "79f8fc22f265404ebf7d71adb1d09d72",
+      "exit_code": 0,
+      "expected": 0,
+      "report_status": "PASS",
+      "source_identity_verified": true
+    },
+    {
+      "name": "inspector",
+      "run_id": "1d85ef8277e0410ea590756628e275ad",
+      "exit_code": 0,
+      "expected": 0,
+      "report_status": "PASS",
+      "source_identity_verified": true
+    },
+    {
+      "name": "realtime-scan",
+      "run_id": null,
+      "exit_code": 0,
+      "expected": 0
+    },
+    {
+      "name": "realtime-measure",
+      "run_id": null,
+      "exit_code": 0,
+      "expected": 0
+    },
+    {
+      "name": "character-reference-diagnostic",
+      "run_id": "a9a2c437bf7b409ba78cc3f2f48831f3",
+      "exit_code": 0,
+      "expected": 0,
+      "report_status": "PASS",
+      "source_identity_verified": true
+    },
+    {
+      "name": "character-reference-strict",
+      "run_id": "05b959d92dc84febb342bfdef1a4ea54",
+      "exit_code": 0,
+      "expected": 0,
+      "report_status": "PASS",
+      "source_identity_verified": true
+    }
+  ],
+  "documentation_note": "completion documents updated after isolated snapshot; executable source identity unchanged"
+}

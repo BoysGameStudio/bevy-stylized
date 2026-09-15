@@ -80,6 +80,18 @@ live A/B views, orbit/focus controls, shared lighting, material diagnostics and
 versioned screenshot recipes. It uses normal MSAA rendering, independently of the
 fixed Blender parity captures.
 
+## Current evidence and open decisions
+
+The [authoring source lock](assets/sources/gacha-authoring.json) owns the current
+release/hash. The [2026-09-15 qualification record](docs/quality/realtime-validation-2026-09-15.json)
+records engineering isolation and the supported static character comparison;
+[final refactor validation](docs/quality/refactor-final-validation-2026-09-15.json)
+records the later complete isolation and regression checks. The
+[execution summary](docs/plans/project-refactoring-final-2026-09-15.md) links each stage. Neither closes the
+[remaining ADR decisions](docs/adr/ADR_INDEX.md) or expands the
+[platform support matrix](docs/platforms/SUPPORT_MATRIX.md). Historical records
+retain their original results and version scope.
+
 ## Layout and contracts
 
 - `crates/`: six product crates; shaders belong to the render crate.
@@ -99,3 +111,7 @@ A public rendering-contract change must update its specification, ADR/traceabili
 and relevant validation. Publication remains disabled pending the existing
 license/provenance and release decisions; no registry publication is performed by
 asset preparation or developer tasks.
+
+Build retries use a new immutable attempt under the same content key and preserve
+failed work. See [asset recovery](docs/authoring/06-build-attempts.md) for stage logs,
+completion markers and verified cache reuse.

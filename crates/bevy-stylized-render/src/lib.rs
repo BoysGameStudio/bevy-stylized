@@ -1,5 +1,5 @@
-//! `bevy-stylized-render`：It-3b Cel@Portable + It-4 Character@Portable
-//! 渲染切片。
+//! `bevy-stylized-render`：Cel/Character/Hero 材质、实例传输、view、
+//! LOD、描边和后处理的运行时实现。
 //!
 //! **Provisional（ADR-0001 未决）**：本 crate 是建立在 Bevy `Material`
 //! 组合路径上的薄层临时 backend；公共语义全部挂在 `bevy-stylized-core`
@@ -12,6 +12,8 @@
 //!   fallback）/ ILM(AO) / Toon Lighting（half-lambert + ramp）/ Rim；
 //! - [`character`]：[`StylizedCharacterMaterial`]——Cel + Face SDF /
 //!   Hair 高光 / Rim / Emission（Character class，docs/rendering/01）；
+//! - [`hero`]：Hero 材质与显式家族光照参数；
+//! - [`post`] / [`screen_outline`]：后处理与屏幕描边；
 //! - [`outline`]：[`StylizedOutlineMaterial`] + [`StylizedOutline`]——
 //!   inverted hull（顶点外扩 + front-face cull）；
 //! - [`instance`]：[`StylizedInstanceData`]——Instance 层数据经 MeshTag
@@ -27,7 +29,7 @@
 //!
 //! Portable 不变量：不请求任何可选 GPU 特性；不依赖 storage buffer /
 //! compute / bindless；固定 binding；shader 按 Class×Tier 分编译单元
-//! （`cel/portable_forward.wgsl`、`character/portable_forward.wgsl`、
+//! （`cel/portable_forward.wgsl`、`character/character_forward.wgsl`、
 //! `outline/portable_outline.wgsl` + 共享 `common/npr_common.wgsl`）。
 
 pub mod budget;
@@ -99,7 +101,7 @@ use bevy::{
     prelude::IntoScheduleConfigs,
 };
 
-/// Cel/Character @Portable 渲染插件：注册 shader 资产、材质插件与同步系统。
+/// 渲染插件：注册 Cel/Character/Hero、描边、后处理 shader 与同步系统。
 ///
 /// 由 facade 的 `StylizedPlugin`（`render` feature）自动装配；也可单独
 /// 加入。需要宿主 App 已配置 RenderPlugin 才能真正出图（headless 无

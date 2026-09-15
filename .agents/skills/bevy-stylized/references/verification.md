@@ -18,13 +18,13 @@ Useful targeted commands in the current workspace:
 python3 tools/dev.py check --lane cpu
 python3 tools/dev.py check --lane gpu --required
 python3 tools/dev.py check --lane asset-integration --required --asset BUILD/compiled/character.glb
-python3 tools/dev.py check --lane reference --required --case BUILD/case.json
+python3 tools/dev.py check --lane character-reference --required --case BUILD/character-matched/case.json --out NEW_OUTPUT
 ```
 
 GPU cases are explicitly ignored by ordinary CPU tests and executed by their GPU
 lane. Missing assets/device/baseline fails a required lane. The external character
-is not a default CPU fixture. Reference comparison uses the declared synthetic
-scene with original maps, not full-character parity. Diagnostic capture success
+is not a default CPU fixture. Current character comparison uses the explicit matched static cases. The synthetic
+`reference` lane remains a historical opt-in comparison, not a current gate. Diagnostic capture success
 is separate from the metric result; --required propagates actual failure.
 
 The repository `docs/reference/08-golden-tolerance-and-cross-layer-criteria.md`

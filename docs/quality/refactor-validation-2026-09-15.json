@@ -1,0 +1,93 @@
+{
+  "schema": "bevy_stylized.refactor-validation/v1",
+  "date": "2026-09-15",
+  "scope": "R0/R1/R1b local implementation and applicable checks",
+  "status": "PASS",
+  "source_sha256": "30c0a58a80d1a8cde2d306fd9c2cc04353f6f16fc27cc546bac95c6a93d661ce",
+  "checks": [
+    {
+      "run_id": "refactor-r1-cpu",
+      "lane": "cpu",
+      "status": "PASS",
+      "source_sha256": "30c0a58a80d1a8cde2d306fd9c2cc04353f6f16fc27cc546bac95c6a93d661ce",
+      "report": "target/stylized/runs/refactor-r1-cpu/cpu.json"
+    },
+    {
+      "run_id": "refactor-r1-gpu",
+      "lane": "gpu",
+      "status": "PASS",
+      "source_sha256": "30c0a58a80d1a8cde2d306fd9c2cc04353f6f16fc27cc546bac95c6a93d661ce",
+      "report": "target/stylized/runs/refactor-r1-gpu/gpu.json"
+    },
+    {
+      "run_id": "refactor-r1-inspector",
+      "lane": "inspector-cpu",
+      "status": "PASS",
+      "source_sha256": "30c0a58a80d1a8cde2d306fd9c2cc04353f6f16fc27cc546bac95c6a93d661ce",
+      "report": "target/stylized/runs/refactor-r1-inspector/inspector-cpu.json"
+    },
+    {
+      "run_id": "refactor-r1-consumers",
+      "lane": "consumers",
+      "status": "PASS",
+      "source_sha256": "30c0a58a80d1a8cde2d306fd9c2cc04353f6f16fc27cc546bac95c6a93d661ce",
+      "report": "target/stylized/runs/refactor-r1-consumers/consumers.json"
+    },
+    {
+      "run_id": "refactor-r1-missing-gpu",
+      "lane": "gpu",
+      "status": "BLOCKED",
+      "source_sha256": "30c0a58a80d1a8cde2d306fd9c2cc04353f6f16fc27cc546bac95c6a93d661ce",
+      "report": "target/stylized/runs/refactor-r1-missing-gpu/gpu.json"
+    }
+  ],
+  "cpu": {
+    "rust_passed": 166,
+    "rust_ignored": 33,
+    "python_passed": 28
+  },
+  "gpu": {
+    "status": "PASS",
+    "expected": 20,
+    "executed": 20,
+    "passed": 20,
+    "failed": 0,
+    "blocked": 0
+  },
+  "synthetic_import": {
+    "passed": 1
+  },
+  "inspector": {
+    "passed": 7,
+    "all_target_clippy": "PASS"
+  },
+  "consumers": {
+    "configurations": 5,
+    "fetch_and_offline_modes": "PASS"
+  },
+  "required_gpu_negative": {
+    "status": "BLOCKED",
+    "expected": 20,
+    "failed": 0,
+    "blocked": 20
+  },
+  "native_mixed_negative": {
+    "expected_status": "FAIL",
+    "observed_status": "FAIL",
+    "failed": 1,
+    "blocked": 1,
+    "report": "target/stylized/runs/refactor-native-negative/native-mixed.json",
+    "scope": "temporary Rust libtest fixture; no accepted baseline removed"
+  },
+  "protected_files_changed": [],
+  "remote_ci": "NOT_EXECUTED",
+  "full_isolation": "NOT_EXECUTED",
+  "current_upstream_parity": "NOT_EXECUTED",
+  "performance": "NOT_EXECUTED",
+  "earlier_incorrect_negative_report": "target/stylized/runs/refactor-missing-gpu/gpu.json",
+  "notes": [
+    "CPU ignored tests are not GPU passes.",
+    "Run IDs and source identity were verified for final checks.",
+    "Only task/CI/Python validation tooling changed; product Rust, WGSL, fixture and schema hashes remain unchanged."
+  ]
+}

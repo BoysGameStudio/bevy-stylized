@@ -73,3 +73,24 @@ physics are not silently executable runtime data.
 All products remain publish=false. Packaging metadata/embedded asset inspection
 and Git-free source builds are independent engineering checks; they do not resolve
 the existing license/provenance decision or authorize a registry publication.
+
+## Compiler internal ownership
+
+The tools crate keeps its CLI/report entry in
+[compile.rs](../../crates/bevy-stylized-tools/src/compile.rs). Private submodules own:
+
+- [input](../../crates/bevy-stylized-tools/src/compile/input.rs): sidecar directives,
+  optional profile interpretation and complete material coverage checks.
+- [textures](../../crates/bevy-stylized-tools/src/compile/textures.rs): copy naming
+  and deduplication, base-color extraction, and exact ILM channel conversion.
+- [plan](../../crates/bevy-stylized-tools/src/compile/plan.rs): descriptor merging,
+  ordered diagnostics and complete pending file contents, without output writes.
+- [output](../../crates/bevy-stylized-tools/src/compile/output.rs): staging, emitted
+  file hashes, manifest and candidate directory publication.
+
+Compile reads and parses the glTF input once and shares document inspection with
+validate/inspect. Source files must remain unchanged during compilation; this is
+not a snapshot transaction over every external texture/sidecar. Existing schema,
+metadata precedence, diagnostics and file naming stay unchanged. Validation errors
+prevent the plan from reaching publication; output directories remain new candidates.
+Moving source changes the build cache key, not the runtime bundle format.

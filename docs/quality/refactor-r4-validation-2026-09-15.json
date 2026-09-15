@@ -1,0 +1,171 @@
+{
+  "schema": "bevy_stylized.refactor-validation/v1",
+  "date": "2026-09-15",
+  "scope": "R4a\u2013R4e local validation",
+  "status": "PASS",
+  "source_sha256": "123c1e6f32bd953cd591e71387eb8bf534ab3b1d6b843a320237cef5293a02a6",
+  "checks": [
+    {
+      "run_id": "refactor-r4-build-final",
+      "lane": "assets-build",
+      "status": "PASS",
+      "source_sha256": "123c1e6f32bd953cd591e71387eb8bf534ab3b1d6b843a320237cef5293a02a6",
+      "report": "target/stylized/runs/refactor-r4-build-final/assets-build.json"
+    },
+    {
+      "run_id": "refactor-r4-new-asset",
+      "lane": "asset-integration",
+      "status": "PASS",
+      "source_sha256": "123c1e6f32bd953cd591e71387eb8bf534ab3b1d6b843a320237cef5293a02a6",
+      "report": "target/stylized/runs/refactor-r4-new-asset/asset-integration.json"
+    },
+    {
+      "run_id": "refactor-r4-new-reference",
+      "lane": "character-reference",
+      "status": "PASS",
+      "source_sha256": "123c1e6f32bd953cd591e71387eb8bf534ab3b1d6b843a320237cef5293a02a6",
+      "report": "target/stylized/runs/refactor-r4-new-reference/character-reference.json"
+    },
+    {
+      "run_id": "refactor-r4-cache-reuse",
+      "lane": "assets-build",
+      "status": "PASS",
+      "source_sha256": "123c1e6f32bd953cd591e71387eb8bf534ab3b1d6b843a320237cef5293a02a6",
+      "report": "target/stylized/runs/refactor-r4-cache-reuse/assets-build.json"
+    },
+    {
+      "run_id": "refactor-r4-reference-after",
+      "lane": "character-reference",
+      "status": "PASS",
+      "source_sha256": "123c1e6f32bd953cd591e71387eb8bf534ab3b1d6b843a320237cef5293a02a6",
+      "report": "target/stylized/runs/refactor-r4-reference-after/character-reference.json"
+    },
+    {
+      "run_id": "refactor-r4-inspector-after",
+      "lane": "inspector",
+      "status": "PASS",
+      "source_sha256": "123c1e6f32bd953cd591e71387eb8bf534ab3b1d6b843a320237cef5293a02a6",
+      "report": "target/stylized/runs/refactor-r4-inspector-after/inspector.json"
+    },
+    {
+      "run_id": "refactor-r4-cpu",
+      "lane": "cpu",
+      "status": "PASS",
+      "source_sha256": "123c1e6f32bd953cd591e71387eb8bf534ab3b1d6b843a320237cef5293a02a6",
+      "report": "target/stylized/runs/refactor-r4-cpu/cpu.json"
+    },
+    {
+      "run_id": "refactor-r4-consumers",
+      "lane": "consumers",
+      "status": "PASS",
+      "source_sha256": "123c1e6f32bd953cd591e71387eb8bf534ab3b1d6b843a320237cef5293a02a6",
+      "report": "target/stylized/runs/refactor-r4-consumers/consumers.json"
+    },
+    {
+      "run_id": "refactor-r4-inspector-cpu-final",
+      "lane": "inspector-cpu",
+      "status": "PASS",
+      "source_sha256": "123c1e6f32bd953cd591e71387eb8bf534ab3b1d6b843a320237cef5293a02a6",
+      "report": "target/stylized/runs/refactor-r4-inspector-cpu-final/inspector-cpu.json"
+    }
+  ],
+  "cpu": {
+    "rust_passed": 166,
+    "rust_ignored": 33,
+    "python_passed": 34
+  },
+  "inspector_cpu": {
+    "passed": 7,
+    "clippy": "PASS"
+  },
+  "consumers": {
+    "configurations": 5
+  },
+  "build": {
+    "scope": "current static Gacha v3.6.4 recipe",
+    "stages": [
+      {
+        "name": "import",
+        "status": "PASS"
+      },
+      {
+        "name": "inspect_character.py",
+        "status": "PASS"
+      },
+      {
+        "name": "capture_character.py",
+        "status": "PASS"
+      },
+      {
+        "name": "export_character.py",
+        "status": "PASS"
+      },
+      {
+        "name": "compile",
+        "status": "PASS"
+      },
+      {
+        "name": "character-cases",
+        "status": "PASS"
+      },
+      {
+        "name": "character-diagnostics",
+        "status": "PASS"
+      },
+      {
+        "name": "character-matched",
+        "status": "PASS"
+      }
+    ],
+    "audit": {
+      "invalid_constraints": 0,
+      "invalid_drivers": 0,
+      "missing_images": 0
+    },
+    "cache_reuse": "same path and journal hash",
+    "completion_marker": "atomic",
+    "evidence": "target/stylized/refactor-r4/new-build.json"
+  },
+  "frozen_input_comparison": {
+    "images": [
+      {
+        "domain": "reference",
+        "png_count": 62,
+        "all_png_bytes_identical": true
+      },
+      {
+        "domain": "inspector",
+        "png_count": 2,
+        "all_png_bytes_identical": true
+      },
+      {
+        "domain": "scan",
+        "png_count": 288,
+        "all_png_bytes_identical": true
+      }
+    ],
+    "reference_report_identical": true,
+    "reference_parity": "PASS",
+    "scan": {
+      "frames_per_phase": 24,
+      "resolution": 512,
+      "sampled_states": 144,
+      "images": 288,
+      "replay_status": "PASS",
+      "nonempty_geometry": true
+    }
+  },
+  "new_build_reference": {
+    "parity_status": "PASS",
+    "cases": 6
+  },
+  "visual_review": "final full-body and face reference PNGs inspected; also match first attempt decoded RGBA",
+  "r4b": "separate input validators retained; reference validation body unchanged",
+  "r4e": "format-only statement expansion AST-equivalent; recovery changes separately tested",
+  "clippy": "workspace/all-targets/all-features -D warnings PASS",
+  "protected_fixture_shader_schema_source_locks": "UNCHANGED",
+  "performance": "NOT_EXECUTED",
+  "full_isolation": "NOT_EXECUTED",
+  "first_party_full_gpu_suite": "NOT_EXECUTED",
+  "remote_ci": "NOT_EXECUTED"
+}

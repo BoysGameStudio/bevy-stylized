@@ -52,3 +52,12 @@ character. Accepted images live in fixtures/golden; diagnostic output is separat
 External art and historical snapshots remain under ignored assets/local. See
 [comparison criteria](08-golden-tolerance-and-cross-layer-criteria.md) and
 [upgrade policy](04-upstream-contract-upgrade-and-golden.md).
+
+## Runtime comparison ownership
+
+The character reference coordinator validates its package, constructs a calibrated
+scene, then runs the fixed cases. Private modules under `labs/reference/src/character`
+own `input`, `scene`, `frames`, `calibration`, `diagnostics`, `metrics`, `cases` and
+local `io` helpers. Thresholds, sampling and independently authored reference data
+are preserved. This code is not an interactive inspector input adapter; see
+[input boundaries](../testing/03-capture-input-boundaries.md).

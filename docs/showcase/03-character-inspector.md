@@ -94,3 +94,14 @@ qualified release.
 Camera/viewport interaction and generation-safe capture were informed by the
 [Tenacity source review](../research/tenacity-rendering-reuse-2026-09-15.md); the
 inspector is implemented within this repository and has no sibling dependencies.
+
+## Internal ownership
+
+The inspector entry module assembles the app. `options.rs` owns CLI options;
+`runtime.rs` owns scene lifecycle, view synchronization, fitting and readiness.
+`state.rs`, `panel.rs`, `capture.rs` and `validation.rs` retain recipe/UI, generation
+capture and replay/measurement responsibilities. The module move preserves update
+ordering, MSAA, warm-up counts and request retirement.
+
+Its input policy remains separate from the fixed reference package; see
+[reference/inspector input boundaries](../testing/03-capture-input-boundaries.md).

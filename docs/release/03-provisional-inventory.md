@@ -1,70 +1,32 @@
-# Provisional 清单（It-10 冻结交接）
+# Provisional implementation inventory
 
-> **Status:** Working document — 维护者 ADR 决策的交接清单。
-> **生成方式：** `grep -rniE "provisional" crates/` 全量扫描 + 逐条人工核对
-> （2026-09-12）。每条：provisional 项 → 阻塞 ADR → 位置 → 现有证据。
-> **纪律：** ADR 状态变更只能由维护者确认；本清单中的每一项在对应 ADR
-> 关闭前不得对外宣称契约语义。
+This is the current implementation map, updated during R2 on 2026-09-15. ADR
+statuses remain owned by the [ADR index](../adr/ADR_INDEX.md); implementation or
+test success does not accept an ADR. The complete [2026-09-12 inventory](../history/provisional-inventory-2026-09-12.md)
+is preserved with its original measurements and limitations.
 
-## 渲染后端与预算
+## Current implementation and remaining decisions
 
-| 项 | 阻塞 ADR | 位置 | 现有证据 |
-|---|---|---|---|
-| 全部材质建立在 Bevy `Material` 组合路径（薄层临时 backend） | ADR-0001 | crates/bevy-stylized-render/src/lib.rs（模块文档）、material.rs / character.rs / hero.rs 模块头 | A/B 对比测量（`target/tmp/adr-0001-spike/`）：A 首帧 602.9ms/稳态 4.47ms，B 首帧 1118.6ms/稳态 4.69ms（500 实例） |
-| 预算阈值为 interim（safety margin、子预算上限） | ADR-0002 | crates/bevy-stylized-core/src/budget.rs（`INTERIM_SAFETY_MARGIN`）、crates/bevy-stylized-render/tests/interim_budget.rs | 全 class pipeline 反射实测 `target/tmp/interim-budget/pipeline_budget.json`（三模型全 fit） |
-| Bindless 不实施 + 重访阈值 | ADR-0003 | `target/tmp/adr-0001-spike/summary.md`（方法论 + 阈值） | 500 实例 1 draw（spike 测量） |
+| Domain | Current code and evidence | Remaining decision / limitation |
+|---|---|---|
+| Material backend | [render plugin](../../crates/bevy-stylized-render/src/lib.rs), Cel/Character/Hero Material implementations | ADR-0001; no backend replacement or speed claim follows from this inventory |
+| Whole-pipeline budgets | [budget tests](../../tests/integration/tests/interim_budget.rs) | ADR-0002/0003; interim limits and bindless policy remain provisional |
+| Instance transport | [MeshTag](../../crates/bevy-stylized-render/src/instance.rs), [instance table](../../crates/bevy-stylized-render/src/instance_table.rs), [tests](../../tests/integration/tests/instance_table.rs) | ADR-0004; StorageTable exists, Character has the table material variant; it does not imply Hero full-precision face transport |
+| Fallback and LOD | [capability](../../crates/bevy-stylized-core/src/capability.rs), [render LOD](../../crates/bevy-stylized-render/src/lod.rs) | Preserve class semantics and explicit tier/feature reductions; three-axis ADR acceptance does not settle every fallback algorithm |
+| View, lighting, environment | [view](../../crates/bevy-stylized-render/src/view.rs), [post](../../crates/bevy-stylized-render/src/post.rs) | ADR-0009; authored mappings and environment limitations remain explicit |
+| Outline | [replica synchronization](../../crates/bevy-stylized-render/src/outline.rs), [screen outline](../../crates/bevy-stylized-render/src/screen_outline.rs) | ADR-0008; updated/removed producer bounds and deformation compatibility are tested, not a general deformation solver |
+| External face input | [adapter](../../crates/bevy-stylized-render/src/face_input.rs), [rendering-input contract](../showcase/04-realtime-validation.md) | External propagated head pose drives existing quantized instance input; no animation controller or general table support |
+| Alpha/prepass/shadows | [semantic matrix](../../tests/integration/tests/semantics_matrix.rs) | ADR-0023; supported combinations stay explicitly bounded |
+| Profile and texture interpretation | [Genshin mapping](../../crates/bevy-stylized-profile-genshin/src/mapping.rs), [Hero](../../crates/bevy-stylized-render/src/hero.rs) | ADR-0005/0006; current static qualification does not establish every family effect |
+| glTF metadata and setup | [metadata](../../crates/bevy-stylized-gltf/src/metadata.rs), [setup](../../crates/bevy-stylized-gltf/src/setup.rs) | ADR-0020/0028; conflict rejection and pre-registration are implemented, final API decisions remain separate |
+| Reference chain | [current dated qualification](../quality/realtime-validation-2026-09-15.json), [current source lock](../../assets/sources/gacha-authoring.json) | ADR-0007/0011/0012/0015; only qualified current static scope, historical releases opt-in |
+| Platform/feature cost | [support matrix](../platforms/SUPPORT_MATRIX.md), [disabled cost tests](../../tests/integration/tests/disabled_feature_cost.rs) | ADR-0010/0021/0026/0027; no unmeasured backend becomes Supported |
+| Distribution | [release checklist](V1_RELEASE_CHECKLIST.md), [provenance](../reference/05-license-and-provenance-boundary.md) | ADR-0017; publication remains disabled |
 
-## 数据通道与降级
+## Evidence interpretation
 
-| 项 | 阻塞 ADR | 位置 | 现有证据 |
-|---|---|---|---|
-| MeshTag 位段布局（instance 传输方案 A）；StorageTable 声明未实现 | ADR-0004 | crates/bevy-stylized-render/src/instance.rs、cel/character/hero WGSL 的位段注释 | 100/1000 实例 1 draw + 逐实例差异图（`tests/instance_batching.rs`、spike 报告） |
-| GPU Instance Database（V2-e）：StorageTable 通道（槽位只增不减无回收、表重写为全量、仅 Character 有表变体材质、bindless 生产路径未做）；`directional_light_color` 之外的正式实例数据布局 | ADR-0004 | render/src/instance_table.rs、character.rs（`StylizedCharacterTableMaterial`）、character WGSL `INSTANCE_STORAGE_TABLE` 分支 | 100/1000/5000 × 两通道 × 稳态/churn 测量（`target/tmp/instance-db/`：全规模 1 draw；churn@5000 表 17.8ms vs tag 29.6ms）+ 全精度阈值梯度 golden + 选择矩阵单测 |
-| Per-class fallback 链与 `*_portable_fallback` 的触发语义（tier_reduced 即应用全链） | 无专属 ADR（fallback 策略；ADR-0018 已 Accepted 不覆盖此项） | crates/bevy-stylized-core/src/capability.rs（`STYLIZED_FALLBACK_CHAINS`）、render/src/character.rs、hero.rs | 快照式 fallback 矩阵测试（3 class × 3 档 × 4 能力模型） |
-| View 层映射常数（昼夜 ambient 亮度/色温、ILM AO floor、display-transform hook 曲线） | ADR-0009 | render/src/view.rs（`NIGHT_AMBIENT_*`）、render/src/post.rs、character WGSL AO floor | view 同步单测 + character golden |
-| 环境 NPR（V2-d first cut）：DistanceFog uniform 通道复用（`directional_light_color` = 阴影染色通道）、线性雾无 height falloff、zenith = 平涂清屏色、outline 不挂雾、无 IBL/reflection | ADR-0009 | core/src/environment.rs、render/src/view.rs（`environment_distance_fog`）、npr_common.wgsl 环境段 | 3 套 showcase 环境捕获（day/dusk/night）+ 既有 golden diff=0（恒等默认）+ 映射单测 |
-| Outline 生命周期为最小副本同步（bounds/LOD/despawn 完整语义未定） | ADR-0008 | render/src/outline.rs（`StylizedOutline`/`sync_outline_replicas`）、outline WGSL | outline golden + Odette 发卡排障（顶点色宽度抑制） |
-| Screen-space 描边（V2-a）：tier 门控 + overlay 实现 + 混合模式 | ADR-0008 | render/src/screen_outline.rs、outline/screen_outline.wgsl | outline-advanced 三捕获 golden + 边缘计数断言 + gating 单测 |
-| Alpha/prepass/shadow 语义矩阵（Opaque/Mask 支持、Blend 类型层不可达、prepass/shadow 显式关闭） | ADR-0023 | render/tests/semantics_matrix.rs、docs/authoring/05 §7 矩阵表 | 矩阵数据驱动测试 + golden |
-| NPR LOD（V2-b）：距离分带政策、per-instance flags 通道（MeshTag bit 0..=2）、几何换 mesh、`StylizedProfile::lod_policy` hook；`StylizedTierOverride` 移入 render（facade re-export） | ADR-0018 | core/src/lod.rs、render/src/lod.rs、hero WGSL per-instance flags | render 单测 6 个 + facade governor→LOD 端到端 + showcase `lod` 捕获（四带梯度目检） |
-
-## Hero / Profile / 导入
-
-| 项 | 阻塞 ADR | 位置 | 现有证据 |
-|---|---|---|---|
-| Hero 纹理 packing/语义（ILM 通道约定、matcap/spec ramp 形态） | ADR-0005/0006 | render/src/hero.rs、hero WGSL | 预算反射（7T/7S/1UBO）+ 三层 golden 报告 |
-| profile-genshin schema 版本（reference-toolchain.toml 中 PENDING）；"待核实"条目（ramp 行序/material-id 映射） | ADR-0019 | crates/bevy-stylized-profile-genshin/src/lib.rs | profile 契约测试；行为契约 docs/reference/07（draft） |
-| extras vs sidecar 冲突：双通道读取 + 冲突诊断、拒绝静默取舍 | ADR-0020 | crates/bevy-stylized-gltf/src/metadata.rs（`import_material`） | 冲突/一致/单通道三向单测 |
-| `_NPR_*` 注册机制（builder + fail-closed 顺序守卫） | ADR-0028 | gltf/src/setup.rs、facade `stylized_gltf_plugin()` | 插件顺序集成测试（正确加载 + 错误顺序报错） |
-
-## 平台与生命周期
-
-| 项 | 阻塞 ADR | 位置 | 现有证据 |
-|---|---|---|---|
-| Tier 需求表数值（Standard/High 需求）与 baseline 限制模型 | ADR-0010 | core/src/capability.rs（`STYLIZED_TIER_REQUIREMENTS`）、budget.rs | 三模型对照表 + fallback 矩阵测试 |
-| Web baseline（WebGL2 vs WebGPU 区分仅在数据层） | ADR-0021 | core/src/budget.rs（`LIMIT_MODEL_WEBGL2`）、SUPPORT_MATRIX.md | 无 web 实测；矩阵中全部 🚧 |
-| Disabled-feature 零成本（组件缺失时系统无工作） | ADR-0026 | render/tests/disabled_feature_cost.rs | 三个 early-out 测试 |
-| Bevy/工具链兼容声明（0.19.1 钉版、1.98.x、本机唯一实测平台） | ADR-0027 | docs/platforms/SUPPORT_MATRIX.md §Compatibility statement | 本机全量测试/捕获/benchmark 基线 |
-
-## 统计
-
-| 阻塞 ADR | 条数 |
-|---|---|
-| 0001 | 1（覆盖 4 个材质 + 4 个 WGSL） |
-| 0002 | 1 |
-| 0003 | 1 |
-| 0004 | 2（+V2-e StorageTable 通道） |
-| 0005/0006 | 1 |
-| 0007 | tier2 阈值草案校准（docs/reference/08 已记实测注记） |
-| 0008 | 1 |
-| 0009 | 2（+V2-d 环境 NPR 通道） |
-| 0010 | 1 |
-| 0018 | 1（V2-b NPR LOD） |
-| 0019 | 1 |
-| 0020 | 1 |
-| 0021 | 1 |
-| 0023 | 1 |
-| 0026 | 1 |
-| 0027 | 1 |
-| 0028 | 1 |
-| （无专属 ADR：fallback 链触发语义） | 1 |
+The current source lock selects the accepted authoring release. Current static
+character parity is recorded separately from engineering independence, first-party
+image regression and performance. Dated records are not rewritten when scope grows.
+The task-level [report contract](../testing/02-task-results.md) prevents stale run
+summaries from becoming new qualification evidence; it does not close visual ADRs.

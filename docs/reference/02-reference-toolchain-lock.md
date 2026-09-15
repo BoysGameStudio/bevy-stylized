@@ -1,5 +1,11 @@
 # Reference Toolchain Lock
 
+> Current applicability (2026-09-15): the current authoring target is pinned in
+> [gacha-authoring.json](../../assets/sources/gacha-authoring.json). Historical v3.6.2
+> examples or continuation requirements below are opt-in evidence, not current gates.
+> [Current static qualification](../quality/realtime-validation-2026-09-15.json)
+> records the later scope; original dated outcomes below are preserved.
+
 > **Status:** Normative architecture specification
 > **Authority:** This document is authoritative for its domain; the archived Master Plan is historical only.
 

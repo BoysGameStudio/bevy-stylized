@@ -6,7 +6,7 @@ rust-version.workspace = true
 repository.workspace = true
 readme = "../../README.md"
 publish = false
-description = "bevy-stylized facade crate: StylizedPlugin, two-phase capability plumbing, and stable re-exports."
+description = "bevy-stylized facade crate: StylizedPlugin, two-phase capability plumbing, and provisional public re-exports."
 
 [dependencies]
 bevy = { workspace = true, features = ["bevy_asset", "bevy_render"] }

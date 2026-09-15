@@ -9,10 +9,11 @@ from an existing GLB, inspect that exact file and its provenance instead.
 
 Locate the project's actual paths; the inspected workspace uses:
 
-- `docs/reference/reference-toolchain.toml`: locked Blender/Gacha/artifacts.
+- `assets/sources/gacha-authoring.json`: current qualified authoring release/hash.
+- `docs/reference/reference-toolchain.toml`: historical opt-in reference lock.
 - `tools/blender/export_reference.py`: version/signature/texture/
   attribute checks, metadata extraction and GLB export.
-- `tools/blender/contracts/`: signatures, exporter settings,
+- `schemas/authoring/`: signatures, exporter settings,
   `_NPR_*` definitions, manifest schema.
 - `crates/bevy-stylized-gltf/src/metadata.rs`: typed runtime sidecar/extras.
 - `crates/bevy-stylized-tools/src/compile.rs`: compiler behavior.
