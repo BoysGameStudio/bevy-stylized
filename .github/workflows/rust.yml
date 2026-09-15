@@ -7,8 +7,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Read pinned Rust toolchain
+        id: rust
+        run: |
+          python3 - <<'PYTHON'
+          import os, tomllib
+          with open("rust-toolchain.toml", "rb") as source:
+              channel = tomllib.load(source)["toolchain"]["channel"]
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"toolchain={channel}\n")
+          PYTHON
       - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: ${{ steps.rust.outputs.toolchain }}
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - run: cargo fetch --locked
@@ -37,6 +48,18 @@ jobs:
           - -p bevy-stylized-tools --features profile-genshin,schema
     steps:
       - uses: actions/checkout@v7
+      - name: Read pinned Rust toolchain
+        id: rust
+        run: |
+          python3 - <<'PYTHON'
+          import os, tomllib
+          with open("rust-toolchain.toml", "rb") as source:
+              channel = tomllib.load(source)["toolchain"]["channel"]
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"toolchain={channel}\n")
+          PYTHON
       - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.rust.outputs.toolchain }}
       - uses: Swatinem/rust-cache@v2
       - run: cargo check --locked ${{ matrix.args }}
