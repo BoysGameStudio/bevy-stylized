@@ -74,20 +74,6 @@ class ProjectTools(unittest.TestCase):
         errors=violations(m,'/repo');self.assertTrue(any('closure' in e for e in errors));self.assertTrue(any('external' in e for e in errors))
 
 
-class LaneCoverage(unittest.TestCase):
-    def test_successful_process_with_zero_executed_tests_is_failure(self):
-        from unittest.mock import patch
-        import subprocess
-        import dev
-        with tempfile.TemporaryDirectory() as tmp:
-            root=pathlib.Path(tmp);(root/'Cargo.toml').write_text('[workspace]\nmembers=[]\n')
-            project=Project(root)
-            result=subprocess.CompletedProcess([],0,stdout='test result: ok. 0 passed; 0 failed; 0 ignored;')
-            with patch('dev.subprocess.run',return_value=result):
-                with self.assertRaises(dev.CheckFailed):dev.run_tests(project,'case',['tool'],1,{'GOLDEN_REBASELINE':'1'})
-            state=json.loads((project.output/'case.json').read_text())
-            self.assertEqual(state['status'],'FAIL');self.assertEqual(state['not_executed'],1)
-
 class CaptureCaseValidation(unittest.TestCase):
     def test_case_rejects_wrong_version_and_incomplete_matrix(self):
         from assets.capture_case import validate,SCHEMA

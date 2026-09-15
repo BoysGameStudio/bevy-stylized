@@ -1,11 +1,12 @@
 """Repeatable scan and instrumented optimized measurement; no baseline acceptance."""
 from pathlib import Path
+from task_runner import ResourceBlocked
 import json,subprocess,statistics,os
 
 def run(project,asset,out):
     asset=project.resolve(asset);out=project.resolve(out)
-    if os.environ.get("STYLIZED_GPU")=="disabled":raise RuntimeError("required GPU unavailable for realtime validation")
-    if not asset.is_file():raise ValueError("required compiled asset missing")
+    if os.environ.get("STYLIZED_GPU")=="disabled":raise ResourceBlocked("required GPU unavailable for realtime validation")
+    if not asset.is_file():raise ResourceBlocked("required compiled asset missing")
     if out.exists():raise ValueError('realtime output must be a new directory')
     out.mkdir(parents=True)
     command=['cargo','build','--locked','--release','-p','showcase','--features','inspector']
@@ -21,7 +22,7 @@ def run(project,asset,out):
         with (out/(name+'.log')).open('w') as log:result=subprocess.run([str(binary),'inspect','--asset',str(asset),*args,'--out',str(out/name)],cwd=project.root,stdout=log,stderr=subprocess.STDOUT)
         if result.returncode:
             message=(out/(name+'.log')).read_text()
-            if 'required GPU' in message:raise RuntimeError(f'required GPU diagnostics unavailable; inspect {out/(name+".log")}')
+            if 'required GPU' in message:raise ResourceBlocked(f'required GPU diagnostics unavailable; inspect {out/(name+".log")}')
             raise subprocess.CalledProcessError(result.returncode,result.args)
     from assets.realtime_report import generate
     review=generate(out/'scan')

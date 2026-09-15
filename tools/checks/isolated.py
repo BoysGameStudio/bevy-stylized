@@ -4,6 +4,7 @@ Only system/toolchain files, Cargo caches, GPU devices and verified raw inputs
 are mounted. No sibling project or previously generated character is visible.
 """
 from pathlib import Path
+from task_runner import ResourceBlocked, CheckFailed
 import hashlib
 import json
 import os
@@ -37,16 +38,17 @@ def source_snapshot(project, destination):
 
 def validate(project, asset=None, case=None):
     if asset or case:raise ValueError('independence rebuilds inputs; do not provide generated --asset/--case')
-    if not shutil.which('bwrap'):raise ValueError('Bubblewrap required for isolated execution on this qualified Linux backend')
+    if not shutil.which('bwrap'):raise ResourceBlocked('Bubblewrap required for isolated execution on this qualified Linux backend')
     raw={}
     for name in ['genshin-odette','gacha-authoring']:
         manifest=json.loads((project.root/'assets/sources'/f'{name}.json').read_text())
         key=hashlib.sha256(json.dumps(manifest,sort_keys=True,separators=(',',':')).encode()).hexdigest()
         folder=project.cache/name/'sources'/key
         from assets.prepare import verify
+        if not folder.is_dir():raise ResourceBlocked(f'required source pack missing: {name}')
         verify(folder,manifest);raw[name]=folder
     blender=Path('/snap/blender/current')
-    if not (blender/'blender').is_file():raise ValueError('this isolation recipe requires the qualified Blender installation')
+    if not (blender/'blender').is_file():raise ResourceBlocked('this isolation recipe requires the qualified Blender installation')
     work=Path(tempfile.mkdtemp(prefix='stylized-independent-'))
     source=work/'source with spaces';source.mkdir()
     source_hash=source_snapshot(project,source)
@@ -72,12 +74,15 @@ def validate(project, asset=None, case=None):
     if Path('/dev/dri').exists():command+=['--dev-bind','/dev/dri','/dev/dri']
     for name,folder in raw.items():command+=['--ro-bind',str(folder),'/inputs/'+name]
     command+=['python3','tools/checks/isolated_job.py']
-    log=project.output/'isolated.log';log.parent.mkdir(parents=True,exist_ok=True)
+    log=project.run_output/'isolated.log';log.parent.mkdir(parents=True,exist_ok=True)
     with log.open('w') as output:result=subprocess.run(command,stdout=output,stderr=subprocess.STDOUT)
     summary=source/'target/stylized/isolated-result.json'
-    report=json.loads(summary.read_text()) if summary.exists() else {'status':'BLOCKED','reason':'isolated job did not finish'}
-    report.update(source_sha256=source_hash,source_copy=str(source),log=str(log),exit_code=result.returncode,
-                  network='disabled during all build/test jobs',inputs='verified raw sources and toolchains only')
+    report=json.loads(summary.read_text()) if summary.exists() else {'status':'FAIL','reason':'isolated job did not finish'}
+    report.update(snapshot_sha256=source_hash,source_copy=str(source),log=str(log),exit_code=result.returncode,
+                  network='disabled during all build/test jobs',input_scope='verified raw sources and toolchains only')
     project.report('independence-execution',report)
     print(json.dumps(report,indent=2))
-    if result.returncode:raise RuntimeError(f'isolated execution failed; inspect {log}')
+    if result.returncode:
+        if report.get('status') == 'BLOCKED':raise ResourceBlocked(f'isolated resources missing; inspect {log}')
+        raise CheckFailed(f'isolated execution failed; inspect {log}')
+    if report.get('status') != 'PASS':raise CheckFailed('isolated result missing or not passed')

@@ -96,6 +96,27 @@ for f in MARKDOWN_FILES:
         if not resolved.exists():
             err(f"{f.relative_to(ROOT)}: broken Markdown link: {target}")
 
+# Current navigation also contains source/schema links. Bound this check to
+# maintained entrypoints, not historical examples or arbitrary Markdown snippets.
+current_navigation = [
+    ROOT/'README.md', ROOT/'ARCHITECTURE.md',
+    ROOT/'docs/release/03-provisional-inventory.md',
+]
+for f in current_navigation:
+    for target in re.findall(r"\[[^\]]*\]\(([^)]+)\)", text(f)):
+        if target.startswith(("https://", "http://", "#")):
+            continue
+        path = (f.parent / target.split("#", 1)[0]).resolve()
+        if not path.is_relative_to(ROOT) or not path.exists():
+            err(f"{f.relative_to(ROOT)}: invalid current contract/source link: {target}")
+
+# The README's qualified version is an explicit claim, not an independent lock.
+import json
+source = json.loads(text(ROOT/'assets/sources/gacha-authoring.json'))
+claimed = re.search(r"currently qualified\s+(v[0-9.]+)", text(ROOT/'README.md'))
+if not claimed or claimed.group(1) != source['release']:
+    err('README current authoring qualification differs from source lock')
+
 # 7. Root-style textual paths like docs/foo.md should exist.
 path_re = re.compile(r"(?<![\w/])((?:docs|tools)/[A-Za-z0-9_./-]+\.md)")
 for f in MARKDOWN_FILES:
@@ -140,7 +161,7 @@ for w in WARNINGS:
     print("WARN:", w)
 for e in ERRORS:
     print("ERROR:", e)
-print(f"Checked {len(list(ROOT.rglob('*.md')))} Markdown files and {len(adr_files)} ADRs.")
+print(f"Checked {len(MARKDOWN_FILES)} Markdown files and {len(adr_files)} ADRs.")
 if ERRORS:
     print(f"FAILED with {len(ERRORS)} error(s).")
     sys.exit(1)

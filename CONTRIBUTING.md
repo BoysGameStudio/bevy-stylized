@@ -11,6 +11,8 @@ cargo fetch --locked # initial Rust dependency preparation; no character assets
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 python3 tools/dev.py check --lane cpu
+python3 tools/dev.py check --lane inspector-cpu
+python3 tools/dev.py check --lane consumers --fetch
 python3 tools/dev.py check --lane gpu --required
 ```
 
@@ -75,3 +77,22 @@ installation under `/snap/blender/current`; this is an explicit platform adapter
 not a runtime library dependency. Results and log paths are reported under
 `target/stylized`. Other platforms need equivalent isolation adapters before they
 can claim the same qualification.
+
+## Task results and required test identity
+
+See [task result contract](docs/testing/02-task-results.md). Each dev task publishes
+RUNNING before work and a PASS/FAIL/BLOCKED terminal report under a unique
+`target/stylized/runs/RUN_ID` directory. Fixed-name reports are convenience copies;
+automation must supply `--run-id` before the subcommand and read that run's report.
+A missing report, wrong identity or RUNNING state is never qualification evidence.
+
+Required GPU cases are selected from `tests/suites.json`. The runner checks each
+binary's ignored-test inventory, then executes every exact case separately so a
+missing resource cannot mask another case's assertion failure. All cases continue
+to be accounted for; FAIL takes precedence over BLOCKED in a mixed result.
+
+`inspector-cpu` runs the optional inspector library tests and all-target clippy.
+It needs the X11/Wayland development libraries used by that feature, but no live
+window, Blender or character pack. `consumers --fetch` explicitly permits Cargo
+to prepare each independent consumer's dependencies before offline checks; omit
+`--fetch` when dependencies are already cached. It never downloads character art.

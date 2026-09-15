@@ -3,39 +3,33 @@
 import argparse
 import json
 import os
-import re
 import subprocess
 import sys
 from pathlib import Path
 from project import Project
 
-class CheckFailed(RuntimeError):
-    pass
-
-
-GPU_TESTS=['golden_cel','golden_character','outline_advanced','instance_batching','morph_skinning','instance_table','interim_budget']
+from task_runner import CheckFailed, ResourceBlocked, run_tests, require_suites, invoke
 
 
 def run(project, command, env=None):
-    subprocess.run(list(map(str,command)),cwd=project.root,env=env,check=True)
+    logs = project.run_output / 'logs'
+    logs.mkdir(parents=True, exist_ok=True)
+    index = len(list(logs.glob('command-*.log')))
+    log = logs / f'command-{index}.log'
+    print('COMMAND ' + ' '.join(map(str, command)), flush=True)
+    with log.open('w') as stream:
+        result = invoke(list(map(str, command)), cwd=project.root, env=env,
+                        stdout=stream, stderr=subprocess.STDOUT)
+    blocked = result.returncode != 0 and 'BLOCKED: required GPU unavailable' in log.read_text()
+    status = 'BLOCKED' if blocked else 'FAIL' if result.returncode else 'PASS'
+    project.report(f'command-{index}', {'status':status,
+                                      'command':list(map(str, command)),
+                                      'exit_code':result.returncode, 'log':str(log)})
+    if result.returncode:
+        if blocked:
+            raise ResourceBlocked(f'required GPU unavailable; inspect {log}')
+        raise subprocess.CalledProcessError(result.returncode, command)
 
-
-def run_tests(project, name, command, expected, env):
-    env=dict(env);env.pop('GOLDEN_REBASELINE',None)
-    result=subprocess.run(command,cwd=project.root,env=env,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
-    project.output.mkdir(parents=True,exist_ok=True)
-    log=project.output/(name+'.log');log.write_text(result.stdout)
-    summaries=re.findall(r'test result: (?:ok|FAILED)\. (\d+) passed; (\d+) failed; (\d+) ignored;',result.stdout)
-    passed=sum(int(row[0]) for row in summaries)
-    failed=sum(int(row[1]) for row in summaries)
-    blocked=any(message in result.stdout for message in ['required GPU unavailable','accepted baseline missing','accepted regression baseline missing'])
-    state={'suite':name,'expected':expected,'executed':passed+failed,'passed':passed,
-           'failed':0 if blocked else failed,'blocked':failed if blocked else 0,
-           'not_executed':max(0,expected-passed-failed),'exit_code':result.returncode,'log':str(log),
-           'status':'PASS' if result.returncode==0 and passed==expected else ('BLOCKED' if blocked else 'FAIL')}
-    project.report(name,state);print(json.dumps(state,indent=2))
-    if state['status']=='BLOCKED':raise RuntimeError(f'{name} missing required resources; inspect {log}')
-    if state['status']!='PASS':raise CheckFailed(f'{name} did not execute/pass the required coverage; inspect {log}')
 
 
 def report_check(project, result):
@@ -46,10 +40,10 @@ def report_check(project, result):
 
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--root');parser.add_argument('--config');parser.add_argument('--cache')
+    parser.add_argument('--run-id');parser.add_argument('--root');parser.add_argument('--config');parser.add_argument('--cache')
     sub=parser.add_subparsers(dest='command',required=True);sub.add_parser('paths')
-    check=sub.add_parser('check');check.add_argument('--lane',choices=['docs','architecture','schema','cpu','gpu','asset-integration','reference','character-reference','inspector','realtime','independence','consumers'],required=True)
-    check.add_argument('--required',action='store_true');check.add_argument('--asset');check.add_argument('--case');check.add_argument('--pack',default='synthetic');check.add_argument('--out')
+    check=sub.add_parser('check');check.add_argument('--lane',choices=['docs','architecture','schema','cpu','gpu','asset-integration','reference','character-reference','inspector','realtime','independence','consumers','inspector-cpu'],required=True)
+    check.add_argument('--fetch',action='store_true',help='prepare independent consumer dependencies online');check.add_argument('--required',action='store_true');check.add_argument('--asset');check.add_argument('--case');check.add_argument('--pack',default='synthetic');check.add_argument('--out')
     assets=sub.add_parser('assets');asset_sub=assets.add_subparsers(dest='action',required=True)
     for action in ['prepare','build']:
         p=asset_sub.add_parser(action);p.add_argument('--pack',required=True);p.add_argument('--manifest');p.add_argument('--mirror');p.add_argument('--blender',default='blender')
@@ -57,7 +51,40 @@ def main():
     for action in ['compare','accept']:
         p=g.add_parser(action);p.add_argument('--candidate',required=True);p.add_argument('--baseline',required=True);p.add_argument('--blender',default='blender')
     capture=g.add_parser('capture');capture.add_argument('--asset',required=True);capture.add_argument('--out',required=True)
-    args=parser.parse_args();project=Project(args.root,args.config,args.cache)
+    args = parser.parse_args()
+    project = Project(args.root, args.config, args.cache)
+    if args.command == 'paths':
+        return execute(project, args)
+    lane = args.lane if args.command == 'check' else args.command + '-' + args.action
+    try:
+        project.begin_run(lane, {key: getattr(args, key, None) for key in
+                                ['asset', 'case', 'manifest', 'candidate', 'baseline']}, args.run_id)
+        print(f'RUN {project.run_id}', flush=True)
+        execute(project, args)
+        project.finish_run('PASS', 'completed')
+        return 0
+    except BaseException as error:
+        if isinstance(error, ResourceBlocked):
+            status, reason, code = 'BLOCKED', 'required-resource-missing', 2
+        elif isinstance(error, KeyboardInterrupt):
+            status, reason, code = 'FAIL', 'interrupted', 1
+        else:
+            reasons = [(CheckFailed, 'validation-failed'),
+                       (subprocess.CalledProcessError, 'process-failed'),
+                       (ValueError, 'input-contract-invalid'),
+                       (OSError, 'io-failed')]
+            reason = next((reason for kind, reason in reasons if isinstance(error, kind)), 'internal-error')
+            status, code = 'FAIL', 1
+        if project.run_id and hasattr(project, 'identity'):
+            project.finish_run(status, reason, error=str(error),
+                               exit_code=getattr(error, 'returncode', code))
+        print(f'{status}: {error}', file=sys.stderr)
+        return code
+
+
+def execute(project, args):
+    if args.command == 'check' and args.fetch and args.lane != 'consumers':
+        raise CheckFailed('--fetch is only valid for consumers')
     if args.command=='paths':
         print(json.dumps({'root':str(project.root),'cache':str(project.cache),'output':str(project.output)},indent=2));return 0
     if args.command=='assets':
@@ -76,12 +103,13 @@ def main():
         print(json.dumps({'status':'PASS','source':str(source),'unpacked':str(unpack_archive(source,manifest))},indent=2));return 0
     if args.command=='golden':
         if args.action=='capture':
+            if not project.resolve(args.asset).is_file():raise ResourceBlocked('required compiled asset missing')
             env=dict(os.environ,STYLIZED_REQUIRE_GPU='1',STYLIZED_TEST_ASSET=str(project.resolve(args.asset)),STYLIZED_CAPTURE_OUT=str(project.resolve(args.out)))
-            run_tests(project,'asset-integration-required',['cargo','test','--locked','-p','stylized-integration-tests','--test','asset_adoption','declared_asset','--','--ignored','--nocapture'],1,env);return 0
+            require_suites([run_tests(project,'asset-integration-required',['cargo','test','--locked','-p','stylized-integration-tests','--test','asset_adoption','declared_asset'],json.loads((project.root/'tests/suites.json').read_text())['asset-integration'],env)]);return 0
         candidate=project.resolve(args.candidate);baseline=project.resolve(args.baseline)
-        if not candidate.is_file():raise ValueError('candidate missing')
+        if not candidate.is_file():raise ResourceBlocked('candidate missing')
         if args.action=='compare':
-            if not baseline.is_file():raise ValueError('accepted baseline missing')
+            if not baseline.is_file():raise ResourceBlocked('accepted baseline missing')
             run(project,[args.blender,'--background','--python-exit-code','1','--python',project.root/'tools/blender/compare_golden.py','--',candidate,baseline]);return 0
         # Explicit acceptance preserves provenance and records the previous bytes.
         import shutil,hashlib,tempfile
@@ -116,17 +144,26 @@ def main():
         run(project,[sys.executable,'-m','unittest','discover','-s','tests/python'])
         run(project,['cargo','test','--locked','--workspace','--','--test-threads=1'])
     elif lane=='gpu':
-        env=dict(os.environ,STYLIZED_REQUIRE_GPU='1')
-        command=['cargo','test','--locked','-p','stylized-integration-tests']
-        for name in GPU_TESTS:command+=['--test',name]
-        suites=json.loads((project.root/'tests/suites.json').read_text())
-        run_tests(project,'gpu-required',command+['--','--ignored','--nocapture','--test-threads=1'],sum(map(len,suites['gpu'].values())),env)
-        run_tests(project,'synthetic-import',['cargo','test','--locked','-p','stylized-integration-tests','--test','asset_adoption','synthetic_character','--','--ignored','--nocapture'],1,env)
-        project.report('gpu',{'status':'PASS','binaries':GPU_TESTS+['asset_adoption:synthetic_character'],'required':True})
+        env = dict(os.environ, STYLIZED_REQUIRE_GPU='1')
+        suites = json.loads((project.root/'tests/suites.json').read_text())
+        states = []
+        for binary, identities in suites['gpu'].items():
+            states.append(run_tests(project, binary,
+                ['cargo','test','--locked','-p','stylized-integration-tests','--test',binary], identities, env))
+        from task_runner import aggregate
+        totals = {key: sum(s[key] for s in states) for key in
+                  ['expected','executed','passed','failed','blocked','not_executed']}
+        project.report('gpu-required', dict(totals, status=aggregate(states)['status'], suites=states))
+        states.append(run_tests(project,'synthetic-import',
+            ['cargo','test','--locked','-p','stylized-integration-tests','--test','asset_adoption','synthetic_character'],
+            suites['synthetic-import'],env))
+        require_suites(states)
+        project.report('gpu', {'status':'PASS','binaries':list(suites['gpu']), 'required':True})
     elif lane=='asset-integration':
         if not args.asset:raise ValueError('--asset must identify the explicitly prepared GLB')
-        env=dict(os.environ,STYLIZED_REQUIRE_GPU='1',STYLIZED_TEST_ASSET=str(project.resolve(args.asset)),STYLIZED_CAPTURE_OUT=str(project.output/'asset-integration.png'))
-        run_tests(project,'asset-integration-required',['cargo','test','--locked','-p','stylized-integration-tests','--test','asset_adoption','declared_asset','--','--ignored','--nocapture'],1,env)
+        if not project.resolve(args.asset).is_file():raise ResourceBlocked('required compiled asset missing')
+        env=dict(os.environ,STYLIZED_REQUIRE_GPU='1',STYLIZED_TEST_ASSET=str(project.resolve(args.asset)),STYLIZED_CAPTURE_OUT=str(project.run_output/'asset-integration.png'))
+        require_suites([run_tests(project,'asset-integration-required',['cargo','test','--locked','-p','stylized-integration-tests','--test','asset_adoption','declared_asset'],json.loads((project.root/'tests/suites.json').read_text())['asset-integration'],env)])
         project.report('asset-integration',{'status':'PASS','asset':str(project.resolve(args.asset)),'scope':'adoption/shared materials/reload; not upstream parity'})
     elif lane=='realtime':
         if not args.asset or not args.out or args.case:raise CheckFailed('realtime requires --asset and a new --out, without --case')
@@ -134,14 +171,15 @@ def main():
         print(json.dumps(realtime(project,args.asset,args.out),indent=2))
     elif lane=='inspector':
         if not args.asset or not args.out:raise CheckFailed('--asset and a new --out directory are required')
+        if not project.resolve(args.asset).is_file():raise ResourceBlocked('required compiled asset missing')
         output=project.resolve(args.out)
         if output.exists():raise CheckFailed('inspector output already exists')
         command=['cargo','run','--locked','-p','showcase','--features','inspector','--','inspect','--asset',str(project.resolve(args.asset)),'--headless','--exercise-reload','--out',str(output)]
         if args.case:command+=['--config',str(project.resolve(args.case))]
-        result=subprocess.run(command,cwd=project.root,env=dict(os.environ,STYLIZED_REQUIRE_GPU='1'),stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
+        result=invoke(command,cwd=project.root,env=dict(os.environ,STYLIZED_REQUIRE_GPU='1'),stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
         project.output.mkdir(parents=True,exist_ok=True)
-        log=project.output/'inspector.log';log.write_text(result.stdout)
-        if 'required GPU unavailable' in result.stdout:raise RuntimeError(f'required GPU unavailable; inspect {log}')
+        log=project.run_output/'inspector.log';log.write_text(result.stdout)
+        if 'required GPU unavailable' in result.stdout:raise ResourceBlocked(f'required GPU unavailable; inspect {log}')
         if result.returncode:raise CheckFailed(f'inspector failed ({result.returncode}); inspect {log}')
         report=json.loads((output/'capture.json').read_text())
         import hashlib
@@ -153,21 +191,29 @@ def main():
         if not args.case or not args.out:raise ValueError('--case and new --out required')
         from assets.capture_case import validate
         case=project.resolve(args.case)
+        if not case.is_file():raise ResourceBlocked('required reference case missing')
         try:validate(case)
         except (ValueError,KeyError,TypeError) as error:raise CheckFailed(str(error)) from error
         if project.resolve(args.out).exists():raise CheckFailed('candidate output already exists')
-        result=subprocess.run(['cargo','run','--locked','-p','reference-comparison','--','--character-case',str(case),'--out',str(project.resolve(args.out))]+(['--required'] if args.required else []),cwd=project.root,env=dict(os.environ,STYLIZED_REQUIRE_GPU='1'))
+        command=['cargo','run','--locked','-p','reference-comparison','--','--character-case',str(case),'--out',str(project.resolve(args.out))]+(['--required'] if args.required else [])
+        result=invoke(command,cwd=project.root,env=dict(os.environ,STYLIZED_REQUIRE_GPU='1'),stdout=subprocess.PIPE,stderr=subprocess.STDOUT,text=True)
+        log=project.run_output/'character-reference.log';log.write_text(result.stdout)
         if (project.resolve(args.out)/'report.json').exists():
             from assets.character_report import generate
             generate(project.resolve(args.out))
-        if result.returncode:raise subprocess.CalledProcessError(result.returncode,result.args)
+        if result.returncode:
+            if 'BLOCKED: required GPU unavailable' in result.stdout:raise ResourceBlocked(f'required GPU unavailable; inspect {log}')
+            raise subprocess.CalledProcessError(result.returncode,result.args)
     elif lane=='reference':
         if not args.case:raise ValueError('--case must identify the prepared reference case JSON')
         env=dict(os.environ,STYLIZED_REQUIRE_GPU='1',STYLIZED_REFERENCE_CASE=str(project.resolve(args.case)))
         run(project,['cargo','run','--locked','-p','reference-comparison','--']+(['--required'] if args.required else []),env)
+    elif lane=='inspector-cpu':
+        run(project,['cargo','test','--locked','-p','showcase','--features','inspector','--lib','--','--test-threads=1'])
+        run(project,['cargo','clippy','--locked','-p','showcase','--features','inspector','--all-targets','--','-D','warnings'])
     elif lane=='consumers':
         from checks.consumers import validate
-        print(json.dumps(validate(project),indent=2))
+        print(json.dumps(validate(project, fetch=args.fetch),indent=2))
     elif lane=='independence':
         from checks.isolated import validate
         validate(project,asset=project.resolve(args.asset) if args.asset else None,case=project.resolve(args.case) if args.case else None)
@@ -178,6 +224,5 @@ if __name__=='__main__':
     try:raise SystemExit(main())
     except CheckFailed as error:
         print(f'FAIL: {error}',file=sys.stderr);raise SystemExit(1)
-    except subprocess.CalledProcessError as error:raise SystemExit(error.returncode)
     except (OSError,ValueError,RuntimeError,KeyError) as error:
-        print(f'BLOCKED: {error}',file=sys.stderr);raise SystemExit(2)
+        print(f'FAIL: {error}',file=sys.stderr);raise SystemExit(1)

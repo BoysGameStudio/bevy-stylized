@@ -1,5 +1,6 @@
 """Build independent asset packs using prepared source manifests and explicit tools."""
 from pathlib import Path
+from task_runner import ResourceBlocked, invoke
 import hashlib
 import json
 import os
@@ -13,7 +14,7 @@ def prepared(project, name):
     manifest=json.loads((project.root/'assets/sources'/f'{name}.json').read_text())
     revision=hashlib.sha256(json.dumps(manifest,sort_keys=True,separators=(',',':')).encode()).hexdigest()
     source=project.cache/name/'sources'/revision
-    if not source.exists():raise ValueError(f'prepare {name} first: assets prepare --pack {name}')
+    if not source.exists():raise ResourceBlocked(f'prepare {name} first: assets prepare --pack {name}')
     verify(source,manifest)
     return unpack_archive(source,manifest)
 
@@ -21,8 +22,8 @@ def prepared(project, name):
 def run_job(project, command, log, env=None):
     log.parent.mkdir(parents=True,exist_ok=True)
     with log.open('w') as output:
-        result=subprocess.run(list(map(str,command)),cwd=project.root,env=env,stdout=output,stderr=subprocess.STDOUT)
-    if result.returncode:raise RuntimeError(f'job failed ({result.returncode}); inspect {log}')
+        result=invoke(list(map(str,command)),cwd=project.root,env=env,stdout=output,stderr=subprocess.STDOUT)
+    if result.returncode:raise subprocess.CalledProcessError(result.returncode, command)
 
 
 def verify_run(path):
