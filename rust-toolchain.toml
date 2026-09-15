@@ -1,8 +1,4 @@
 [toolchain]
-# V1 development line tracks stable (currently 1.98.x, matching the
-# ADR-0027 interim clause baseline Bevy 0.19.1 was validated with).
-# NOTE: an exact "1.98.0" pin is preferred for reproducibility, but this
-# environment cannot reach static.rust-lang.org to install it; pin exactly
-# before the 0.9 freeze (iteration plan §3 It-10).
-channel = "stable"
+# Exact compiler validated by the standalone CPU/GPU workflow.
+channel = "1.98.0"
 components = ["rustfmt", "clippy"]

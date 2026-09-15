@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/BoysGameStudio/bevy-stylized/schemas/authoring/manifest.schema.json",
+  "title": "Blender Reference Export Manifest (blender-gltf-npr-v1)",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "blender_version",
+    "gacha_setup_version",
+    "gacha_setup_commit",
+    "gacha_setup_asset_digest",
+    "gltf_exporter_version",
+    "export_contract_version",
+    "export_settings_hash",
+    "node_graph_signature",
+    "render_engine",
+    "color_management",
+    "canonical_environment_id",
+    "source_fixture",
+    "outputs",
+    "status"
+  ],
+  "properties": {
+    "schema_version": {"type": "string", "const": "export-manifest-v1"},
+    "blender_version": {"type": "string", "description": "Exact bpy.app.version_string of the exporting Blender."},
+    "gacha_setup_version": {"type": "string"},
+    "gacha_setup_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "gacha_setup_asset_digest": {"type": "string", "description": "SHA-256 of the Gacha Setup release asset (zip), from the toolchain lock."},
+    "gltf_exporter_version": {"type": "string", "description": "io_scene_gltf2 bl_info version."},
+    "export_contract_version": {"type": "string", "const": "blender-gltf-npr-v1"},
+    "export_settings_hash": {"type": "string", "description": "SHA-256 over the canonical JSON of the locked export settings actually applied."},
+    "node_graph_signature": {
+      "type": "object",
+      "required": ["revision", "signature_sha256"],
+      "properties": {
+        "revision": {"type": "string"},
+        "signature_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "render_engine": {"type": "string"},
+    "color_management": {
+      "type": "object",
+      "required": ["display_device", "view_transform", "view_look"],
+      "properties": {
+        "display_device": {"type": "string"},
+        "view_transform": {"type": "string"},
+        "view_look": {"type": "string"},
+        "sequencer_colorspace": {"type": "string"}
+      }
+    },
+    "canonical_environment_id": {"type": "string"},
+    "source_fixture": {
+      "type": "object",
+      "required": ["path", "sha256", "role"],
+      "properties": {
+        "path": {"type": "string"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "role": {"type": "string", "enum": ["main", "outline", "post", "fixture"]}
+      }
+    },
+    "outputs": {
+      "type": "object",
+      "required": ["glb", "glb_sha256", "sidecar", "node_graph_signature"],
+      "properties": {
+        "glb": {"type": "string"},
+        "glb_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "sidecar": {"type": "string"},
+        "node_graph_signature": {"type": "string"}
+      }
+    },
+    "status": {"type": "string", "enum": ["ok"]},
+    "warnings": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": false
+}

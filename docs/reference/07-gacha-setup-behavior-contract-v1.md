@@ -2,7 +2,7 @@
 
 > **Status:** Draft（pending ADR-0007 / ADR-0012，未经维护者确认前不构成 Oracle 语义）
 > **框架：** 本文档按 docs/reference/04-upstream-contract-upgrade-and-golden.md 的行为契约格式填充 v3.6.2 的具体内容。
-> **证据：** `tools/blender-reference-export/contracts/expected-signature.genshin-v3.6.2.json`，revision `gacha-setup-v3.6.2-069e51f3fd89`，提取自 PaoloESAN/gacha-setup v3.6.2（commit `069e51f3fd89cdc66b4c2741798ede11a5fb16b5`）包内三个 reference blend，提取环境 Blender 5.2.1 LTS。
+> **证据：** `schemas/authoring/expected-signature.genshin-v3.6.2.json`，revision `gacha-setup-v3.6.2-069e51f3fd89`，提取自 PaoloESAN/gacha-setup v3.6.2（commit `069e51f3fd89cdc66b4c2741798ede11a5fb16b5`）包内三个 reference blend，提取环境 Blender 5.2.1 LTS。
 > **配套：** 导出侧契约见 docs/reference/06-export-contract-blender-gltf-npr-v1.md。
 
 ## 1. 证据能力与边界
@@ -14,7 +14,7 @@
 
 凡是依赖“不能证明”部分的行为描述，一律标记 **待核实（needs inspection）**，不得凭上游名称猜测语义。
 
-**2026-09-12 补充**：`tools/blender-reference-export/inspect_node_math.py` 已将三个 reference blend 全部节点组的内部数学（节点类型/参数/socket 默认值/逐 link 连接）全量转储为 JSON，§3 各域的“待核实”条目已据此逐条核实（见 §3 各节与 §5）。注意该转储是一次性取证手段，**不**进入签名/导出合同——上游升级时仍以签名 diff 触发复核，内部数学变更须按 docs/reference/04-upstream-contract-upgrade-and-golden.md 的流程重新核实并提升本文档修订号。
+**2026-09-12 补充**：`tools/blender/inspect_node_math.py` 已将三个 reference blend 全部节点组的内部数学（节点类型/参数/socket 默认值/逐 link 连接）全量转储为 JSON，§3 各域的“待核实”条目已据此逐条核实（见 §3 各节与 §5）。注意该转储是一次性取证手段，**不**进入签名/导出合同——上游升级时仍以签名 diff 触发复核，内部数学变更须按 docs/reference/04-upstream-contract-upgrade-and-golden.md 的流程重新核实并提升本文档修订号。
 
 ## 2. 行为契约总表
 
@@ -46,7 +46,7 @@ fidelity 标记：`Exact` / `Approximation` / `Intentional Difference` / `Unsupp
 bevy-stylized 表示：ramp 纹理 + 每档过渡参数进入 profile 常量；昼夜切换由 view/frame 状态驱动。
 
 - 输入来源：`Texture Channel`（ramp 纹理）、`Profile Constant`（metadata_map 常量）、`View/Frame State`（Day/Night）。
-- ~~待核实（needs inspection）~~ **已核实（2026-09-12，逐节点转储，`tools/blender-reference-export/inspect_node_math.py`）**：
+- ~~待核实（needs inspection）~~ **已核实（2026-09-12，逐节点转储，`tools/blender/inspect_node_math.py`）**：
   - `Body Shadow Ramp` / `Hair Shadow Ramp` 组本体是**纯纹理采样器**（`Group Input.Vector` → `ShaderNodeTexImage`（label `Body Shadow Ramp (sRGB) (Channel Packed)`）→ `Color`/`Alpha`），坐标完全由外部构造。**注意：vendor blend 中这些纹理节点的 image 为 None**——ramp 贴图由 Setup Wizard 在导入角色时注入（运行时数据，非 shader 本体内容）。
   - 采样坐标（`HoYoverse - GI Body` 内，以 Day 为例）：X = `1 − (ShadowPosition − LitFactor_AO) / (ShadowPosition × (vcol_G × 2) × ShadowRampWidth)`，链：`Ramps Subtract -- NdotL`(=`Shadow Position` − `Light Mix -- AO`) → `Ramps Divide -- Shadow Pos` → `Ramps Divide -- Shadow Width`(÷ `Ramps Multiply -- Shadow Width` = `Ramps Green.Green`（顶点色层 `Col` 的 G 通道 × 2.0）× `Shadow Ramp Width`) → `Ramps Subtract -- Shadow Width`(1−x) → `Ramps Combine XY -- Day.X`。其中 `Light Mix -- AO` = lerp(0, NdotL×0.5+0.5, `Smoothstep -- AO`(edge0=0.01, edge1=0.4))——**光照项为 half-lambert（`Multiply -- NdotL` ×0.5 → `Add -- NdotL` +0.5），并经 AO 门控**。
   - 采样 Y（行选择）= `0.05 + 0.1×((6 − RampID) − 1)`，Night 直接用该值（贴图下半行），Day = Night + 0.5（贴图上半行）；RampID ∈ {1..5} 由 `Ramp IDs`（`Genshin Material IDs - Float` 实例）从 `Lightmap Alpha` 阈值分带选择：≤0.2→1，(0.2,0.4]→2，(0.4,0.6]→3，(0.6,0.8]→4，>0.8→5（`>=`/`<=`/`&&` 辅助组，带 `Use Material 2–5` 开关）。
@@ -215,7 +215,7 @@ bevy-stylized 表示：Reference/Post profile——bloom 以 Threshold/Intensity
 
 ## 5. 待核实清单（汇总，升级与 Golden 工作前须逐条关闭或显式接受）
 
-核查方式（原定）：在锁定的 Blender 5.2.1 LTS 上打开 reference blend 逐节点检查。**2026-09-12 已执行**：`tools/blender-reference-export/inspect_node_math.py` 对三个 reference blend 的全部节点组做了全量转储（节点类型/参数/socket 默认值/逐 link 连接），逐条核实结果如下：
+核查方式（原定）：在锁定的 Blender 5.2.1 LTS 上打开 reference blend 逐节点检查。**2026-09-12 已执行**：`tools/blender/inspect_node_math.py` 对三个 reference blend 的全部节点组做了全量转储（节点类型/参数/socket 默认值/逐 link 连接），逐条核实结果如下：
 
 1. ~~Shadow ramp 采样坐标构造与昼夜色混合公式（§3.1）~~ → **已核实**：X = 1 − (ShadowPosition − LitFactor_AO)/(ShadowPosition × 2·vcolG × RampWidth)；Y = 0.05+0.1×(5−RampID)，Day 行为上半（+0.5）Night 下半；half-lambert + AO 门控；lerp(Day,Night,Day/Night)。**附带发现：ramp 贴图由 wizard 运行时注入（blend 内 image=None），且 cast-shadow 节点为 NodeUndefined 死路径。**
 2. ~~Lightmap R/G/B/A 通道语义分配（§3.2）~~ → **已核实**：R=金属遮罩（>0.9），G=AO（另 >0.95 光照门控），B=高光抑制（1.03−B），A=材质分带 ID；顶点色层 `Col`：R=vertex AO，G=ramp 阴影宽度。

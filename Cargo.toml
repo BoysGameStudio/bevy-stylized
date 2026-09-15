@@ -1,26 +1,35 @@
 [workspace]
 resolver = "3"
 members = [
+    "tests/integration",
     "crates/bevy-stylized",
     "crates/bevy-stylized-core",
     "crates/bevy-stylized-gltf",
     "crates/bevy-stylized-profile-genshin",
     "crates/bevy-stylized-tools",
     "crates/bevy-stylized-render",
-    "crates/dev/benchmarks",
-    "crates/dev/golden-harness",
-    "crates/dev/gpu-driven-spike",
-    "crates/dev/regression-lab",
-    "crates/dev/odette-reference-lab",
-    "crates/dev/reference-comparison",
-    "crates/dev/showcase",
-    "crates/legacy/bevy-cel",
-    "crates/legacy/bevy-cel-metadata",
+    "labs/benchmarks",
+    "tests/harness",
+    "labs/spikes/gpu-driven",
+    "labs/regression",
+    "labs/reference",
+    "apps/showcase",
+]
+
+default-members = [
+    "crates/bevy-stylized",
+    "crates/bevy-stylized-core",
+    "crates/bevy-stylized-gltf",
+    "crates/bevy-stylized-profile-genshin",
+    "crates/bevy-stylized-tools",
+    "crates/bevy-stylized-render",
 ]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.98"
+repository = "https://github.com/BoysGameStudio/bevy-stylized"
 # License intentionally unset at the workspace level: pending ADR-0017 /
 # provenance review. Legacy crates carry their original license fields.
 
@@ -47,10 +56,13 @@ serde_json = "1"
 serde_path_to_error = "0.1"
 thiserror = "2"
 tempfile = "3"
-gltf = { version = "=1.4.1", features = ["extensions"] }
+gltf = { version = "=1.4.1", features = ["extensions", "extras"] }
 # Asset Compiler（bevy-stylized-tools compile）：ILM 打包需要 PNG 解码/编码
 # （gltf crate 不解码图片；仅启用 png feature，保持 CLI 依赖面最小）。
 image = { version = "0.25", default-features = false, features = ["png"] }
 # compile --json 报告要求产物内容哈希；与 fixtures 既有 sha256 provenance
-# 约定一致（见 fixtures/reference/export-sidecar.json）。
+# 约定一致（见 fixtures/synthetic/reference-scene/export-sidecar.json）。
 sha2 = "0.10"
+
+# Optional schema generation; fixed version keeps generated snapshots stable.
+schemars = "=1.2.1"

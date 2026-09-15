@@ -1,13 +1,13 @@
 //! `_NPR_*` 顶点属性注册表。
 //!
-//! 正本契约：`tools/blender-reference-export/contracts/npr-attributes.v1.json`
+//! 正本契约：`schemas/authoring/npr-attributes.v1.json`
 //! （docs/reference/06 §4）。本模块把该契约编码为 Bevy
 //! [`MeshVertexAttribute`] 常量与注册表，经
 //! [`StylizedGltfPluginExt::add_npr_vertex_attributes`] 在
 //! **GltfPlugin 加入 App 之前**注册（ADR-0028，机制标记为 provisional）。
 //!
-//! 与 legacy `crates/legacy/bevy-cel-metadata/src/attributes.rs` 的机制同构
-//! （仅参考其实现，不依赖 legacy crate）：
+//! Canonical attribute registration is checked against the generated contract.
+//! Historical naming aliases are data only, not a dependency on an old renderer:
 //!
 //! - glTF 规范要求 application-specific attribute 以 `_` 开头；`gltf-json`
 //!   解析时会剥掉首字符下划线，因此注册 key 为语义名去掉首 `_`
@@ -83,14 +83,10 @@ pub const ATTRIBUTE_NPR_CONTROL0: MeshVertexAttribute = MeshVertexAttribute::new
     VertexFormat::Float32x3,
 );
 
-/// attribute 缺省值的静态表达（契约 v1 只用标量与 vec3）。
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum NprAttributeDefault {
-    /// 标量缺省值。
-    Scalar(f32),
-    /// vec3 缺省值。
-    Vec3([f32; 3]),
-}
+pub use crate::contract::{
+    LEGACY_CEL_ALIASES, LEGACY_ONLY_CEL_ATTRIBUTES, LegacyCelAlias, NprAttributeDefault,
+    legacy_cel_alias,
+};
 
 /// 一条 `_NPR_*` attribute 的完整契约条目。
 #[derive(Clone, Copy, Debug)]
@@ -207,74 +203,6 @@ pub const NPR_VERTEX_ATTRIBUTES: [NprVertexAttributeRegistration; 10] = [
     },
 ];
 
-/// `_NPR_*` → legacy `_CEL_*` 别名表条目（迁移期 shim 数据）。
-///
-/// 仅作为数据提供（docs/reference/06 §4.3）；**默认不注册任何
-/// `_CEL_*` attribute**。
-#[derive(Clone, Copy, Debug)]
-pub struct LegacyCelAlias {
-    /// 规范 `_NPR_*` 语义名。
-    pub npr_semantic: &'static str,
-    /// 对应 legacy `_CEL_*` 语义名；`None` 表示 legacy 无对应（v1 新增语义）。
-    pub cel_semantic: Option<&'static str>,
-}
-
-/// `_NPR_*` → `_CEL_*` 别名表（reference-only 数据）。
-pub const LEGACY_CEL_ALIASES: [LegacyCelAlias; 10] = [
-    LegacyCelAlias {
-        npr_semantic: "_NPR_MASK",
-        cel_semantic: Some("_CEL_MASK"),
-    },
-    LegacyCelAlias {
-        npr_semantic: "_NPR_CLOTH_PIN",
-        cel_semantic: Some("_CEL_CLOTH_PIN"),
-    },
-    LegacyCelAlias {
-        npr_semantic: "_NPR_EMISSION",
-        cel_semantic: Some("_CEL_EMISSION"),
-    },
-    LegacyCelAlias {
-        npr_semantic: "_NPR_FACE_SDF",
-        cel_semantic: Some("_CEL_FACE_SDF"),
-    },
-    LegacyCelAlias {
-        npr_semantic: "_NPR_FACE_SIDE",
-        cel_semantic: Some("_CEL_FACE_SIDE"),
-    },
-    LegacyCelAlias {
-        npr_semantic: "_NPR_HAIR_MASK",
-        cel_semantic: Some("_CEL_HAIR_MASK"),
-    },
-    LegacyCelAlias {
-        npr_semantic: "_NPR_HAIR_TANGENT",
-        cel_semantic: Some("_CEL_HAIR_TANGENT"),
-    },
-    LegacyCelAlias {
-        npr_semantic: "_NPR_MATERIAL_ID",
-        cel_semantic: Some("_CEL_MATERIAL_ID"),
-    },
-    LegacyCelAlias {
-        npr_semantic: "_NPR_LEVEL_ROLE",
-        cel_semantic: Some("_CEL_LEVEL_ROLE"),
-    },
-    LegacyCelAlias {
-        npr_semantic: "_NPR_CONTROL0",
-        cel_semantic: None,
-    },
-];
-
-/// legacy 独有的 `_CEL_*` attribute（无 `_NPR_*` 对应，仅记录）。
-pub const LEGACY_ONLY_CEL_ATTRIBUTES: [&str; 2] = ["_CEL_JOINTS_1", "_CEL_WEIGHTS_1"];
-
-/// 查询某 `_NPR_*` 语义的 legacy `_CEL_*` 别名。
-#[must_use]
-pub fn legacy_cel_alias(npr_semantic: &str) -> Option<&'static str> {
-    LEGACY_CEL_ALIASES
-        .iter()
-        .find(|alias| alias.npr_semantic == npr_semantic)
-        .and_then(|alias| alias.cel_semantic)
-}
-
 /// 为 [`bevy::gltf::GltfPlugin`] 注册全部 `_NPR_*` 自定义顶点属性。
 ///
 /// **调用时机（ADR-0028，provisional）**：必须在把 `GltfPlugin` 加入
@@ -306,7 +234,7 @@ mod tests {
     fn registration_table_matches_contract_json() {
         let contract_path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../tools/blender-reference-export/contracts/npr-attributes.v1.json"
+            "/../../schemas/authoring/npr-attributes.v1.json"
         );
         let contract: serde_json::Value = serde_json::from_str(
             &std::fs::read_to_string(contract_path).expect("contract JSON must be readable"),

@@ -1,0 +1,40 @@
+[package]
+name = "showcase"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+description = "Showcase suite for bevy-stylized (17 fixed cases plus a static character inspector)."
+
+[[bin]]
+name = "showcase"
+path = "src/main.rs"
+
+[dependencies]
+bevy = { workspace = true, features = [
+    "bevy_animation",
+    "bevy_gltf",
+    "bevy_scene",
+    "png",
+    "reflect_auto_register",
+] }
+bevy-stylized = { path = "../../crates/bevy-stylized" }
+benchmarks = { path = "../../labs/benchmarks" }
+golden-harness = { path = "../../tests/harness" }
+
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+gltf.workspace = true
+bevy_egui = { version = "=0.41.1", optional = true, default-features = false, features = ["render", "default_fonts"] }
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[features]
+# 开窗交互模式需要 winit（x11）。默认关闭：headless 捕获与测试不含
+# winit，避免事件循环进入测试线程的兼容性问题。
+interactive = ["bevy/bevy_winit", "bevy/x11"]
+inspector = ["interactive", "bevy/wayland", "dep:bevy_egui"]
+
+[lints]
+workspace = true

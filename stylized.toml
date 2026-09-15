@@ -1,0 +1,4 @@
+# Paths are relative to this file. CLI overrides take precedence.
+[paths]
+cache = "assets/local"
+output = "target/stylized"

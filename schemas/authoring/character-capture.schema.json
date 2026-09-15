@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Static character capture package (versioned development artifact)",
+  "type": "object",
+  "required": [
+    "schema",
+    "coordinates",
+    "resolution",
+    "required_cases",
+    "files",
+    "cases",
+    "background_linear"
+  ],
+  "properties": {
+    "schema": {
+      "enum": [
+        "bevy_stylized.character-capture/v1",
+        "bevy_stylized.character-capture/v2",
+        "bevy_stylized.character-capture/v3"
+      ]
+    },
+    "coordinates": {
+      "const": "gltf-y-up-metres"
+    },
+    "resolution": {
+      "const": [
+        512,
+        512
+      ]
+    },
+    "background_linear": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 4,
+      "maxItems": 4
+    },
+    "files": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    },
+    "required_cases": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "camera",
+          "direction_to_light",
+          "reference",
+          "actual",
+          "silhouette"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "camera": {
+            "type": "object",
+            "required": [
+              "position",
+              "target",
+              "up",
+              "projection",
+              "scale",
+              "near",
+              "far"
+            ],
+            "properties": {
+              "position": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 3,
+                "maxItems": 3
+              },
+              "target": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 3,
+                "maxItems": 3
+              },
+              "up": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 3,
+                "maxItems": 3
+              },
+              "projection": {
+                "const": "orthographic"
+              },
+              "scale": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "near": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "far": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            },
+            "additionalProperties": false
+          },
+          "direction_to_light": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 3,
+            "maxItems": 3
+          },
+          "reference": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": {
+              "type": "string"
+            }
+          },
+          "actual": {
+            "type": "string"
+          },
+          "silhouette": {
+            "type": "string"
+          },
+          "factor_reference": {
+            "type": "string"
+          },
+          "center_reference": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "supersample": {
+      "enum": [
+        2,
+        4,
+        8
+      ]
+    },
+    "diagnostics": {
+      "type": "object",
+      "required": [
+        "policy"
+      ],
+      "properties": {
+        "policy": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schema": {
+            "enum": [
+              "bevy_stylized.character-capture/v2",
+              "bevy_stylized.character-capture/v3"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "diagnostics"
+        ],
+        "properties": {
+          "cases": {
+            "items": {
+              "required": [
+                "factor_reference",
+                "center_reference"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schema": {
+            "const": "bevy_stylized.character-capture/v3"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "supersample",
+          "sampling"
+        ],
+        "properties": {
+          "diagnostics": {
+            "properties": {
+              "policy": {
+                "const": "lighting-factors/v1"
+              }
+            }
+          },
+          "sampling": {
+            "properties": {
+              "matched": {
+                "type": "object",
+                "required": [
+                  "grid",
+                  "policy"
+                ],
+                "properties": {
+                  "grid": {
+                    "enum": [
+                      2,
+                      4,
+                      8
+                    ]
+                  },
+                  "policy": {
+                    "const": "matched-box/v1"
+                  }
+                }
+              }
+            },
+            "required": [
+              "matched"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

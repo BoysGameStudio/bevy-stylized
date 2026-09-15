@@ -1,0 +1,11 @@
+{
+  "schema": "bevy_stylized.fixture/v1",
+  "id": "synthetic-character-v1",
+  "authorship": "Bevy Stylized first-party procedural geometry",
+  "units": "metres",
+  "up": "+Y",
+  "forward": "+Z",
+  "head_bone": "HeadJoint",
+  "sha256": "330e810ffc4ee4b71e131ce0b981f9e8fccc63da4da68bd82815c26d27f56bb0",
+  "generator_sha256": "a18a906aadb22ecc303eda5ced96c550dcf1ea58c44113785ba6c28842200126"
+}

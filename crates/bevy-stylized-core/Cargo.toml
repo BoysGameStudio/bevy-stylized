@@ -2,6 +2,9 @@
 name = "bevy-stylized-core"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+readme = "../../README.md"
 publish = false
 description = "Domain model, descriptors, capability model and schema versioning for the bevy-stylized framework (no render internals)."
 
@@ -14,11 +17,14 @@ bevy_color = { workspace = true, features = ["std", "bevy_reflect"] }
 bevy_reflect = { workspace = true, features = ["std"] }
 serde = { workspace = true, optional = true }
 
+schemars = { workspace = true, optional = true }
+
 [dev-dependencies]
 serde_json.workspace = true
 
 [features]
 default = ["serde"]
+schema = ["serde", "dep:schemars"]
 serde = ["dep:serde", "bevy_math/serialize", "bevy_color/serialize"]
 
 [lints]

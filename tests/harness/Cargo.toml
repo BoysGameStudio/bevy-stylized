@@ -1,0 +1,26 @@
+[package]
+name = "golden-harness"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+description = "Dev-only offscreen capture, image diff, and golden baseline harness for Bevy renderers"
+
+[dependencies]
+bevy = { workspace = true, features = [
+    "bevy_asset",
+    "bevy_core_pipeline",
+    "bevy_image",
+    "bevy_render",
+    "bevy_window",
+] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+half = "=2.7.1"
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true

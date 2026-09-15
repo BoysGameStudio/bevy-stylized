@@ -1,0 +1,322 @@
+{
+  "schema": "bevy_stylized.static-character-validation/v1",
+  "date": "2026-09-14",
+  "recipe": "genshin-static-v4",
+  "source_sha256": "296fe9a0d478cb6a392aebd12f5c9e66432813240592b27f3781d26eda8dd2ba",
+  "engineering_independence": "PASS",
+  "milestone_m1": "Reproducible scoped comparison workflow implemented; full lighting/shadow equivalence remains unqualified",
+  "visual_qualification": "FAIL",
+  "cpu": {
+    "passed": 163,
+    "failed": 0,
+    "ignored": 26
+  },
+  "python": {
+    "passed": 11
+  },
+  "gpu_required": {
+    "suite": "gpu-required",
+    "expected": 13,
+    "executed": 13,
+    "passed": 13,
+    "failed": 0,
+    "blocked": 0,
+    "not_executed": 0,
+    "exit_code": 0,
+    "log": "/work/project with spaces/target/stylized/gpu-required.log",
+    "status": "PASS"
+  },
+  "synthetic_import": {
+    "suite": "synthetic-import",
+    "expected": 1,
+    "executed": 1,
+    "passed": 1,
+    "failed": 0,
+    "blocked": 0,
+    "not_executed": 0,
+    "exit_code": 0,
+    "log": "/work/project with spaces/target/stylized/synthetic-import.log",
+    "status": "PASS"
+  },
+  "external_asset": {
+    "suite": "asset-integration-required",
+    "expected": 1,
+    "executed": 1,
+    "passed": 1,
+    "failed": 0,
+    "blocked": 0,
+    "not_executed": 0,
+    "exit_code": 0,
+    "log": "/work/project with spaces/target/stylized/asset-integration-required.log",
+    "status": "PASS"
+  },
+  "cross_build_blender": [
+    {
+      "image": "full_body-front-blender-0.png",
+      "exact_pixels": true,
+      "max_channel_delta": 0
+    },
+    {
+      "image": "full_body-front-blender-1.png",
+      "exact_pixels": true,
+      "max_channel_delta": 0
+    },
+    {
+      "image": "face_closeup-front-blender-0.png",
+      "exact_pixels": true,
+      "max_channel_delta": 0
+    },
+    {
+      "image": "face_closeup-front-blender-1.png",
+      "exact_pixels": true,
+      "max_channel_delta": 0
+    },
+    {
+      "image": "full_body-left-blender-0.png",
+      "exact_pixels": true,
+      "max_channel_delta": 0
+    },
+    {
+      "image": "full_body-left-blender-1.png",
+      "exact_pixels": true,
+      "max_channel_delta": 0
+    },
+    {
+      "image": "face_closeup-left-blender-0.png",
+      "exact_pixels": true,
+      "max_channel_delta": 0
+    },
+    {
+      "image": "face_closeup-left-blender-1.png",
+      "exact_pixels": true,
+      "max_channel_delta": 0
+    },
+    {
+      "image": "full_body-right-blender-0.png",
+      "exact_pixels": true,
+      "max_channel_delta": 0
+    },
+    {
+      "image": "full_body-right-blender-1.png",
+      "exact_pixels": true,
+      "max_channel_delta": 0
+    },
+    {
+      "image": "face_closeup-right-blender-0.png",
+      "exact_pixels": true,
+      "max_channel_delta": 0
+    },
+    {
+      "image": "face_closeup-right-blender-1.png",
+      "exact_pixels": true,
+      "max_channel_delta": 0
+    }
+  ],
+  "cross_build_bevy": [
+    {
+      "image": "full_body-front-bevy.png",
+      "exact_pixels": true,
+      "max_channel_delta": 0
+    },
+    {
+      "image": "face_closeup-front-bevy.png",
+      "exact_pixels": true,
+      "max_channel_delta": 0
+    },
+    {
+      "image": "full_body-left-bevy.png",
+      "exact_pixels": true,
+      "max_channel_delta": 0
+    },
+    {
+      "image": "face_closeup-left-bevy.png",
+      "exact_pixels": true,
+      "max_channel_delta": 0
+    },
+    {
+      "image": "full_body-right-bevy.png",
+      "exact_pixels": true,
+      "max_channel_delta": 0
+    },
+    {
+      "image": "face_closeup-right-bevy.png",
+      "exact_pixels": true,
+      "max_channel_delta": 0
+    }
+  ],
+  "host_roundtrip": {
+    "core_guard_passed": 1,
+    "gltf_ordering_passed": 2
+  },
+  "clippy": "PASS: workspace all-targets all-features -D warnings",
+  "format": "PASS",
+  "negative_gpu_readiness_and_loading": [
+    {
+      "case": "strict",
+      "expected": 1,
+      "exit_code": 1,
+      "log": "target/stylized/v4-strict.log"
+    },
+    {
+      "case": "missing-gpu",
+      "expected": 2,
+      "exit_code": 2,
+      "log": "target/stylized/v4-missing-gpu.log"
+    },
+    {
+      "case": "readiness-timeout",
+      "expected": 2,
+      "exit_code": 2,
+      "log": "target/stylized/v4-readiness-timeout.log"
+    },
+    {
+      "case": "texture-load-failure",
+      "expected": 2,
+      "exit_code": 2,
+      "log": "target/stylized/v4-texture-load-failure.log"
+    }
+  ],
+  "negative_input_validation": [
+    {
+      "case": "version",
+      "expected": 1,
+      "actual": 1,
+      "output": "FAIL: unknown capture schema\n"
+    },
+    {
+      "case": "missing-case",
+      "expected": 1,
+      "actual": 1,
+      "output": "FAIL: required cases missing, duplicated or reordered\n"
+    },
+    {
+      "case": "camera-mismatch",
+      "expected": 1,
+      "actual": 1,
+      "output": "FAIL: actual camera transform mismatch\n"
+    },
+    {
+      "case": "input-hash",
+      "expected": 1,
+      "actual": 1,
+      "output": "FAIL: input identity mismatch: runtime/character.glb\n"
+    },
+    {
+      "case": "missing-texture",
+      "expected": 2,
+      "actual": 2,
+      "output": "BLOCKED: [Errno 2] No such file or directory: '/tmp/capture negative o14dw3d4/case/runtime/textures/HoYoverse___Odette_Body01_color.png'\n"
+    }
+  ],
+  "capture_report": "target/stylized/static-character-v4-final/report.json",
+  "visual_report": "target/stylized/static-character-v4-final/index.html",
+  "host_case": "assets/local/genshin-odette/builds/dde34331b68cf965df8f11488c09f5221c85e2e5ad9a3643eb895a6babd7c1e4/character-cases/case.json",
+  "legacy_synthetic_reference": {
+    "case": "production_vs_upstream",
+    "max_abs_delta_nonedge": 0.7294118,
+    "mean_abs_delta": 0.0377829,
+    "psnr_db": 20.732267,
+    "edge_fraction": 0.04505539,
+    "shadow_iou": 0.8988989,
+    "silhouette_iou": 0.9960536,
+    "passed": false,
+    "violations": [
+      "non-edge max delta 0.7294 exceeds 0.0627",
+      "mean abs delta 0.0378 exceeds 0.0157",
+      "PSNR 20.73dB below 30.00dB",
+      "shadow mask IoU 0.8989 below 0.9500"
+    ]
+  },
+  "isolation_steps": [
+    {
+      "name": "prepare-genshin-odette",
+      "exit_code": 0,
+      "expected": 0
+    },
+    {
+      "name": "prepare-gacha-authoring",
+      "exit_code": 0,
+      "expected": 0
+    },
+    {
+      "name": "prepare-gacha-reference",
+      "exit_code": 0,
+      "expected": 0
+    },
+    {
+      "name": "synthetic-rebuild",
+      "exit_code": 0,
+      "expected": 0
+    },
+    {
+      "name": "cpu",
+      "exit_code": 0,
+      "expected": 0
+    },
+    {
+      "name": "missing-gpu-is-blocked",
+      "exit_code": 2,
+      "expected": 2
+    },
+    {
+      "name": "missing-baseline-is-blocked",
+      "exit_code": 2,
+      "expected": 2
+    },
+    {
+      "name": "gpu",
+      "exit_code": 0,
+      "expected": 0
+    },
+    {
+      "name": "asset-integration",
+      "exit_code": 0,
+      "expected": 0
+    },
+    {
+      "name": "character-reference-diagnostic",
+      "exit_code": 0,
+      "expected": 0
+    },
+    {
+      "name": "character-reference-strict",
+      "exit_code": 1,
+      "expected": 1
+    },
+    {
+      "name": "reference-capture",
+      "exit_code": 0,
+      "expected": 0
+    },
+    {
+      "name": "reference-strict",
+      "exit_code": 1,
+      "expected": 1
+    }
+  ],
+  "limitations": [
+    "True lighting-factor shadow masks remain unqualified; median luminance is a proxy",
+    "Full-body geometry coverage IoU remains below 0.99 with declared sampling",
+    "Side-lit face and non-edge color errors still fail existing thresholds",
+    "Only recorded Linux/Vulkan hardware is qualified; no publication or baseline acceptance"
+  ],
+  "evidence_sha256": {
+    "target/stylized/static-character-v4-final/evidence/static-character-v4-host-core.log": "93acccd2d9a1c85f6583bb213448e35a61441941498a875e7c0780d213907e14",
+    "target/stylized/static-character-v4-final/evidence/static-character-v4-host-gltf.log": "c165141591576f970f0b1dc04fe8b27e2beedcea129ef0d38af6f57911d0c024",
+    "target/stylized/static-character-v4-final/evidence/canonical-host.json": "d9da9e41db25064403417c648ff69764c2aa7b765db821315f5dae49e880f059",
+    "target/stylized/static-character-v4-final/evidence/static-character-v4-clippy.log": "22e0df986057b9ba5be07526ac5fb348862a3dedef42108383cc3e088acbb889",
+    "target/stylized/static-character-v4-final/evidence/genshin-ao-bound-before.log": "b3304652bb87ba7ecb4358add40a037e93659143a8ed13d258a1590358a625be",
+    "target/stylized/static-character-v4-final/evidence/static-character-v4-python.log": "b9b63fd1bfbddf6bc9e3404f7dc95ece418984e78fb5f427fb971ad05276a0d3",
+    "target/stylized/static-character-v4-final/evidence/isolated.log": "fc3fe25192937e581ab6e7ae1848c1c2d3a6ad3202bd45e4ebc7b37bb6772c9b",
+    "target/stylized/static-character-v4-final/evidence/genshin-ao-final.log": "a6ff357116bd06209c44fc1fbdf0235865487d8b5dd0c25659ccd79d41005c0a",
+    "target/stylized/static-character-v4-final/evidence/ramp-consumption.json": "0c747ca421cc05f851b2c7a993c98be6d74e90a3cd66fd3ee77c86a24f393133",
+    "target/stylized/static-character-v4-final/evidence/canonical-isol.json": "d9da9e41db25064403417c648ff69764c2aa7b765db821315f5dae49e880f059",
+    "target/stylized/static-character-v4-final/material-rois.json": "e89d8d1c830c93c8e0351818125bbcc0de05f6550eab06fba199283aec7cbcba"
+  },
+  "material_roi_report": "target/stylized/static-character-v4-final/material-rois.json",
+  "material_roi_policy": "Supplementary original material-role masks; 24 rows; whole-frame gates unchanged",
+  "plan_adjustments": [
+    "Normal-sphere fixture replaced by actual light-attribute/zero-offset audits, runtime light-transform checks and the GPU AO fixture; no full lighting-function qualification",
+    "Supplementary material ROI analysis is a standalone artifact using its recorded Pillow version"
+  ]
+}

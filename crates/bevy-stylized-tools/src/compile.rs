@@ -275,7 +275,11 @@ fn compose_ilm(input_dir: &Path, channels: &IlmChannels) -> Result<Vec<u8>, Stri
 
 /// 编译单个输入文件。`Err` = usage/IO 级失败（exit 2）；诊断级失败通过
 /// `report.violation` 表达（exit 1，且不写出任何产物）。
-pub fn compile_path(path: &Path, out_override: Option<&Path>) -> Result<CompileReport, String> {
+pub fn compile_path(
+    path: &Path,
+    out_override: Option<&Path>,
+    profile: Option<&str>,
+) -> Result<CompileReport, String> {
     // compile 蕴含 validate：契约违规 fail-closed，直接不产出。
     let validation = crate::run_one(path, true)?;
     let stem = path
@@ -343,6 +347,54 @@ pub fn compile_path(path: &Path, out_override: Option<&Path>) -> Result<CompileR
         }
     }
 
+    let mut profile_view = None;
+    if let Some(profile) = profile {
+        if path.extension().and_then(|x| x.to_str()) != Some("glb") {
+            report.diagnostics.push(Diagnostic {
+                severity: "error",
+                message: "strict profile packaging currently requires GLB".into(),
+            });
+        }
+        let mapped = load_profile_materials(path, profile);
+        match mapped {
+            Ok((materials, view)) => {
+                profile_view = Some(view);
+                let expected: std::collections::BTreeSet<_> = document
+                    .materials()
+                    .enumerate()
+                    .map(|(i, m)| {
+                        m.name()
+                            .map(str::to_owned)
+                            .unwrap_or_else(|| format!("material_{i}"))
+                    })
+                    .collect();
+                if expected.len() != document.materials().len()
+                    || expected != materials.keys().cloned().collect()
+                {
+                    report.diagnostics.push(Diagnostic {
+                        severity: "error",
+                        message: "profile material coverage differs from GLB materials".into(),
+                    });
+                }
+                for (name, descriptor) in materials {
+                    if let Some(previous) = sidecar_materials.get(&name)
+                        && previous != &descriptor
+                    {
+                        report.diagnostics.push(Diagnostic {
+                            severity: "error",
+                            message: format!("{name}: profile/sidecar conflict"),
+                        });
+                    }
+                    sidecar_materials.insert(name, descriptor);
+                }
+            }
+            Err(message) => report.diagnostics.push(Diagnostic {
+                severity: "error",
+                message,
+            }),
+        }
+    }
+    let mut runtime_materials = BTreeMap::new();
     let mut pending: Vec<PendingWrite> = Vec::new();
     // 纹理复制去重：源路径 → textures/ 下的目标文件名。
     let mut copies: BTreeMap<PathBuf, String> = BTreeMap::new();
@@ -553,9 +605,34 @@ pub fn compile_path(path: &Path, out_override: Option<&Path>) -> Result<CompileR
             }
         }
 
+        runtime_materials.insert(name, descriptor.clone());
         pending_descriptor(&mut pending, &descriptor, &mut report.diagnostics);
     }
 
+    if let Some(view) = profile_view {
+        pending.push(PendingWrite {
+            kind: "view",
+            rel_path: PathBuf::from(format!("{stem}.view.json")),
+            bytes: serde_json::to_vec_pretty(&view).map_err(|e| e.to_string())?,
+        });
+    }
+    if profile.is_some() {
+        let asset_name = path.file_name().ok_or("missing asset name")?;
+        pending.push(PendingWrite {
+            kind: "asset",
+            rel_path: PathBuf::from(asset_name),
+            bytes: bytes.clone(),
+        });
+        let sidecar = bevy_stylized_gltf::StylizedSidecar {
+            schema: bevy_stylized_gltf::STYLIZED_SIDECAR_SCHEMA.into(),
+            materials: runtime_materials,
+        };
+        pending.push(PendingWrite {
+            kind: "sidecar",
+            rel_path: PathBuf::from(format!("{stem}.npr.json")),
+            bytes: serde_json::to_vec_pretty(&sidecar).map_err(|e| e.to_string())?,
+        });
+    }
     // -- fail-closed：有 error 不落盘 ----------------------------------------
     report.violation = report.diagnostics.iter().any(|d| d.severity == "error");
     if report.violation {
@@ -563,9 +640,23 @@ pub fn compile_path(path: &Path, out_override: Option<&Path>) -> Result<CompileR
     }
 
     // -- 落盘 + 哈希 ---------------------------------------------------------
-    std::fs::create_dir_all(&out_dir).map_err(|e| format!("create {}: {e}", out_dir.display()))?;
+    if out_dir.exists() {
+        return Err(format!(
+            "output already exists: {}; choose a new candidate directory",
+            out_dir.display()
+        ));
+    }
+    let parent = out_dir
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    std::fs::create_dir_all(parent).map_err(|e| format!("create output parent: {e}"))?;
+    let staging = tempfile::Builder::new()
+        .prefix(".compile-")
+        .tempdir_in(parent)
+        .map_err(|e| e.to_string())?;
     for write in pending {
-        let target = out_dir.join(&write.rel_path);
+        let target = staging.path().join(&write.rel_path);
         if let Some(parent) = target.parent() {
             std::fs::create_dir_all(parent)
                 .map_err(|e| format!("create {}: {e}", parent.display()))?;
@@ -579,6 +670,15 @@ pub fn compile_path(path: &Path, out_override: Option<&Path>) -> Result<CompileR
             bytes: write.bytes.len() as u64,
         });
     }
+    let manifest = serde_json::json!({"schema":"bevy_stylized.compiled/v1", "profile":profile,
+        "input_sha256":format!("{:x}",Sha256::digest(&bytes)), "emitted":report.emitted});
+    std::fs::write(
+        staging.path().join("compile-manifest.json"),
+        serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
+    std::fs::rename(staging.path(), &out_dir)
+        .map_err(|e| format!("commit compiled candidate: {e}"))?;
     Ok(report)
 }
 
@@ -685,5 +785,36 @@ fn pending_descriptor(
                 descriptor.name
             ),
         }),
+    }
+}
+
+fn load_profile_materials(
+    path: &Path,
+    profile: &str,
+) -> Result<
+    (
+        BTreeMap<String, StylizedMaterialDescriptor>,
+        bevy_stylized_core::StylizedViewDescriptor,
+    ),
+    String,
+> {
+    #[cfg(feature = "profile-genshin")]
+    {
+        if profile != "genshin" {
+            return Err(format!("unsupported profile: {profile}"));
+        }
+        let source = path.with_extension("genshin.json");
+        let data = std::fs::read(&source).map_err(|e| format!("{}: {e}", source.display()))?;
+        let input: bevy_stylized_profile_genshin::GenshinBundleInput =
+            serde_json::from_slice(&data).map_err(|e| e.to_string())?;
+        Ok((
+            bevy_stylized_profile_genshin::map_bundle(&input)?,
+            bevy_stylized_profile_genshin::map_view(&input)?,
+        ))
+    }
+    #[cfg(not(feature = "profile-genshin"))]
+    {
+        let _ = (path, profile);
+        Err("profile-genshin feature unavailable".into())
     }
 }

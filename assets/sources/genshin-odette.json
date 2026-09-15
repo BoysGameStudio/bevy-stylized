@@ -1,0 +1,330 @@
+{
+  "schema": "bevy_stylized.source/v1",
+  "id": "genshin-odette",
+  "game": "gi",
+  "character_id": "10000150",
+  "variant": "Snow Swan's Dance",
+  "channel": "live",
+  "retrieved": "2026-09-14",
+  "source_url": "https://assets.hoyotoon.com/?game=gi&type=characters",
+  "files": [
+    {
+      "path": "Avatar_Girl_Sword_Odette.fbx",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FAvatar_Girl_Sword_Odette.fbx&v=aad0f2027b97690f5892c434b0d82124",
+      "bytes": 6061908,
+      "sha256": "278df9bd75c5fa9b82f90c1123926bdff10483dd85285e8c5becc16f2e5eb02a"
+    },
+    {
+      "path": "Materials/Avatar_Default_Mat.json",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FMaterials%2FAvatar_Default_Mat.json&v=dc522a0cd10c21e22bb6259375dbf837",
+      "bytes": 1741,
+      "sha256": "723b112fe60e0d15e430395762916d5f7a9189ef32b69316a1a7b5651f6b1816"
+    },
+    {
+      "path": "Materials/Avatar_Girl_Sword_Odette_Mat_Body.json",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FMaterials%2FAvatar_Girl_Sword_Odette_Mat_Body.json&v=e742190e8fc359e76aea6c350a5e3fcd",
+      "bytes": 91379,
+      "sha256": "987c37a10d0b81d29cd29cd91e667b6a1d9b3711e49c90dacf04edb4bfd31aa8"
+    },
+    {
+      "path": "Materials/Avatar_Girl_Sword_Odette_Mat_Body01.json",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FMaterials%2FAvatar_Girl_Sword_Odette_Mat_Body01.json&v=d5a71d25af9bfffaaffbeeca410eaa8b",
+      "bytes": 89172,
+      "sha256": "dc0ce0f45abf5720b2bc80292450961add74428ebe48505709c16473c8df90d5"
+    },
+    {
+      "path": "Materials/Avatar_Girl_Sword_Odette_Mat_Brow.json",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FMaterials%2FAvatar_Girl_Sword_Odette_Mat_Brow.json&v=f3b4ca0ebcded480845681a6da83ada0",
+      "bytes": 25979,
+      "sha256": "1bfe63f949054a1440409d7c71a21e79310337d9c86555887cddeee1855a3051"
+    },
+    {
+      "path": "Materials/Avatar_Girl_Sword_Odette_Mat_Dress.json",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FMaterials%2FAvatar_Girl_Sword_Odette_Mat_Dress.json&v=41370606c6a5d933402ccaf5cb1486b8",
+      "bytes": 34651,
+      "sha256": "95acd367922ec73ac33488fbd707825fc84ba2fc6da4445ac38c2bf7d6c5f2ce"
+    },
+    {
+      "path": "Materials/Avatar_Girl_Sword_Odette_Mat_Dress01.json",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FMaterials%2FAvatar_Girl_Sword_Odette_Mat_Dress01.json&v=896c7945fd05bd36f24f3eb45ea168a9",
+      "bytes": 88680,
+      "sha256": "07ac12da1d7ab5c89c66c02e747de2e7ae055e8ce9d3e8fd46c178739eb1fd8c"
+    },
+    {
+      "path": "Materials/Avatar_Girl_Sword_Odette_Mat_Face.json",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FMaterials%2FAvatar_Girl_Sword_Odette_Mat_Face.json&v=2ee1acfd7dc013f00b50d84a24eb78eb",
+      "bytes": 25928,
+      "sha256": "2566145c1f4f6d0b5a0c6c7240e526d1a041c2934a2959f4eb3d482c6406d736"
+    },
+    {
+      "path": "Materials/Avatar_Girl_Sword_Odette_Mat_Hair.json",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FMaterials%2FAvatar_Girl_Sword_Odette_Mat_Hair.json&v=913390619522fbdaa43138b908d755bc",
+      "bytes": 34914,
+      "sha256": "78e7349f543b15b6220ee39345fd880b8efe93b7a7aad8377a65bd4c9395952f"
+    },
+    {
+      "path": "Materials/Avatar_Girl_Sword_Odette_Mat_Pupil.json",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FMaterials%2FAvatar_Girl_Sword_Odette_Mat_Pupil.json&v=1da5e40789cb1845453712ef75b8b60d",
+      "bytes": 35566,
+      "sha256": "916aa23ffa195d2530920c0039dc5b48cba21f1e81e1a347d3f1fa3c98ba7c98"
+    },
+    {
+      "path": "Materials/Eff_Aura_428_DO_T_01.json",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FMaterials%2FEff_Aura_428_DO_T_01.json&v=ad26d0e6bb40d222123a4279126d4098",
+      "bytes": 13312,
+      "sha256": "5ed162f64015ff5dde3966abf5cf3455d9709823e4d408976b1ca822cc546188"
+    },
+    {
+      "path": "Materials/Eff_Aura_428_DO_T_02.json",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FMaterials%2FEff_Aura_428_DO_T_02.json&v=012a794a4ba0e30c29cbef0cd53f0bb5",
+      "bytes": 16002,
+      "sha256": "301cfa4d2a2ebfc54d8117e99363dbaca87a47712f62e3736d021930135f7f23"
+    },
+    {
+      "path": "Textures/Avatar_Girl_Pole_Escoffier_Tex_Stockings_Detailmap.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Girl_Pole_Escoffier_Tex_Stockings_Detailmap.png&v=44eda787a6f37fe2f1029639fad3a901",
+      "bytes": 5485,
+      "sha256": "05ae7b12ee91ce64a7c75be3ec6458104b81dfd66bfa7ca8069f472012b06779"
+    },
+    {
+      "path": "Textures/Avatar_Girl_Sword_Odette_Tex_Body_Diffuse.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Girl_Sword_Odette_Tex_Body_Diffuse.png&v=616db57ab60c4bebc0917011e329e854",
+      "bytes": 1074103,
+      "sha256": "d46e1ad305675ec705ad104ad1da09a3618ca49e11df76d8a1fccd79cc053115"
+    },
+    {
+      "path": "Textures/Avatar_Girl_Sword_Odette_Tex_Body_Lightmap.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Girl_Sword_Odette_Tex_Body_Lightmap.png&v=cc96f36040e0144d22e251545fa4acf7",
+      "bytes": 613705,
+      "sha256": "b0ddda9263d89c913cd6bcf445249a8f2037d39524fe5b4b7b9dc50334a75419"
+    },
+    {
+      "path": "Textures/Avatar_Girl_Sword_Odette_Tex_Body_Normalmap.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Girl_Sword_Odette_Tex_Body_Normalmap.png&v=57e6cf40acb7dc06cd705932a156c8ff",
+      "bytes": 176123,
+      "sha256": "da2e60230725a72d5ab7337c26455d4cf94c70e5853a45b6f96063aaf48463c1"
+    },
+    {
+      "path": "Textures/Avatar_Girl_Sword_Odette_Tex_Body_Shadow_Ramp.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Girl_Sword_Odette_Tex_Body_Shadow_Ramp.png&v=dda21d80374cfb23501f9a131ad423da",
+      "bytes": 543,
+      "sha256": "e39ed3641971632f4f7f99c918ec9c89f4c45b6c140b033323483b01f7506a64"
+    },
+    {
+      "path": "Textures/Avatar_Girl_Sword_Odette_Tex_Body01_Diffuse.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Girl_Sword_Odette_Tex_Body01_Diffuse.png&v=f2cf933dd07e5f0f421fa89bae03517b",
+      "bytes": 815512,
+      "sha256": "ea64f9d2542f00b7a876fd730f45ed5cd4a3f8db84da31f8f51b85b30b7140a1"
+    },
+    {
+      "path": "Textures/Avatar_Girl_Sword_Odette_Tex_Body01_Lightmap.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Girl_Sword_Odette_Tex_Body01_Lightmap.png&v=3ac30c8489756978312fcb74c53c5168",
+      "bytes": 300723,
+      "sha256": "11b2a3d348b44a20f9b760b422914e1cb634c0acd1642a59ca1132d5a4398594"
+    },
+    {
+      "path": "Textures/Avatar_Girl_Sword_Odette_Tex_Body01_Normalmap.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Girl_Sword_Odette_Tex_Body01_Normalmap.png&v=69877a5fa0c210e1426983ff282a524c",
+      "bytes": 147520,
+      "sha256": "73cd3af4bc3e13c229446654d7e706d2bba74b3718c63d617b220b6ad4080136"
+    },
+    {
+      "path": "Textures/Avatar_Girl_Sword_Odette_Tex_Body01_Shadow_Ramp.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Girl_Sword_Odette_Tex_Body01_Shadow_Ramp.png&v=1ce1146d52ad742dd01fdffcda5991b3",
+      "bytes": 517,
+      "sha256": "109abf88f2be8f72acb47b641830712568cb9b89b4d970101934a6d02ea7996a"
+    },
+    {
+      "path": "Textures/Avatar_Girl_Sword_Odette_Tex_EyeHighlight_Diffuse.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Girl_Sword_Odette_Tex_EyeHighlight_Diffuse.png&v=d0535a49a3d6e01df68793ff838e88d7",
+      "bytes": 3832,
+      "sha256": "6424ace593eb6af184fbb98d778db5eeab9cc583335c98561bf06c0d888958b9"
+    },
+    {
+      "path": "Textures/Avatar_Girl_Sword_Odette_Tex_Face_Diffuse.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Girl_Sword_Odette_Tex_Face_Diffuse.png&v=f1f84623099cd494d615ca6ed980611c",
+      "bytes": 221920,
+      "sha256": "0b50e1811aaa6e1dab7dbc30ec810979fa68d11cc2b19bb9c19b09110cfcfcc8"
+    },
+    {
+      "path": "Textures/Avatar_Girl_Sword_Odette_Tex_Hair_Diffuse.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Girl_Sword_Odette_Tex_Hair_Diffuse.png&v=3f32b5a676c2fd3e0576f1b5e9e0c275",
+      "bytes": 1180194,
+      "sha256": "7192a24fc0537ba2f4ccb8a107f06d39220a6c4baa896c673e63426b9b6d561f"
+    },
+    {
+      "path": "Textures/Avatar_Girl_Sword_Odette_Tex_Hair_Lightmap.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Girl_Sword_Odette_Tex_Hair_Lightmap.png&v=c96327422a994ad421d03e026ffbc387",
+      "bytes": 430881,
+      "sha256": "8b2f40cf7ef3dca864cd943b4b720bddea73c66d0acda1c0882ca267798e21e7"
+    },
+    {
+      "path": "Textures/Avatar_Girl_Sword_Odette_Tex_Hair_Normalmap.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Girl_Sword_Odette_Tex_Hair_Normalmap.png&v=10d51cd3897e21974401ec79acc1a91a",
+      "bytes": 424467,
+      "sha256": "58b64d27f93d8c5d7a38e94d1c511a09568dc8b6c3c5136e829710778061d98f"
+    },
+    {
+      "path": "Textures/Avatar_Girl_Sword_Odette_Tex_Hair_Shadow_Ramp.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Girl_Sword_Odette_Tex_Hair_Shadow_Ramp.png&v=2097f0ccb25065b5457ee4f47715eaf6",
+      "bytes": 634,
+      "sha256": "76416c35118ffa65c92f52356dc1d8a203e5beead0798b086e65e6fc847b21a3"
+    },
+    {
+      "path": "Textures/Avatar_Girl_Sword_Odette_Tex_Pupil_Matcap_Mask.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Girl_Sword_Odette_Tex_Pupil_Matcap_Mask.png&v=e992cefa32e5310adb356e125ab43d34",
+      "bytes": 34394,
+      "sha256": "1dc4d43fe3e5d13ed65f0d69d211252387ee1273f7be322d397ecc9f990d51a0"
+    },
+    {
+      "path": "Textures/Avatar_Girl_Sword_Odette_Tex_Pupil_Normalmap.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Girl_Sword_Odette_Tex_Pupil_Normalmap.png&v=46c69122e6cf55761d405a1c8265eb11",
+      "bytes": 74607,
+      "sha256": "a6a684f0004d3c19c9da8648300ed22671054210ed9f794d0ba25c9b1b974ee1"
+    },
+    {
+      "path": "Textures/Avatar_Girl_Sword_Odette_Tex_Pupil_Packed_Ramp.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Girl_Sword_Odette_Tex_Pupil_Packed_Ramp.png&v=2c5d583ab7fd1e3cb375a86b537513f3",
+      "bytes": 226,
+      "sha256": "dde9aa4e936dd722804a694c361e024ad1fb49004eafeadf23766641e114790e"
+    },
+    {
+      "path": "Textures/Avatar_Girl_Sword_Odette_Tex_Pupil01_Diffuse.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Girl_Sword_Odette_Tex_Pupil01_Diffuse.png&v=d157bd214b3625f9186207f45179297b",
+      "bytes": 48435,
+      "sha256": "78fd1948a9270a02aa6acfdabb9d20f07f88a8b5edecf523706cdc0320befae0"
+    },
+    {
+      "path": "Textures/Avatar_Girl_Sword_Odette_Tex_Pupil02_Diffuse.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Girl_Sword_Odette_Tex_Pupil02_Diffuse.png&v=7e264d24839bf4372d863b870fd14c6c",
+      "bytes": 29890,
+      "sha256": "f398bf1130530b8ed5d407df959b3fdb177c7c1c5ec021b5d5796d1681f4b1ee"
+    },
+    {
+      "path": "Textures/Avatar_Girl_Sword_Odette_Tex_Pupil03_Diffuse.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Girl_Sword_Odette_Tex_Pupil03_Diffuse.png&v=d377ec71c9f8e2d93b8f64c5b0cca21c",
+      "bytes": 19125,
+      "sha256": "027e017e4ba259d8e6af25c89756aecafbd62c84b5371dad5b699f0442830892"
+    },
+    {
+      "path": "Textures/Avatar_Girl_Sword_Odette_Tex_Stockings_Detailmap.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Girl_Sword_Odette_Tex_Stockings_Detailmap.png&v=a39823f36a24792c1d3e09591b39b392",
+      "bytes": 19617,
+      "sha256": "9be6fa82ce971a03b83aa7afc3deed3bbcf7875fcb81c882f1434b2d52504582"
+    },
+    {
+      "path": "Textures/Avatar_Girl_Sword_Odette_Tex_Stockings.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Girl_Sword_Odette_Tex_Stockings.png&v=84c02e4cbe40f39ac6dfe59a2142bb5f",
+      "bytes": 31775,
+      "sha256": "a7ceb7e3fbb666a789f26c3a54e1e2027b3314a47e039e61d5f68bd21be9968a"
+    },
+    {
+      "path": "Textures/Avatar_Girl_Tex_FaceSDF.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Girl_Tex_FaceSDF.png&v=a639bd52179eb4ab3ac4ebc7a1c59aa7",
+      "bytes": 155895,
+      "sha256": "7f0b40b93f56dc3e5ecfe353befef2cffe1ee778c211c1e3c6a039cc61936e94"
+    },
+    {
+      "path": "Textures/Avatar_Tex_Appear_Face01_Mask.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Tex_Appear_Face01_Mask.png&v=f3339351ca23f59fa10c827441335ca0",
+      "bytes": 1666,
+      "sha256": "f6c4039bebd84a6d06551424906c4b525f2cb8e0c3eb12dafba28217c642def6"
+    },
+    {
+      "path": "Textures/Avatar_Tex_Crystal_Diffuse.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Tex_Crystal_Diffuse.png&v=d9305879acc047abe421cf0285c24923",
+      "bytes": 80075,
+      "sha256": "25e79e7a7fcc92d88e8f6b485c58b60f4486a83dd536cf9647def3f24050aaf9"
+    },
+    {
+      "path": "Textures/Avatar_Tex_Face02_Shadow.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Tex_Face02_Shadow.png&v=7585d6f5a334dd5fe03441e18e5b3c24",
+      "bytes": 28363,
+      "sha256": "d625173c8a086e0d624fcdab08d8054b79d95e979529025c62ef58f859ebe7ac"
+    },
+    {
+      "path": "Textures/Avatar_Tex_Facet_Normalmap.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Tex_Facet_Normalmap.png&v=abee540f32abada7000848931b3e1fbd",
+      "bytes": 429599,
+      "sha256": "f5dd292f52992877eeb245b8110fcd4ed030941229e68d2ded47bf3c54ff9e91"
+    },
+    {
+      "path": "Textures/Avatar_Tex_MetalMap.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Tex_MetalMap.png&v=6a93ed1b32be758657ec7ba5ddae65ce",
+      "bytes": 14635,
+      "sha256": "9b43e3d6932bf41de018d113661c75cd45b94e51268b9c4625a8671e89dfdf2b"
+    },
+    {
+      "path": "Textures/Avatar_Tex_Specular_Ramp.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FAvatar_Tex_Specular_Ramp.png&v=219001aafcf455a7cbd7a8552dbf5f45",
+      "bytes": 161,
+      "sha256": "7813bd79aaf1547a94bbf09e285bd72fa558fbe9451dde04810dc3d5db1f9761"
+    },
+    {
+      "path": "Textures/Eff_Avatra_Odette_Ramp_01.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FEff_Avatra_Odette_Ramp_01.png&v=1f905e8b4385d14fa6227a59ba79e9d9",
+      "bytes": 222,
+      "sha256": "596bbe92a29139b753ae0aceaab585711e764bcd3bea31e1fb12e61ba6087acf"
+    },
+    {
+      "path": "Textures/Eff_Avatra_Odette_Symbol_01.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FEff_Avatra_Odette_Symbol_01.png&v=6b0ebdfed730f0349a52db3c8c2cef2e",
+      "bytes": 1372146,
+      "sha256": "a0f0a6e2c06db501d8e071d7dc16c362e2a08c71a2d3d685ae5565c08e7ad807"
+    },
+    {
+      "path": "Textures/Eff_Blur_Multi_01.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FEff_Blur_Multi_01.png&v=708352ba4f662d5391b25e2191df9cb3",
+      "bytes": 74718,
+      "sha256": "e2ed9b406da8f90f37a24530bebee4ceb326ff3c3d58dcbd0b2ac003439a0211"
+    },
+    {
+      "path": "Textures/Eff_Gcg_Noise_02.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FEff_Gcg_Noise_02.png&v=6349379db1340b000be1f0dca71f778a",
+      "bytes": 72438,
+      "sha256": "4b8aec956d1675440307dfcd3e650a19bc5b8d84e8b6f9917e1ee8e9db22d921"
+    },
+    {
+      "path": "Textures/Eff_Mask_07.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FEff_Mask_07.png&v=4e0adb21dbf8482f7fb63460f725541b",
+      "bytes": 319,
+      "sha256": "2f576b4c0cefbf08e65d803ef6e83c5ffeb479a18398d94f9b409bffcc96ce10"
+    },
+    {
+      "path": "Textures/Eff_Mask_60.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FEff_Mask_60.png&v=baf4e2cbf336ced4f497f4d73d608aeb",
+      "bytes": 2131,
+      "sha256": "05f5120a31278b9d1acda8b54868c8cb17d44d6a8baab7a5ce78e274ca719420"
+    },
+    {
+      "path": "Textures/Eff_Noise_13.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FEff_Noise_13.png&v=8a96b0faf3d72abe3ad4ef348528c0b9",
+      "bytes": 27369,
+      "sha256": "a3f1d3d6f9ef1ed6c1fb2ac7cb43bb5d5da3a7025b584bd3f851331e306a1e05"
+    },
+    {
+      "path": "Textures/Eff_Noise_28_01.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FEff_Noise_28_01.png&v=70011229c42a77f42b150b8e7492303f",
+      "bytes": 71496,
+      "sha256": "a8fd75b1be07e2c266f767ac4c8bbc5542472e21226042adfc2ac133a74781cb"
+    },
+    {
+      "path": "Textures/Eff_Normal_Fluid_02.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FEff_Normal_Fluid_02.png&v=c7f0053e88eb1da8218a9ca865428eab",
+      "bytes": 225113,
+      "sha256": "60425aca24b0be0b0a963002e028469daca5ebd5d23a4df1797aab4ba6225f72"
+    },
+    {
+      "path": "Textures/Eff_Sc_TrailMulti_05.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FEff_Sc_TrailMulti_05.png&v=3c721625233586761f63004d57d9971b",
+      "bytes": 36963,
+      "sha256": "d556b73969ef31d7a147c4322003f447e10ee72fd73cc71898dd4af03ceb9a6b"
+    },
+    {
+      "path": "Textures/Eff_Universe_03.png",
+      "url": "https://assets.hoyotoon.com/api/remote-assets/file?path=Genshin+Impact%2FCharacters%2FOdette%2FSnow+Swan%27s+Dance%2FTextures%2FEff_Universe_03.png&v=58f5ce52e20c7504b068f2631b8db958",
+      "bytes": 477427,
+      "sha256": "430a77438887ed78df206d5be0fabd3d9222601f9d6d2b34ccb678589177e212"
+    }
+  ]
+}

@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Genshin static authoring recipe",
+  "type": "object",
+  "required": [
+    "schema",
+    "id",
+    "blender",
+    "gacha_version",
+    "addon_files",
+    "meshes",
+    "material_roles",
+    "material_overrides",
+    "palette",
+    "lighting_overrides",
+    "frame",
+    "up",
+    "forward",
+    "units",
+    "rigging",
+    "secondary_physics",
+    "outlines"
+  ],
+  "properties": {
+    "schema": {
+      "const": "bevy_stylized.recipe/v1"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "blender": {
+      "type": "string"
+    },
+    "gacha_version": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "addon_files": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    },
+    "meshes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "material_roles": {
+      "type": "object",
+      "additionalProperties": {
+        "enum": [
+          "body",
+          "hair",
+          "face",
+          "brow",
+          "pupil"
+        ]
+      }
+    },
+    "material_overrides": {
+      "type": "object"
+    },
+    "palette": {
+      "type": "object"
+    },
+    "lighting_overrides": {
+      "type": "object"
+    },
+    "frame": {
+      "type": "integer"
+    },
+    "up": {
+      "const": "+Z"
+    },
+    "forward": {
+      "const": "-Y"
+    },
+    "units": {
+      "const": "metres"
+    },
+    "rigging": {
+      "const": "preserve-source-rest-skeleton"
+    },
+    "secondary_physics": {
+      "const": false
+    },
+    "outlines": {
+      "const": false
+    },
+    "ramp_policy": {
+      "enum": [
+        "material-json-named-texture-v1",
+        "material-json-shader-closure-v1"
+      ]
+    },
+    "material_sources": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  },
+  "description": "This schema describes only the implemented static recipe. Import additionally verifies exact tool/shader hashes, selected materials and successful application of every requested override."
+}

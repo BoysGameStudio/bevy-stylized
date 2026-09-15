@@ -20,7 +20,7 @@ Blender/Gacha Setup Reference
 建议：
 
 ```text
-tools/blender-reference-export/
+tools/blender/
 ├── README.md
 ├── export_reference.py
 └── contracts/

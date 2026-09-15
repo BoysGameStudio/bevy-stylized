@@ -14,8 +14,8 @@ use bevy::{
     },
     pbr::{Material, MaterialPipeline, MaterialPipelineKey, MeshMaterial3d},
     prelude::{
-        Asset, Commands, Component, Entity, GlobalTransform, Handle, Query, Reflect, Transform,
-        Visibility, With,
+        Asset, Commands, Component, DetectChanges, Entity, GlobalTransform, Handle, Query, Ref,
+        Reflect, Transform, Visibility, Without,
     },
     render::render_resource::{AsBindGroup, Face, ShaderType, SpecializedMeshPipelineError},
     shader::ShaderRef,
@@ -30,6 +30,115 @@ pub const OUTLINE_PORTABLE_SHADER_PATH: &str =
 pub struct StylizedOutlineParams {
     /// 线性 rgb + 宽度（物理像素，0 = 关闭）。
     pub color_width: bevy::math::Vec4,
+}
+
+#[cfg(test)]
+mod lifecycle_tests {
+    use super::*;
+    use bevy::prelude::*;
+
+    #[test]
+    fn outline_tracks_external_bounds_without_mesh_replacement() {
+        use bevy::camera::primitives::Aabb;
+        let mut app = App::new();
+        app.add_systems(Update, sync_outline_replicas);
+        let source = app
+            .world_mut()
+            .spawn((
+                Mesh3d(Handle::default()),
+                StylizedOutline::new(Handle::default()),
+                Aabb::from_min_max(Vec3::ZERO, Vec3::ONE),
+            ))
+            .id();
+        app.update();
+        let replica = app
+            .world_mut()
+            .query_filtered::<Entity, With<StylizedOutlineReplica>>()
+            .single(app.world())
+            .unwrap();
+        let next = Aabb::from_min_max(Vec3::new(-3., -1., 0.), Vec3::new(4., 5., 2.));
+        app.world_mut().entity_mut(source).insert(next);
+        app.update();
+        let actual = app
+            .world()
+            .get::<Aabb>(replica)
+            .expect("external bounds must propagate");
+        assert_eq!(actual.center, next.center);
+        assert_eq!(actual.half_extents, next.half_extents);
+        app.world_mut().entity_mut(source).remove::<Aabb>();
+        app.update();
+        assert!(
+            app.world().get::<Aabb>(replica).is_none(),
+            "removed producer bounds must not remain on the outline"
+        );
+    }
+
+    #[test]
+    fn outline_tracks_live_inputs_and_removes_stale_deformation() {
+        let mut app = App::new();
+        app.add_systems(Update, sync_outline_replicas);
+        let mut meshes = Assets::<Mesh>::default();
+        let first = meshes.add(Cuboid::default());
+        let next = meshes.add(Sphere::default());
+        let mut materials = Assets::<StylizedOutlineMaterial>::default();
+        let first_material = materials.add(StylizedOutlineMaterial::default());
+        let next_material = materials.add(StylizedOutlineMaterial::default());
+        let joint = app.world_mut().spawn_empty().id();
+        let source = app
+            .world_mut()
+            .spawn((
+                Mesh3d(first),
+                StylizedOutline::new(first_material),
+                SkinnedMesh {
+                    inverse_bindposes: Handle::default(),
+                    joints: vec![joint],
+                },
+                MorphWeights::new(vec![0.0], None).unwrap(),
+                MeshMorphWeights::Value { weights: vec![0.0] },
+            ))
+            .id();
+        app.update();
+        let replica = app
+            .world_mut()
+            .query_filtered::<Entity, With<StylizedOutlineReplica>>()
+            .single(app.world())
+            .unwrap();
+        app.world_mut().entity_mut(source).insert((
+            Mesh3d(next.clone()),
+            StylizedOutline::new(next_material.clone()),
+            MeshMorphWeights::Value { weights: vec![1.0] },
+        ));
+        app.world_mut()
+            .entity_mut(source)
+            .get_mut::<MorphWeights>()
+            .unwrap()
+            .weights_mut()[0] = 1.0;
+        app.update();
+        let entity = app.world().entity(replica);
+        assert_eq!(entity.get::<Mesh3d>().unwrap().0, next);
+        assert_eq!(
+            entity
+                .get::<MeshMaterial3d<StylizedOutlineMaterial>>()
+                .unwrap()
+                .0,
+            next_material
+        );
+        assert_eq!(entity.get::<MorphWeights>().unwrap().weights(), &[1.0]);
+        assert!(
+            matches!(entity.get::<MeshMorphWeights>(), Some(MeshMorphWeights::Value { weights }) if weights == &[1.0])
+        );
+        app.world_mut()
+            .entity_mut(source)
+            .remove::<(SkinnedMesh, MorphWeights, MeshMorphWeights)>();
+        app.update();
+        let entity = app.world().entity(replica);
+        assert!(!entity.contains::<SkinnedMesh>());
+        assert!(!entity.contains::<MorphWeights>());
+        assert!(!entity.contains::<MeshMorphWeights>());
+        app.world_mut().entity_mut(source).remove::<Mesh3d>();
+        app.update();
+        assert!(app.world().get_entity(replica).is_err());
+    }
 }
 
 impl Default for StylizedOutlineParams {
@@ -140,54 +249,90 @@ pub struct StylizedOutlineReplica {
 
 /// 为每个带 [`StylizedOutline`] 的 mesh 实体维护一个轮廓副本。
 ///
+#[derive(Component)]
+#[doc(hidden)]
+pub struct StylizedOutlineSourceBounds;
+
 /// 副本复制源实体的蒙皮/形态组件（`SkinnedMesh` / `MorphWeights`），
 /// 否则蒙皮 mesh 的 outline pipeline 与实例 bind group 布局不匹配
 /// （skinned vs model-only），渲染直接 validation error。
 pub fn sync_outline_replicas(
     mut commands: Commands,
-    sources: Query<(
+    sources: Query<
+        (
+            Entity,
+            Ref<Mesh3d>,
+            Ref<StylizedOutline>,
+            Option<Ref<SkinnedMesh>>,
+            Option<Ref<MorphWeights>>,
+            Option<Ref<MeshMorphWeights>>,
+            Option<Ref<bevy::camera::primitives::Aabb>>,
+        ),
+        Without<StylizedOutlineReplica>,
+    >,
+    replicas: Query<(
         Entity,
-        &Mesh3d,
-        &StylizedOutline,
-        Option<&SkinnedMesh>,
-        Option<&MorphWeights>,
-        Option<&MeshMorphWeights>,
+        &StylizedOutlineReplica,
+        Option<&StylizedOutlineSourceBounds>,
     )>,
-    replicas: Query<(Entity, &StylizedOutlineReplica)>,
-    source_alive: Query<(), With<StylizedOutline>>,
 ) {
-    // 清理孤儿副本（源组件移除或源实体销毁；子副本可能已随源实体 despawn）。
-    for (entity, replica) in &replicas {
-        if source_alive.get(replica.source).is_err()
-            && let Ok(mut replica_commands) = commands.get_entity(entity)
-        {
-            replica_commands.despawn();
+    let mut existing = std::collections::HashMap::new();
+    for (entity, replica, bounds) in &replicas {
+        if sources.get(replica.source).is_err() {
+            commands.entity(entity).despawn();
+        } else {
+            existing.insert(replica.source, (entity, bounds.is_some()));
         }
     }
-    // 补齐缺失副本。
-    for (entity, mesh, outline, skin, morph, morph_reference) in &sources {
-        let alive = replicas.iter().any(|(_, replica)| replica.source == entity);
-        if alive {
-            continue;
+    for (entity, mesh, outline, skin, morph, morph_reference, bounds) in &sources {
+        let current = existing.get(&entity).copied();
+        let new = current.is_none();
+        let mut target = if let Some((replica, _)) = current {
+            commands.entity(replica)
+        } else {
+            commands.spawn((
+                StylizedOutlineReplica { source: entity },
+                Transform::IDENTITY,
+                GlobalTransform::IDENTITY,
+                Visibility::Inherited,
+                bevy::prelude::ChildOf(entity),
+            ))
+        };
+        if new || mesh.is_changed() {
+            target.insert(Mesh3d(mesh.0.clone()));
+            // Mesh replacement invalidates the old mesh's automatically computed bounds.
+            target.remove::<bevy::camera::primitives::Aabb>();
         }
-        let mut replica_commands = commands.spawn((
-            StylizedOutlineReplica { source: entity },
-            Mesh3d(mesh.0.clone()),
-            MeshMaterial3d(outline.material.clone()),
-            Transform::IDENTITY,
-            GlobalTransform::IDENTITY,
-            Visibility::Inherited,
-        ));
-        // ChildOf 语义：副本跟随源实体 transform。
-        replica_commands.insert(bevy::prelude::ChildOf(entity));
+        if let Some(bounds) = bounds {
+            if new || mesh.is_changed() || bounds.is_changed() {
+                target.insert((*bounds, StylizedOutlineSourceBounds));
+            }
+        } else if current.is_some_and(|(_, mirrored)| mirrored) {
+            target.remove::<(bevy::camera::primitives::Aabb, StylizedOutlineSourceBounds)>();
+        }
+        if new || outline.is_changed() {
+            target.insert(MeshMaterial3d(outline.material.clone()));
+        }
         if let Some(skin) = skin {
-            replica_commands.insert(skin.clone());
+            if new || skin.is_changed() {
+                target.insert((*skin).clone());
+            }
+        } else {
+            target.remove::<SkinnedMesh>();
         }
         if let Some(morph) = morph {
-            replica_commands.insert(morph.clone());
+            if new || morph.is_changed() {
+                target.insert((*morph).clone());
+            }
+        } else {
+            target.remove::<MorphWeights>();
         }
-        if let Some(morph_reference) = morph_reference {
-            replica_commands.insert(morph_reference.clone());
+        if let Some(reference) = morph_reference {
+            if new || reference.is_changed() {
+                target.insert((*reference).clone());
+            }
+        } else {
+            target.remove::<MeshMorphWeights>();
         }
     }
 }

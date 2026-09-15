@@ -8,6 +8,11 @@
 //! **证据支撑**的条目才给出常量；其余一律标注 **待核实（needs
 //! inspection）** 并拒绝填值。
 
+pub mod mapping;
+pub use mapping::{
+    GenshinBundleInput, GenshinMaterialInput, GenshinMaterialRole, map_bundle, map_view,
+};
+
 use bevy_stylized_core::{
     StylizedExecutionTier, StylizedFallbackPolicy, StylizedProfile, StylizedProfileMetadata,
     StylizedQualityPolicy, StylizedSchemaVersion, StylizedSurfaceClass, StylizedValidationMode,

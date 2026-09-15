@@ -7,16 +7,34 @@ Semantic Versioning applies once the first release is published.
 
 ## [Unreleased]
 
+### Independent project migration
+
+- Retired the active legacy renderer and game-specific reference lab; preserved
+  source attribution, coverage dispositions and historical visual failures.
+- Retained six product crates, separated apps/labs/integration/harness/tooling,
+  pinned Rust 1.98.0, and made the glTF metadata/CLI path renderer-independent.
+- Added verified source packs, project-owned static authoring/export recipes,
+  strict Genshin mapping, atomic compiled bundles, generated schemas, and shared
+  scene material adoption with reload verification.
+- Added optional view v1.2 authored ambient radiance (default behavior unchanged),
+  removing reference overexposure compensation from static material colors.
+- Added deterministic first-party skinned/morph assets, explicit required GPU
+  lanes, baseline-integrity checks, isolated consumers and Git-free/network-disabled
+  source-to-render validation. Missing coverage/assets/GPU/baselines cannot pass.
+- Upstream reproduction remains pixel-identical; production/upstream parity still
+  fails its unchanged criteria. Publishing and hosted GPU runner provisioning remain
+  separate qualifications.
+
 ### Added
 
 - V2-g：Regression/Performance Lab（provisional；ADR-0029 证据格式扩展）——
-  - 新 dev crate `crates/dev/regression-lab`（lib + CLI）：sweep 矩阵 `Count{1,100,1000} × Resolution{512²,720p} × Tier{Portable,Standard} × Lighting{day,night} × Pose{bind,animated}`（crowd 实例场景 24 cells + strip 蒙皮条带场景 16 cells + High 探测 2 cells = 42 cells；High 请求档如实记录解析结果）；Backend 轴只跑 vulkan，其余记录 `skipped-unavailable`（不伪造）；
+  - 新 dev crate `labs/regression`（lib + CLI）：sweep 矩阵 `Count{1,100,1000} × Resolution{512²,720p} × Tier{Portable,Standard} × Lighting{day,night} × Pose{bind,animated}`（crowd 实例场景 24 cells + strip 蒙皮条带场景 16 cells + High 探测 2 cells = 42 cells；High 请求档如实记录解析结果）；Backend 轴只跑 vulkan，其余记录 `skipped-unavailable`（不伪造）；
   - 测量子采样（文档化）：15 warm-up + 40 测量帧（benchmarks 为 20+60），保持分钟级墙钟；帧统计 mean/median/p95/min/max；4 个代表 cell 的 golden 子集捕获（`fixtures/golden-local/regression-lab/`，首跑写基线，后续 diff）；
   - 回归门禁：`--gate BASELINE.json` 按 target_id 对齐，mean 帧时劣化 >10% 记回归并 exit 1（缺失 cell 如实记录不算回归）；gate 语义纯逻辑单测覆盖；
   - 本机基线：`docs/performance/baselines/sweep-nvidia-geforce-rtx-5090--vulkan-2026-09-12.json`（可入库测量数据）。
 - V2 GPU-driven Rendering 可行性评估（评估交付，非生产特性）——
   - API 调研 + spike 证据：`docs/rendering/04-gpu-driven-feasibility.md`（能力矩阵：indirect draw 内建默认启用 / 内建管线 GPU frustum+occlusion culling / instance compaction 构建块 pub 但无 phase 注入点 / meshlet feature-gated High-only / 自定义 compute 可用）；
-  - spike crate `crates/dev/gpu-driven-spike`（publish=false）：compute 视锥剔除 + 实例压缩原型（raw wgpu 层，golden-harness probe 设备），10k/50k/100k 实例——CPU 剔除线性 0.21→2.08ms vs GPU dispatch ≈0.15ms 平坦（100k 时 ~14×），CPU/GPU 可见计数逐一相等的正确性门；原始数据 `target/tmp/gpu-driven-spike/spike_results.json`；
+  - spike crate `labs/spikes/gpu-driven`（publish=false）：compute 视锥剔除 + 实例压缩原型（raw wgpu 层，golden-harness probe 设备），10k/50k/100k 实例——CPU 剔除线性 0.21→2.08ms vs GPU dispatch ≈0.15ms 平坦（100k 时 ~14×），CPU/GPU 可见计数逐一相等的正确性门；原始数据 `target/tmp/gpu-driven-spike/spike_results.json`；
   - 结论：不做自定义 GPU-driven 改造（内建已覆盖；实例规模距瓶颈两个量级）；Portable 管线零触碰；重访条件写入文档。
 - 三层对比 loop-closure（dev-only，reference-comparison）——
   - production 路径接线侧车声明纹理（export-sidecar-v1.1 + golden provenance 的 Tenacity 本地路径，env-gated `TENACITY_ROOT`）：Body/Hair ← ILM lightmap + shadow ramp（Genshin 寻址）、Head ← face lightmap（SDF softness 0.001 取侧车 ground truth）；`Use Specular Ramp=0` 不接线；metal_map **不接线**（上游 Metallic 块公式与我方 matcap 语义不同源，实测绑定反降 PSNR——记录在案的语义缺口）；face_shadow 无生产槽位（wiring gap 记录）；
@@ -73,9 +91,9 @@ Semantic Versioning applies once the first release is published.
   - 新 crate `crates/bevy-stylized-tools`（binary `bevy-stylized`）：`validate`（`_NPR_*` 属性存在性/形态 vs 契约数据、extras/sidecar schema 版本 fail-closed；exit 0/1/2，human/`--json` 双输出）与 `inspect`（属性发现/场景计数/class 启发式，启发式已文档化）；纯 gltf 解析，无需 Bevy App/GPU；7 个集成测试（合成 gltf + 真实 fixture GLB）；
   - 第三方 profile 示例 `crates/bevy-stylized/examples/custom_profile.rs`（可运行）+ 注册契约测试 `tests/custom_profile.rs`（ADR-0025：只经 core 契约，不触 render internals）；
   - `docs/authoring/05-integration-guide.md`（≤10 行接入 / glTF 路径 / CLI / fallback 行为 / 自定义 profile / showcase 入口）。
-- It-9a：Showcase 套件——新 dev crate `crates/dev/showcase`：12 个固定用例（overview / ramp / lighting / face / hair / metal / outline / animation / post / stress / reference / performance），CLI `cargo run -p showcase -- <name|all> [--capture]`（交互开窗 / headless 捕获到 `fixtures/golden-local/showcase/`）；`stress`/`performance` 复用 benchmarks 场景构建器（benchmarks 的 `build_hero_1`/`build_portable_instances` 转 pub）；全部程序化资产；GPU-gated 全量捕获测试断言非黑图；操作手册 `docs/showcase/02-running-the-showcase-suite.md`。
+- It-9a：Showcase 套件——新 dev crate `apps/showcase`：12 个固定用例（overview / ramp / lighting / face / hair / metal / outline / animation / post / stress / reference / performance），CLI `cargo run -p showcase -- <name|all> [--capture]`（交互开窗 / headless 捕获到 `fixtures/golden-local/showcase/`）；`stress`/`performance` 复用 benchmarks 场景构建器（benchmarks 的 `build_hero_1`/`build_portable_instances` 转 pub）；全部程序化资产；GPU-gated 全量捕获测试断言非黑图；操作手册 `docs/showcase/02-running-the-showcase-suite.md`。
 - It-8：Benchmark 基线 + CI 分层——
-  - 新 dev crate `crates/dev/benchmarks`：release gate 的 4 个固定场景（`hero_1` / `portable_100` / `portable_500` / `portable_1000`）headless 离屏 1280×720，20 帧 warm-up + 60 帧测量，JSON 输出遵循 docs/performance/targets.md 的 target record（scene/class/tier/backend/分辨率/帧统计/硬件 provenance；GPU 计时未启用并显式为 null）；
+  - 新 dev crate `labs/benchmarks`：release gate 的 4 个固定场景（`hero_1` / `portable_100` / `portable_500` / `portable_1000`）headless 离屏 1280×720，20 帧 warm-up + 60 帧测量，JSON 输出遵循 docs/performance/targets.md 的 target record（scene/class/tier/backend/分辨率/帧统计/硬件 provenance；GPU 计时未启用并显式为 null）；
   - 本机 baseline：`docs/performance/baselines/linux-vulkan-rtx5090-2026-09-11.json`（V1 只建立本机 NVIDIA baseline，其余平台 Experimental）；
   - CI 分层：`.github/workflows/rust.yml` 标注为 CPU 层；新增 `.github/workflows/gpu.yml`（`runs-on: self-hosted` + `if: false`，维护者注册 runner 后启用）与 `.github/README.md`（两层政策 + 过渡规则：GPU 层失败不阻塞非渲染 PR）。
 - It-7：完整 Capability Resolver + 确定性 fallback + 平台矩阵卫生——
@@ -94,7 +112,7 @@ Semantic Versioning applies once the first release is published.
   - `StylizedHeroMaterial`（render crate）：Character + authored ramp（atlas 行经 MeshTag profile_index）+ packed normal（xy/z 重建）+ metal matcap（ILM.B mask）+ spec ramp；`apply_hero_portable_fallback` / `hero_params_for_variant` 定义 Hero@Portable 降级（关 matcap/spec ramp/packed normal）；预算实测 7 纹理/7 sampler/1 UBO（超 Cel interim 子预算，报告于 `target/tmp/interim-budget/`）；
   - 新 crate `bevy-stylized-profile-genshin`（ADR-0019：V1 唯一锁定 family）：实现 core 的 `StylizedProfile` 契约；metadata_map 键常量与 palette 槽位表（仅 docs/reference/07 签名证据支撑的条目，其余标注"待核实"）；facade 经 `profile-genshin` feature 接入（默认关闭，ADR-0024）；
   - 生产后处理 `StylizedPostProcess`（单 pass FullscreenMaterial：vignette + chromatic + display-transform hook；View 层驱动；LDR-safe；单 pass 约束写入文档）；
-  - 三层 Golden 对比（`crates/dev/reference-comparison`，dev-only）：fixture 场景经 production(Hero) / legacy engine reference / upstream Blender 三路径渲染，按 docs/reference/08 §3 Tier-2 草案判据（边缘排除带 + 阴影/剪影 IoU，golden-harness 新增 `tier2` 模块）输出报告；
+  - 三层 Golden 对比（`labs/reference`，dev-only）：fixture 场景经 production(Hero) / legacy engine reference / upstream Blender 三路径渲染，按 docs/reference/08 §3 Tier-2 草案判据（边缘排除带 + 阴影/剪影 IoU，golden-harness 新增 `tier2` 模块）输出报告；
   - 材质双面渲染经 `bind_group_data` 特化键（cull 继承语义不变）。
 - It-4：Material/Instance/View 三层分离 + Character surface——
   - Instance 传输（provisional pending ADR-0004）：`StylizedInstanceData` 组件 → MeshTag 位打包（profile_index/face_threshold/face_side/outline_scale/flags），`sync_instance_tags` 仅变更时写入；无 per-frame 材质资产变异（回归测试钉死）；`select_transport` 依 Stage B 解析选择通道（当前恒 MeshTagBits，StorageTable 声明未实现）；

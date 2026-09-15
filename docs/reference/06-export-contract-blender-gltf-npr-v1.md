@@ -2,8 +2,8 @@
 
 > **Status:** Draft（pending ADR-0012，未经维护者确认前不构成 runtime 契约）
 > **上游规范：** 本文档是 docs/reference/03-blender-export-contract.md 的具体 v1 落地；03 是规范性边界，本文档是它的版本化实例。
-> **配套文档：** 行为侧契约见 docs/reference/07-gacha-setup-behavior-contract-v1.md；桥实现见 tools/blender-reference-export/README.md。
-> **机器可读载体：** `tools/blender-reference-export/contracts/` 下的 `export-settings.v1.json`、`npr-attributes.v1.json`、`manifest.schema.json`、`expected-signature.genshin-v3.6.2.json`。本文档与这些 JSON 冲突时，以 JSON 为准并修订本文档。
+> **配套文档：** 行为侧契约见 docs/reference/07-gacha-setup-behavior-contract-v1.md；桥实现见 tools/blender/README.md。
+> **机器可读载体：** `schemas/authoring/` 下的 `export-settings.v1.json`、`npr-attributes.v1.json`、`manifest.schema.json`、`expected-signature.genshin-v3.6.2.json`。本文档与这些 JSON 冲突时，以 JSON 为准并修订本文档。
 
 ## 1. 合同版本与版本规则
 
@@ -56,13 +56,13 @@
 
 ## 4. `_NPR_*` Mesh Attribute Schema
 
-机器可读正本：`tools/blender-reference-export/contracts/npr-attributes.v1.json`。
+机器可读正本：`schemas/authoring/npr-attributes.v1.json`。
 
 ### 4.1 统一约定
 
 - **glTF accessor 形态**：`FLOAT` → `SCALAR` / componentType `FLOAT`(5126)；`FLOAT_VECTOR` → `VEC3` / componentType `FLOAT`(5126)；`normalized=false`。
 - **量化规则（待定，pending ADR-0012）**：v1 草案建议**不做量化**——全部以未压缩 float32 传输。依据 docs/authoring/03-authoring-schema-runtime-packing.md：glTF 2.0 禁止 application-specific attribute 使用 `UNSIGNED_INT`，且 Bevy 0.19.1 不支持 `KHR_mesh_quantization`；U8/Float16 压缩待 Bevy 侧能力验证后在未来合同版本中决定，v1 不凭感觉定格式。
-- **Shader location / runtime packing（待定，pending ADR-0012）**：v1 草案建议——经 `GltfPlugin::add_custom_vertex_attribute` 注册为 Bevy 自定义顶点属性（与 legacy `crates/legacy/bevy-cel-metadata/src/attributes.rs` 的既有机制同构），shader location 由 profile 在材质编译期分配，不固定在导出合同中。迁移期通过 §4.3 的别名表把 `_NPR_*` 映射到已注册的 `_CEL_*` attribute id。
+- **Shader location / runtime packing（待定，pending ADR-0012）**：v1 草案建议——经 `GltfPlugin::add_custom_vertex_attribute` 注册为 Bevy 自定义顶点属性（与 legacy `crates/legacy/bevy-cel-metadata/src/attributes.rs` 的既有机制同构），shader location 由 profile 在材质编译期分配，不固定在导出合同中。§4.3 保留历史命名对应；当前只注册规范 `_NPR_*`，不加载旧实现。
 - **Requiredness**：桥层面 v1 全部 attribute 为 warn-if-missing（vendor Gacha Setup v3.6.2 reference blend 不作者 `_NPR_*`，它们由 setup wizard / 资产管线后生成）；逐资产必需性由 runtime profile 强制，不由桥强制。
 - **Domain drift**：任何**存在**的 `_NPR_*` attribute 若 domain 或 data type 与本表不符，是 fail-closed 条件。
 
@@ -83,7 +83,7 @@
 
 ### 4.3 Legacy `_CEL_*` 别名表
 
-合同以 `_NPR_*` 为规范前缀；legacy crate `crates/legacy/bevy-cel-metadata` 在运行期实际注册 `_CEL_*` 名称（attribute id base `0x4345_4c00_0000_0000`，offset +1…+11）。迁移期 shim 按下表做 `_NPR_*` → `_CEL_*` 别名；该表与 attributes.rs 的实际注册逐项核对一致：
+合同以 `_NPR_*` 为规范前缀；已退役实现曾在运行期注册 `_CEL_*` 名称（attribute id base `0x4345_4c00_0000_0000`，offset +1…+11）。下表仅保留兼容性命名信息；当前生成表和 Bevy 注册使用规范 `_NPR_*`：
 
 | `_NPR_*` | `_CEL_*` | 备注 |
 |---|---|---|
@@ -114,7 +114,7 @@ ADR-0020（glTF Extras vs Sidecar Precedence）仍为 Proposed，因此本合同
 
 ## 6. Export Manifest 字段
 
-`export-manifest.json` 正本 schema：`tools/blender-reference-export/contracts/manifest.schema.json`（`schema_version="export-manifest-v1"`，`additionalProperties=false`）。字段覆盖 docs/reference/03-blender-export-contract.md §Export Artifact Manifest 的全部要求：
+`export-manifest.json` 正本 schema：`schemas/authoring/manifest.schema.json`（`schema_version="export-manifest-v1"`，`additionalProperties=false`）。字段覆盖 docs/reference/03-blender-export-contract.md §Export Artifact Manifest 的全部要求：
 
 | 字段 | 内容 |
 |---|---|

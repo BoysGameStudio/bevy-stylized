@@ -61,7 +61,7 @@ fn run_cli(args: &[&str]) -> (i32, String) {
 fn fixture_glb_validates_clean() {
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../fixtures/reference/reference_scene.glb"
+        "/../../fixtures/synthetic/reference-scene/reference_scene.glb"
     );
     let (code, out) = run_cli(&["validate", path]);
     assert_eq!(code, 0, "fixture must validate clean: {out}");
@@ -76,7 +76,7 @@ fn fixture_glb_validates_clean() {
 fn fixture_glb_inspect_reports_classes() {
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../fixtures/reference/reference_scene.glb"
+        "/../../fixtures/synthetic/reference-scene/reference_scene.glb"
     );
     let (code, out) = run_cli(&["inspect", path]);
     assert_eq!(code, 0, "{out}");
@@ -117,7 +117,7 @@ fn correct_synthetic_gltf_passes_with_warnings() {
 fn json_output_is_machine_readable() {
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../fixtures/reference/reference_scene.glb"
+        "/../../fixtures/synthetic/reference-scene/reference_scene.glb"
     );
     let (code, out) = run_cli(&["validate", "--json", path]);
     assert_eq!(code, 0, "{out}");
@@ -201,7 +201,7 @@ fn write_synthetic_with_ilm(dir: &Path) -> std::path::PathBuf {
 fn compile_fixture_emits_parseable_descriptors() {
     let fixture = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../../fixtures/reference/reference_scene.glb"
+        "/../../fixtures/synthetic/reference-scene/reference_scene.glb"
     );
     let dir = tempfile::tempdir().expect("tempdir");
     let out = dir.path().join("out");
@@ -432,4 +432,75 @@ fn compile_directives_from_sidecar() {
 fn usage_error_exits_2() {
     let (code, _) = run_cli(&["frobnicate"]);
     assert_eq!(code, 2);
+}
+
+#[cfg(feature = "profile-genshin")]
+#[test]
+fn strict_profile_covers_every_material_and_publishes_atomically() {
+    let temp = tempfile::tempdir().unwrap();
+    let input = temp.path().join("asset.glb");
+    let original = std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../fixtures/synthetic/reference-scene/reference_scene.glb"
+    ))
+    .unwrap();
+    std::fs::write(&input, &original).unwrap();
+    let document = gltf::Gltf::from_slice(&original).unwrap();
+    image::RgbaImage::from_pixel(2, 2, image::Rgba([200, 150, 100, 255]))
+        .save(temp.path().join("color.png"))
+        .unwrap();
+    let materials:Vec<_> = document.materials().map(|m|serde_json::json!({
+        "name":m.name().unwrap(),"role":"brow","base_color":"color.png","ilm":null,"ramp":null,"face_sdf":null,
+        "shadow_position":0.55,"ramp_width":1.0,"face_softness":0.01,"face_forward":[0,0,1],"face_up":[0,1,0],
+        "metallic":false,"specular_ramp":false,"packed_normal":false
+    })).collect();
+    let mut payload = serde_json::json!({"schema":"bevy_stylized.genshin-input/v1","variant":"explicit-test",
+        "materials":materials,"palette":{"Ambient Colour":[1,1,1,1],"Soft Lit Colour":[1,1,1,1],"Sharp Lit Colour":[1,1,1,1],"Soft Shadow Color":[0.5,0.5,0.5,1],"Sharp Shadow Color":[0.5,0.5,0.5,1]}});
+    let profile = input.with_extension("genshin.json");
+    std::fs::write(&profile, serde_json::to_vec(&payload).unwrap()).unwrap();
+    let out = temp.path().join("compiled");
+    let command = |out: &Path| {
+        Command::new(env!("CARGO_BIN_EXE_bevy-stylized"))
+            .args([
+                "compile",
+                "--profile",
+                "genshin",
+                "--strict",
+                "--json",
+                "--out",
+            ])
+            .arg(out)
+            .arg(&input)
+            .output()
+            .unwrap()
+    };
+    assert!(command(&out).status.success());
+    let sidecar = bevy_stylized_gltf::load_sidecar(out.join("asset.npr.json")).unwrap();
+    assert_eq!(sidecar.materials.len(), document.materials().len());
+    assert_eq!(std::fs::read(&input).unwrap(), original);
+    let accepted = std::fs::read(out.join("compile-manifest.json")).unwrap();
+    assert_eq!(command(&out).status.code(), Some(2));
+    assert_eq!(
+        std::fs::read(out.join("compile-manifest.json")).unwrap(),
+        accepted
+    );
+    payload["materials"].as_array_mut().unwrap().pop();
+    std::fs::write(&profile, serde_json::to_vec(&payload).unwrap()).unwrap();
+    let bad = temp.path().join("incomplete");
+    assert_eq!(command(&bad).status.code(), Some(1));
+    assert!(
+        !bad.exists(),
+        "partial profile coverage must not emit a package"
+    );
+}
+
+#[cfg(not(feature = "profile-genshin"))]
+#[test]
+fn unavailable_profile_cannot_fall_back_to_generic_compile() {
+    let output = Command::new(env!("CARGO_BIN_EXE_bevy-stylized"))
+        .args(["compile", "--profile", "genshin", "--strict", "missing.glb"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&output.stderr).contains("profile-genshin"));
 }

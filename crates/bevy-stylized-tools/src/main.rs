@@ -15,7 +15,7 @@ use std::{
 };
 
 use bevy_stylized_gltf::{
-    LEGACY_CEL_ALIASES, MATERIAL_EXTRAS_KEY, NPR_VERTEX_ATTRIBUTES, NprVertexAttributeRegistration,
+    LEGACY_CEL_ALIASES, MATERIAL_EXTRAS_KEY, NPR_ATTRIBUTE_SPECS, NprAttributeSpec,
     StylizedImportError, extract_materials_from_document, load_sidecar, sidecar_path_for_gltf,
 };
 
@@ -56,6 +56,7 @@ enum Action {
         command: Command,
         format: Format,
         out: Option<PathBuf>,
+        profile: Option<String>,
         paths: Vec<PathBuf>,
     },
 }
@@ -64,12 +65,24 @@ fn parse(arguments: &[OsString]) -> Result<Action, String> {
     let mut format = Format::default();
     let mut command: Option<Command> = None;
     let mut out: Option<PathBuf> = None;
+    let mut profile = None;
+    let mut strict = false;
     let mut paths = Vec::new();
     let mut args = arguments.iter();
     while let Some(arg) = args.next() {
         let arg = arg.to_str().ok_or("non-UTF8 argument")?;
         match arg {
             "--json" => format = Format::Json,
+            "--strict" => strict = true,
+            "--profile" => {
+                profile = Some(
+                    args.next()
+                        .ok_or("--profile requires a value")?
+                        .to_str()
+                        .ok_or("non-UTF8 profile")?
+                        .to_owned(),
+                );
+            }
             "-h" | "--help" => return Ok(Action::Help),
             "--out" => {
                 let value = args
@@ -99,6 +112,14 @@ fn parse(arguments: &[OsString]) -> Result<Action, String> {
     if out.is_some() && command != Command::Compile {
         return Err("--out is only valid for compile".to_string());
     }
+    if profile.is_some() || strict {
+        if command != Command::Compile || profile.as_deref() != Some("genshin") || !strict {
+            return Err("use compile --profile genshin --strict".into());
+        }
+        if !cfg!(feature = "profile-genshin") {
+            return Err("rebuild bevy-stylized-tools with --features profile-genshin".into());
+        }
+    }
     if paths.is_empty() {
         return Err("missing input file".to_string());
     }
@@ -106,6 +127,7 @@ fn parse(arguments: &[OsString]) -> Result<Action, String> {
         command,
         format,
         out,
+        profile,
         paths,
     })
 }
@@ -121,6 +143,7 @@ fn main() -> ExitCode {
             command,
             format,
             out,
+            profile,
             paths,
         }) => {
             let mut violations = false;
@@ -132,10 +155,14 @@ fn main() -> ExitCode {
                             write_report(&report, format)
                         })
                     }
-                    Command::Compile => compile::compile_path(path, out.as_deref()).map(|report| {
-                        violations |= report.violation;
-                        compile::write_report(&report, format)
-                    }),
+                    Command::Compile => {
+                        compile::compile_path(path, out.as_deref(), profile.as_deref()).map(
+                            |report| {
+                                violations |= report.violation;
+                                compile::write_report(&report, format)
+                            },
+                        )
+                    }
                 };
                 match result {
                     Ok(Ok(())) => {}
@@ -269,8 +296,8 @@ fn write_report(report: &FileReport, format: Format) -> io::Result<()> {
 // ---------------------------------------------------------------------------
 
 /// 契约条目查找（gltf-json 语义名剥掉首下划线；注册表键即剥线名）。
-fn contract_entry(loader_key: &str) -> Option<&'static NprVertexAttributeRegistration> {
-    NPR_VERTEX_ATTRIBUTES
+fn contract_entry(loader_key: &str) -> Option<&'static NprAttributeSpec> {
+    NPR_ATTRIBUTE_SPECS
         .iter()
         .find(|registration| registration.loader_key == loader_key)
 }
@@ -346,7 +373,7 @@ pub(crate) fn run_one(path: &Path, validate: bool) -> Result<FileReport, String>
         }
     }
     // warn-if-missing（契约 v1：全部 warn 级）。
-    for entry in NPR_VERTEX_ATTRIBUTES {
+    for entry in NPR_ATTRIBUTE_SPECS {
         if !found.iter().any(|(k, ..)| k == entry.loader_key) {
             report.diagnostics.push(Diagnostic {
                 severity: "warning",

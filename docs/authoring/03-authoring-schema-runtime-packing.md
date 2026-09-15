@@ -16,6 +16,11 @@ bevy_stylized.camera/v1
 bevy_stylized.profile.genshin/v1
 ```
 
+以上为领域划分，不能据此声称每个 namespace 都有已实现的运行时契约。
+其中 `rig` 仅允许表达渲染需要的绑定或参考求值元数据；它不授权新增动画图、
+IK、重定向、表情控制或物理解算 schema。实际交付以已有版本化 schema 和
+实现为准，遵守[渲染职责边界](../architecture/01-goals-scope-and-three-axis-model.md)。
+
 避免：
 
 ```text
@@ -193,3 +198,10 @@ default/fallback
 ```
 
 V1 优先选择 vanilla glTF + Bevy 0.19.1 已验证支持的 accessor/format，避免把 `KHR_mesh_quantization` 变成 Portable Requirement。
+
+## Source-derived schema snapshots
+
+Runtime schemas under schemas/runtime are generated from the Rust descriptors
+through the optional schema feature (Schemars 1.2.1). Authoring attribute contracts
+under schemas/authoring generate the pure glTF table; the Bevy adapter is verified
+against the same table. Generated files are checked, not independently hand-edited.

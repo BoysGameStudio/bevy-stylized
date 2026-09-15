@@ -91,7 +91,13 @@ mod tests {
     /// 新增任何其它依赖（含 build/target 依赖）都必须先修订架构文档。
     #[test]
     fn dependency_boundary_guard() {
-        const ALLOWED: [&str; 4] = ["bevy_math", "bevy_color", "bevy_reflect", "serde"];
+        const ALLOWED: [&str; 5] = [
+            "bevy_math",
+            "bevy_color",
+            "bevy_reflect",
+            "serde",
+            "schemars",
+        ];
         const ALLOWED_DEV: [&str; 1] = ["serde_json"];
 
         let manifest = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.toml"))

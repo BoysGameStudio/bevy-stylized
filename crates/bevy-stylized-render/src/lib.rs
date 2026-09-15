@@ -33,6 +33,7 @@
 pub mod budget;
 pub mod capability;
 pub mod character;
+pub mod face_input;
 pub mod hero;
 pub mod instance;
 pub mod instance_table;
@@ -42,6 +43,7 @@ pub mod outline;
 pub mod post;
 pub mod screen_outline;
 pub mod view;
+pub use face_input::{StylizedFaceInput, StylizedFaceInputStatus};
 
 pub use budget::{
     count_layout_entries, count_material_usage, instance_usage, mesh_usage_for_model,
@@ -53,7 +55,8 @@ pub use character::{
     character_params_for_variant,
 };
 pub use hero::{
-    HERO_FORWARD_SHADER_PATH, StylizedHeroMaterial, StylizedHeroParams,
+    HERO_FORWARD_SHADER_PATH, StylizedGenshinLightingParams, StylizedHeroDebugView,
+    StylizedHeroMaterial, StylizedHeroParams, StylizedHeroSurfaceControl,
     apply_hero_portable_fallback, hero_params_for_variant,
 };
 pub use instance::{
@@ -128,7 +131,9 @@ impl Plugin for StylizedRenderPlugin {
             .register_type::<StylizedHeroMaterial>()
             .register_type::<screen_outline::StylizedScreenOutline>()
             .register_type::<outline::StylizedOutline>()
-            .register_type::<instance::StylizedInstanceData>();
+            .register_type::<instance::StylizedInstanceData>()
+            .register_type::<face_input::StylizedFaceInput>()
+            .register_type::<face_input::StylizedFaceInputStatus>();
         // Instance 传输通道：依 Stage B 解析结果选择（Standard+ →
         // StorageTable，见 instance::select_transport；表通道落地见
         // instance_table 模块）。
@@ -149,8 +154,18 @@ impl Plugin for StylizedRenderPlugin {
                 character::sync_character_table_material_flags
                     .after(bevy::asset::AssetEventSystems),
                 hero::sync_hero_material_flags.after(bevy::asset::AssetEventSystems),
-                outline::sync_outline_replicas,
+                outline::sync_outline_replicas
+                    .after(bevy::app::AnimationSystems)
+                    .before(bevy::transform::TransformSystems::Propagate)
+                    .before(bevy::camera::visibility::VisibilitySystems::CalculateBounds),
                 screen_outline::sync_screen_outline,
+                face_input::sync_face_inputs
+                    .after(hero::sync_hero_material_flags)
+                    .after(bevy::transform::TransformSystems::Propagate)
+                    .before(instance::sync_instance_tags),
+                face_input::restore_removed_face_inputs
+                    .after(face_input::sync_face_inputs)
+                    .before(instance::sync_instance_tags),
                 instance::sync_instance_tags,
             ),
         );

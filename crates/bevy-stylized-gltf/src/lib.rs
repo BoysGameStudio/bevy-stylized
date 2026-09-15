@@ -11,17 +11,24 @@
 //! - [`setup`]：`GltfPlugin` 配置入口与初始化顺序守卫（ADR-0028，
 //!   机制标记为 provisional）。
 
+#[cfg(feature = "bevy-integration")]
 pub mod attributes;
+pub mod contract;
 pub mod metadata;
+#[cfg(feature = "bevy-integration")]
 pub mod setup;
 
+#[cfg(feature = "bevy-integration")]
 pub use attributes::{
     ATTRIBUTE_NPR_CLOTH_PIN, ATTRIBUTE_NPR_CONTROL0, ATTRIBUTE_NPR_EMISSION,
     ATTRIBUTE_NPR_FACE_SDF, ATTRIBUTE_NPR_FACE_SIDE, ATTRIBUTE_NPR_HAIR_MASK,
     ATTRIBUTE_NPR_HAIR_TANGENT, ATTRIBUTE_NPR_LEVEL_ROLE, ATTRIBUTE_NPR_MASK,
-    ATTRIBUTE_NPR_MATERIAL_ID, LEGACY_CEL_ALIASES, LEGACY_ONLY_CEL_ATTRIBUTES, LegacyCelAlias,
-    NPR_ATTRIBUTE_ID_BASE, NPR_VERTEX_ATTRIBUTES, NprAttributeDefault,
-    NprVertexAttributeRegistration, StylizedGltfPluginExt, legacy_cel_alias,
+    ATTRIBUTE_NPR_MATERIAL_ID, NPR_ATTRIBUTE_ID_BASE, NPR_VERTEX_ATTRIBUTES,
+    NprVertexAttributeRegistration, StylizedGltfPluginExt,
+};
+pub use contract::{
+    LEGACY_CEL_ALIASES, LEGACY_ONLY_CEL_ATTRIBUTES, LegacyCelAlias, NPR_ATTRIBUTE_SPECS,
+    NprAttributeDefault, NprAttributeSpec, legacy_cel_alias,
 };
 pub use metadata::{
     MATERIAL_EXTRAS_KEY, STYLIZED_SIDECAR_EXTENSION, STYLIZED_SIDECAR_SCHEMA,
@@ -30,4 +37,5 @@ pub use metadata::{
     extract_materials_from_document, import_material, load_sidecar, parse_sidecar_str,
     sidecar_path_for_gltf,
 };
+#[cfg(feature = "bevy-integration")]
 pub use setup::{StylizedGltfConfigError, check_gltf_plugin_not_added, npr_gltf_plugin};

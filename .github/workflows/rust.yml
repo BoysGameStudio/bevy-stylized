@@ -1,99 +1,38 @@
 name: Rust
-
-# CPU 层 CI（GitHub-hosted）：fmt / clippy / test / feature 矩阵。
-# GPU 测试在无 adapter 的 runner 上自动 graceful skip。
-# GPU 层（self-hosted，默认不启用）见 .github/workflows/gpu.yml 与
-# .github/README.md 的两层政策。
-
-on:
-  push:
-  pull_request:
-
+on: [push, pull_request]
 permissions:
   contents: read
-
-env:
-  CARGO_TERM_COLOR: always
-
 jobs:
-  fmt:
+  cpu:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
         with:
-          components: rustfmt
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-
-  clippy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
-        with:
-          components: clippy
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-      - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
-
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-      - name: Test
-        run: cargo test --workspace
-
-  # ADR-0024 evidence seed: features only express compile capability.
-  # Extend this matrix as new crates/features land (see iteration plan §3).
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fetch --locked
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: python3 tools/dev.py check --lane cpu --required
   feature-matrix:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - name: bevy_cel (default)
-            args: -p bevy_cel
-          - name: bevy_gltf_metadata (no-default-features)
-            args: -p bevy_gltf_metadata --no-default-features
-          - name: bevy_gltf_metadata (default)
-            args: -p bevy_gltf_metadata
-          - name: bevy_gltf_metadata (all-features)
-            args: -p bevy_gltf_metadata --all-features
-          - name: bevy-stylized-core (default)
-            args: -p bevy-stylized-core
-          - name: bevy-stylized-core (no-default-features)
-            args: -p bevy-stylized-core --no-default-features
-          - name: bevy-stylized (default)
-            args: -p bevy-stylized
-          - name: bevy-stylized (no-default-features)
-            args: -p bevy-stylized --no-default-features
-          - name: bevy-stylized (gltf only)
-            args: -p bevy-stylized --no-default-features --features gltf
-          - name: bevy-stylized (render only)
-            args: -p bevy-stylized --no-default-features --features render
-          - name: bevy-stylized (render + profile-genshin)
-            args: -p bevy-stylized --no-default-features --features render,profile-genshin
-          - name: bevy-stylized-gltf
-            args: -p bevy-stylized-gltf
-          - name: bevy-stylized-tools
-            args: -p bevy-stylized-tools
+        args:
+          - -p bevy-stylized-core --no-default-features
+          - -p bevy-stylized-core --features schema
+          - -p bevy-stylized --no-default-features
+          - -p bevy-stylized --no-default-features --features gltf
+          - -p bevy-stylized --no-default-features --features render
+          - -p bevy-stylized --features profile-genshin
+          - -p bevy-stylized-gltf --no-default-features
+          - -p bevy-stylized-gltf
+          - -p bevy-stylized-tools --no-default-features
+          - -p bevy-stylized-tools --features profile-genshin,schema
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-      - name: Check ${{ matrix.name }}
-        run: cargo check ${{ matrix.args }}
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --locked ${{ matrix.args }}

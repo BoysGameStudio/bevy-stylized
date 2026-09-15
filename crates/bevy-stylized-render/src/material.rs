@@ -213,7 +213,19 @@ impl StylizedCelMaterial {
                 _ => {}
             }
         }
+        material.double_sided = descriptor.static_flags.double_sided;
         let params = &descriptor.static_params;
+        material.params.base_color_factor = bevy::math::Vec4::new(
+            params.get("base_color_r").copied().unwrap_or(1.0),
+            params.get("base_color_g").copied().unwrap_or(1.0),
+            params.get("base_color_b").copied().unwrap_or(1.0),
+            params.get("base_color_a").copied().unwrap_or(1.0),
+        );
+        if descriptor.static_flags.alpha_test {
+            material.params = material
+                .params
+                .with_alpha_cutoff(params.get("alpha_cutoff").copied().unwrap_or(0.5));
+        }
         let threshold = params.get("shadow_threshold").copied().unwrap_or(0.5);
         let softness = params.get("shadow_softness").copied().unwrap_or(0.1);
         let floor = params.get("shadow_floor").copied().unwrap_or(0.3);

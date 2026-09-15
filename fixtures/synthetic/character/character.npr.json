@@ -1,0 +1,35 @@
+{
+  "schema": "bevy-stylized.sidecar/v1",
+  "materials": {
+    "body": {
+      "name": "body",
+      "static_params": {
+        "base_color_a": 1,
+        "base_color_b": 0.75,
+        "base_color_g": 0.45,
+        "base_color_r": 0.22
+      },
+      "surface_class": "cel"
+    },
+    "face": {
+      "name": "face",
+      "static_params": {
+        "base_color_a": 1,
+        "base_color_b": 0.55,
+        "base_color_g": 0.7,
+        "base_color_r": 0.95
+      },
+      "surface_class": "cel"
+    },
+    "hair": {
+      "name": "hair",
+      "static_params": {
+        "base_color_a": 1,
+        "base_color_b": 0.3,
+        "base_color_g": 0.1,
+        "base_color_r": 0.15
+      },
+      "surface_class": "cel"
+    }
+  }
+}

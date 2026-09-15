@@ -1,245 +1,75 @@
-# 独立 GitHub 仓库与 Crate 架构
+# Independent repository and crate architecture
 
-> **Status:** Normative architecture specification
-> **Authority:** This document is authoritative for its domain; the archived Master Plan is historical only.
+> Status: Normative architecture specification, updated by the authorized
+> independent-project plan (2026-09-14).
 
+The project is Bevy Stylized (`BoysGameStudio/bevy-stylized`). Package and directory
+names use kebab-case; Rust crate identifiers and serialization namespaces follow
+the established snake_case contracts. Keep six product crates:
 
-## 仓库、目录与 Cargo Package 命名
-
-项目正式品牌与仓库名：
-
-```text
-Bevy Stylized
-bevy-stylized
-```
-
-命名规则：
-
-| Surface | Convention | Example |
+| Product | Responsibility | Project dependencies |
 |---|---|---|
-| GitHub repository | owner/repository | `BoysGameStudio/bevy-stylized` |
-| Project/workspace directory | kebab-case | `bevy-stylized/` |
-| Cargo package / crate directory | kebab-case | `bevy-stylized-core/` |
-| Rust crate identifier | snake_case | `bevy_stylized_core` |
-| Public framework type | PascalCase `Stylized*` | `StylizedPlugin` |
-| Technical NPR algorithm term | keep `Npr*` when semantically useful | `NprLightingModel` |
-| Authoring/schema namespace | snake_case brand namespace | `bevy_stylized.material/v1` |
+| bevy-stylized-core | Domain/schema/capability data | None |
+| bevy-stylized-render | Runtime material, instance, outline, LOD, post, view | core |
+| bevy-stylized-gltf | Pure metadata and optional engine registration | core |
+| bevy-stylized-profile-genshin | Versioned family interpretation | core |
+| bevy-stylized-tools | Validate/inspect/compile/schema tooling | core, pure gltf, optional profile |
+| bevy-stylized | Public exports, capability/plugin setup, optional scene adoption | core, render, optional gltf/profile |
 
-Cargo package availability must still be rechecked immediately before the first crates.io publish; the naming decision itself is closed by ADR-0016.
+Core uses Bevy math/color/reflection and optional serde; optional `schema` enables
+Schemars for source-derived JSON Schema. It does not depend on a renderer or an
+asset server. `bevy-integration` is the glTF engine feature; tools disable that
+default feature. Features are additive capabilities, not runtime quality choices.
+Facade without default features is not promised to be a renderer-free core: use
+the core crate for that requirement.
 
-仓库许可证仍不能在尚未完成 GPL/Reference provenance 审查前直接假定为 MIT/Apache 双许可。Gacha Setup 和当前 Genshin Reference artifact lineage 均声明 GPL-3.0；最终仓库许可证由 ADR-0017 决定。
+## Development layout
 
-V1 仓库结构：
+`apps/showcase`, `labs/reference`, `labs/benchmarks`, `labs/regression` and
+`labs/spikes/gpu-driven` own their development executables. `tests/harness` is a
+product-neutral capture library. `tests/integration` is an explicit Cargo package,
+not a magically discovered root test directory. GPU/file/cross-crate tests live
+there; module tests stay with their implementation.
 
-```text
-bevy-stylized/
-│
-├── Cargo.toml
-├── Cargo.lock
-├── README.md
-├── ARCHITECTURE.md
-├── CHANGELOG.md
-├── CONTRIBUTING.md
-├── LICENSE.md                 # pending ADR-0017/review
-├── THIRD_PARTY_NOTICES.md
-│
-├── crates/
-│   ├── bevy-stylized/                    # facade
-│   ├── bevy-stylized-core/
-│   ├── bevy-stylized-render/
-│   ├── bevy-stylized-gltf/
-│   ├── bevy-stylized-profile-genshin/    # V1 concrete reference family
-│   ├── bevy-stylized-tools/
-│   └── legacy/                           # 迁移期 Tenacity legacy reference（非 V1 crate 集合）
-│       ├── bevy-cel/
-│       └── bevy-cel-metadata/
-│
-├── shaders/
-│   ├── common/
-│   ├── cel/
-│   ├── character/
-│   ├── hero/
-│   ├── outline/
-│   ├── post/
-│   └── reference/
-│
-├── examples/
-├── showcase/
-├── fixtures/
-├── tests/
-├── benches/
-├── tools/blender-reference-export/
-├── docs/
-│   ├── adr/
-│   ├── architecture/
-│   ├── authoring/
-│   ├── profiles/
-│   ├── platforms/
-│   ├── reference/
-│   ├── performance/
-│   ├── quality/
-│   └── migration/
-└── .github/workflows/
-```
+The default workspace selection is the six products. `--workspace` includes all
+13 current members. No retired renderer is hidden by changing default-members.
+The former migration renderer is absent from the active source graph. Historical
+attribution is kept in [legacy provenance](../history/legacy-provenance.md).
 
-早期命名 ADR 已关闭：
+Runtime WGSL is embedded from `crates/bevy-stylized-render/src/shaders`. There is
+no second root shaders tree. Examples belong to the facade's examples directory.
+Tools live under tools/blender, tools/assets and tools/checks. Authoring contracts
+live under schemas/authoring; runtime snapshots derive from Rust types.
 
-```text
-ADR-0016 Package Naming → Accepted: bevy-stylized
-ADR-0017 License & Provenance → still open
-```
+## Dependency enforcement
 
-`crates/legacy/` 是迁移期的例外区域：其中的 Tenacity legacy crate(`bevy_cel`、`bevy_gltf_metadata`）冻结为 Reference Oracle，不受上述命名规则约束，也不计入 V1 crate 集合。任何 `bevy-stylized-*` crate 不得依赖 `crates/legacy/`;Production 代码只能从新写的 core/render 中提取与参考。详见 `docs/migration/01-tenacity-migration-plan.md` 的迁移状态记录。
+Products' normal/build closure cannot reach apps, labs, harness or integration.
+Cross-crate integration tests no longer create render→facade dev cycles. Use the
+complete resolved graph checker and isolated consumers to detect transitive path,
+build-dependency and feature-unification mistakes. In-crate embedded paths are
+valid; undeclared sibling-workspace files and escaped includes are not.
 
----
+Profiles select meaningful data and modes. Renderer code does not identify a
+character by name or consult an external game directory. A family algorithm may
+exist as an explicit renderer mode; removing all family terminology is not an
+architecture goal.
 
-## V1 不应过度拆 Crate
+## Public lifecycle and distribution
 
-V1 控制到：
+`StylizedPlugin` installs framework rendering. `stylized_gltf_plugin()` must replace
+the DefaultPlugins instance with `.set(...)` so PBR's glTF extensions see initialized
+resources. `StylizedAssetIntegrationPlugin` is opt-in: a root MaterialSet maps exact
+material names to descriptors; descendants receive shared materials, and the cache
+releases unused entries after adoption components are removed.
 
-```text
-bevy-stylized
-bevy-stylized-core
-bevy-stylized-render
-bevy-stylized-gltf
-bevy-stylized-profile-genshin
-bevy-stylized-tools
-```
+MaterialSet is a one-time scene adoption configuration: replace the scene to apply
+a different set. Mutating it after adoption is not a supported live editor API.
+Per-instance state updates remain separate from shared material assets.
 
-Outline / Post / Runtime Asset 先作为 `bevy-stylized-render` module。
+Static material data, per-instance data and view/frame settings have separate
+owners. Asset compilation is not a GPU loader. Blender node graphs, controls and
+physics are not silently executable runtime data.
 
-只有出现清晰独立 API 与独立版本价值时，再拆：
-
-```text
-bevy-stylized-outline
-bevy-stylized-post
-bevy-stylized-assets
-```
-
----
-
-## 依赖方向
-
-必须单向：
-
-```text
-Showcase / Tools / Examples
-            │
-            ▼
-Profiles / glTF
-            │
-            ▼
-Renderer
-            │
-            ▼
-Core
-```
-
-禁止：
-
-```text
-Core → Gacha
-Core → Showcase
-Renderer → Tenacity
-```
-
-推荐：
-
-```text
-bevy-stylized
-├── bevy-stylized-core
-├── bevy-stylized-render
-├── optional bevy-stylized-gltf
-└── optional bevy-stylized-profile-genshin
-
-bevy-stylized-render
-└── bevy-stylized-core
-
-bevy-stylized-gltf
-└── bevy-stylized-core
-
-bevy-stylized-profile-genshin
-├── bevy-stylized-core
-└── 尽量不接触 render internals
-
-bevy-stylized-tools
-├── bevy-stylized-core
-└── bevy-stylized-gltf
-```
-
----
-
-## Facade
-
-对外稳定 facade package：
-
-```toml
-[dependencies]
-bevy-stylized = "0.1"
-```
-
-Rust import：
-
-```rust
-use bevy_stylized::prelude::*;
-```
-
-目录/Cargo package 使用中横线；Rust crate identifier 使用 Cargo 自动映射后的下划线。
-
-Facade 必须同时提供：
-
-```text
-StylizedPlugin                  # programmatic/no-glTF path
-Stylized-aware `GltfPlugin` configuration helper # _NPR_* registration before loader initialization
-```
-
-不能承诺“DefaultPlugins 加完以后再加 StylizedPlugin 就能 retroactively 注册 glTF custom attributes”。
-
-Facade 只负责：
-
-- Re-export；
-- Plugin Group；
-- compile capability routing；
-- 稳定公共 API。
-
-Renderer internals 尽量 `pub(crate)`，不要把 Bevy Render World internals 变成 1.0 稳定 API。
-
----
-
-## Core
-
-`bevy-stylized-core` 只包含：
-
-- Domain Model；
-- `StylizedMaterialDescriptor`；
-- `StylizedInstanceDescriptor`；
-- `StylizedViewDescriptor`；
-- `StylizedSurfaceClass` / `StylizedExecutionTier` / `StylizedValidationMode`；
-- Capability Model；
-- Quality Policy；
-- Profile Contract；
-- Schema-neutral serialization types。
-
-尽量避免依赖完整 `bevy` crate。
-
-能使用：
-
-```text
-bevy_math
-bevy_color
-bevy_reflect（需要时）
-```
-
-就不要为了几个类型依赖完整 Renderer。
-
-Core 不应出现：
-
-```text
-RenderPipelineDescriptor
-BindGroup
-TextureView
-CommandEncoder
-RenderPhase
-```
-
----
+All products remain publish=false. Packaging metadata/embedded asset inspection
+and Git-free source builds are independent engineering checks; they do not resolve
+the existing license/provenance decision or authorize a registry publication.

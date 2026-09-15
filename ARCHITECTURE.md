@@ -5,7 +5,7 @@
 
 ## Architecture status
 
-- Current state: **Architecture Pre-Freeze Review**
+- Current state: **Independent implementation; visual/release qualification remains open**
 - Bevy baseline: **0.19.1**
 - Reference family currently targeted for V1: **Genshin / Gacha Setup locked reference family**
 - Facade Cargo package: **`bevy-stylized`**
@@ -44,11 +44,11 @@ Production Renderer
 Validation is a separate axis:
 
 ```text
-Upstream Blender Reference
-        ↓
-Engine Reference Renderer
-        ↓
-Production Renderer
+Upstream Blender Reference  ↔  Production Renderer
+                                    ↓
+                         Accepted regression images
+
+Independent semantic fixtures validate data and rendering contracts.
 ```
 
 ## Non-negotiable invariants
@@ -73,7 +73,7 @@ Production Renderer
 | Goals, scope, three-axis model | `docs/architecture/01-goals-scope-and-three-axis-model.md` |
 | Target architecture | `docs/architecture/02-target-architecture.md` |
 | Repository/crate architecture | `docs/architecture/03-repository-and-crate-architecture.md` |
-| Existing renderer adversarial review | `docs/reviews/01-current-implementation-adversarial-review.md` |
+| Historical renderer review (non-normative) | `docs/history/legacy-implementation-review.md` |
 | Surface classes, tiers, resource budgets | `docs/rendering/01-surface-tier-resource-and-bindless.md` |
 | Material / Instance / View | `docs/rendering/02-material-instance-view.md` |
 | Shader / lighting / outline / post | `docs/rendering/03-shader-lighting-outline-post.md` |
@@ -95,7 +95,7 @@ Production Renderer
 | Performance target format | `docs/performance/targets.md` |
 | Showcase / fixtures | `docs/showcase/01-showcase-examples-fixtures.md` |
 | Tooling / versioning / publishing | `docs/release/01-tooling-versioning-and-publication.md` |
-| Tenacity migration | `docs/migration/01-tenacity-migration-plan.md` |
+| Historical migration (non-normative) | `docs/history/tenacity-migration.md` |
 | V1/V2/V3 roadmap | `docs/roadmap/01-v1-v2-v3-roadmap.md` |
 | V1 release gate | `docs/release/02-v1-release-gate.md` |
 | Invariants / risks / ADR governance | `docs/governance/01-invariants-risks-and-adrs.md` |

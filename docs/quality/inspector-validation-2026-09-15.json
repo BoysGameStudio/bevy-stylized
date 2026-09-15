@@ -1,0 +1,192 @@
+{
+  "date": "2026-09-15",
+  "milestone": "first batch: static character inspector in existing Showcase",
+  "status": "PASS",
+  "scope": "interactive inspection, reproducible captures and generation-safe scene reload; no animation controller or performance qualification",
+  "source_snapshot": "e49ce3203658d2071064fbbbbfd73cfca43986f47a0fddfe531709578b6808f3",
+  "source_inventory": "target/stylized/inspector-validation/source-inventory.json",
+  "cpu": {
+    "passed": 164,
+    "failed": 0,
+    "ignored": 32
+  },
+  "showcase_feature_tests": {
+    "passed": 6,
+    "new_inspector_tests": 5
+  },
+  "gpu": {
+    "suite": "gpu-required",
+    "expected": 19,
+    "executed": 19,
+    "passed": 19,
+    "failed": 0,
+    "blocked": 0,
+    "not_executed": 0,
+    "exit_code": 0,
+    "log": "/work/project with spaces/target/stylized/gpu-required.log",
+    "status": "PASS"
+  },
+  "isolation": {
+    "status": "PASS",
+    "steps": [
+      {
+        "name": "prepare-genshin-odette",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "prepare-gacha-authoring",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "synthetic-rebuild",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "cpu",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "missing-gpu-is-blocked",
+        "exit_code": 2,
+        "expected": 2
+      },
+      {
+        "name": "missing-baseline-is-blocked",
+        "exit_code": 2,
+        "expected": 2
+      },
+      {
+        "name": "gpu",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "asset-integration",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "inspector-unit",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "inspector",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "character-reference-diagnostic",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "character-reference-strict",
+        "exit_code": 0,
+        "expected": 0
+      }
+    ],
+    "gacha_release": "v3.6.4",
+    "character_parity_status": "PASS",
+    "parity_status": "PASS",
+    "scope": "independence and current supported static character parity; archived upstream versions are outside acceptance",
+    "source_sha256": "e49ce3203658d2071064fbbbbfd73cfca43986f47a0fddfe531709578b6808f3",
+    "source_copy": "/tmp/stylized-independent-lkr0otgv/source with spaces",
+    "log": "/home/x/Projects/bevy-stylized/target/stylized/isolated.log",
+    "exit_code": 0,
+    "network": "disabled during all build/test jobs",
+    "inputs": "verified raw sources and toolchains only"
+  },
+  "capture": {
+    "device": "WgpuWrapper(AdapterInfo { name: \"NVIDIA GeForce RTX 5090\", vendor: 4318, device: 11141, device_type: DiscreteGpu, device_pci_bus_id: \"0000:01:00.0\", driver: \"NVIDIA\", driver_info: \"615.71.09\", backend: Vulkan, subgroup_min_size: 32, subgroup_max_size: 32, transient_saves_memory: false })",
+    "files": {
+      "character.glb": "d9cbbf0e60c58fd859dfe0e7c27a30b3f9f2a8098c273cdbaddc1769411c1fc6",
+      "character.npr.json": "a736e772ae340b06940aad48b87e77da022cd5db06e0187a6c199b40a73e6e41",
+      "character.view.json": "3f9c7913e5f833e662db7740339da2a71553bd943e2b0efa7efaf1c1b0628c57",
+      "textures/HoYoverse___Odette_Body01_color.png": "4e675db67a4ae3779f633bed38b8c8899c82276ff42841aa248c682a2209492d",
+      "textures/HoYoverse___Odette_Body01_ilm.png": "193bb14da0b86fb82a397bd8337ea1e507b2b2cd89cf8109b01db6a64a574b9a",
+      "textures/HoYoverse___Odette_Body01_ramp.png": "54d598a9adcd3d5b0558fe0cfbb36f185b272fe8209a55b31ed5d84f6ee43bc6",
+      "textures/HoYoverse___Odette_Body_color.png": "9fa33611318389e9292723c202a23b694d21358f284b6557f5819ecc492bb4bc",
+      "textures/HoYoverse___Odette_Body_ilm.png": "0dc8db1272378190b42aeb27f3f40e251d32a5dc84001d57839e783700c6d5ac",
+      "textures/HoYoverse___Odette_Body_ramp.png": "f15d48495091815af0bb8984facd5836bd9f7816d1711c295d3464b74441043c",
+      "textures/HoYoverse___Odette_Brow_color.png": "c9cddb5a5e5f333305d100e716638dbfcf8880789a02a7e3f13ddfa6ddf43d33",
+      "textures/HoYoverse___Odette_Brow_ilm.png": "d969fa0e09921fe3045896e3c99f76871cc6e542b101be04fb608cd02bd2c6d0",
+      "textures/HoYoverse___Odette_Dress01_color.png": "171d1666ba6e2b5f8b5e38c1917f08e45321ebd4a997274b1fd7357a904f27d2",
+      "textures/HoYoverse___Odette_Dress01_ilm.png": "193bb14da0b86fb82a397bd8337ea1e507b2b2cd89cf8109b01db6a64a574b9a",
+      "textures/HoYoverse___Odette_Dress01_ramp.png": "54d598a9adcd3d5b0558fe0cfbb36f185b272fe8209a55b31ed5d84f6ee43bc6",
+      "textures/HoYoverse___Odette_Dress_color.png": "a081ed5c18cc698a253c8f8f760584fb8fbfab1dd3a5f20893137c6a6fbd9fe3",
+      "textures/HoYoverse___Odette_Dress_ilm.png": "d3b431b7bd0c80d23aaa22c1176b8b23e7f064f6132f46f7db2240471336273b",
+      "textures/HoYoverse___Odette_Dress_ramp.png": "09927758f9a4e3becdaee62c97f610b79e805d98bf0ed43e54e618847261628d",
+      "textures/HoYoverse___Odette_Face_color.png": "a91878e0d0396d8e72b75362023fd8e667ecdcce44874133821d792bf52c002a",
+      "textures/HoYoverse___Odette_Hair_color.png": "4866297f1474b97ee34c3f38e7a3a0210c29edf61ef01d10ab2881d7c73248d0",
+      "textures/HoYoverse___Odette_Hair_ilm.png": "d3b431b7bd0c80d23aaa22c1176b8b23e7f064f6132f46f7db2240471336273b",
+      "textures/HoYoverse___Odette_Hair_ramp.png": "09927758f9a4e3becdaee62c97f610b79e805d98bf0ed43e54e618847261628d",
+      "textures/HoYoverse___Odette_New_Pupil_color.png": "04b01a7dcda943a2fe3d2296992eca37f0fbc8f67062a562d9900bc532357177",
+      "textures/face_lightmap.png": "3a3d0130276d406cb6d8e8286d57aae504993d9354109d9b33f4a00c6978dd51",
+      "textures/face_shadow.png": "5cfe198bb0f199268e051a3d0367bb6b82a37e52c2946322d89fa6ce978c77e7",
+      "textures/pupil_highlight.png": "4631f8a375706026ddf3c4f9e30d777e2b9daf2bb3d20991077855883de72551"
+    },
+    "generation": 2,
+    "images": {
+      "a.png": "1f222c320313fba99fae565b905ee3cd2252a8849e0a14526868e3d4a79a2d14",
+      "b.png": "f3d97d843b23808d8377c61f9ced9e308ac46511c832f69c2f6056169a8c960a"
+    },
+    "inspector_source_sha256": "44887b5f8c1fca42366c1d042b2d4f3c1bb698581e946299165e8c202d500620",
+    "material_primitives_per_view": 10,
+    "msaa": 4,
+    "ready_render_frames": 27,
+    "renderer_version": "0.1.0",
+    "retired_captures": 1,
+    "revision": 3,
+    "schema": "bevy_stylized.inspector-capture/v1",
+    "scope": "current live A/B capture, not upstream parity or an accepted baseline",
+    "status": "PASS",
+    "supersampling": false
+  },
+  "negative_checks": [
+    {
+      "check": "replay",
+      "exit": 0,
+      "expected": 0
+    },
+    {
+      "check": "identity",
+      "exit": 1,
+      "expected": 1
+    },
+    {
+      "check": "gpu-missing",
+      "exit": 2,
+      "expected": 2
+    }
+  ],
+  "image_reproduction": {
+    "a.png": {
+      "recipe_replay": "pixel-identical",
+      "isolated_rebuild": "pixel-identical"
+    },
+    "b.png": {
+      "recipe_replay": "pixel-identical",
+      "isolated_rebuild": "pixel-identical"
+    }
+  },
+  "window_capture": "target/stylized/inspector-window-final/window.png",
+  "window_sha256": "6445aeb3c2bebabcd0372307cbabf219b32dd143a7c82f06e491fc47a011bc12",
+  "clippy": "workspace/all-targets/all-features -D warnings PASS",
+  "reviewed_ui": "actual Wayland window captured and visually inspected",
+  "limitations": [
+    "face focus is approximate unless inspector-focus.json is supplied",
+    "scene reload requires unchanged immutable compiled input",
+    "initial framing does not qualify dynamic skin/morph bounds",
+    "A/B displays live runtime diagnostics, not independent upstream reference images"
+  ],
+  "host_return_checks": {
+    "passed": 2,
+    "scope": "core dependency manifest and glTF registration contract"
+  },
+  "documentation": "175 Markdown files and 29 ADRs PASS"
+}

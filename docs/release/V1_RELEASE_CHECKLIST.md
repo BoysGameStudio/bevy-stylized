@@ -14,12 +14,17 @@
 - [ ] Whole-pipeline resource budget ADR closed.
 
 ## Reference
+
+Gacha Setup gates apply only to the current latest-stable target pinned in
+`assets/sources/gacha-authoring.json`. Historical v3.6.2 failures are not release
+blockers. Broader current-version feature scope remains explicitly qualified.
+
 - [x] Blender upstream Golden produced before runtime export.
 - [x] Reference toolchain locked (Blender / Gacha Setup / digests).
 - [ ] Blender export contract frozen.
 - [ ] Reference upgrade policy frozen.
-- [ ] Engine Reference validated against upstream Golden.
-- [ ] Production variants validated against Engine Reference.
+- [ ] Production validated against independent upstream Golden.
+- [ ] Production variants pass accepted regression and semantic suites.
 - [ ] Reference artifact provenance complete.
 - [x] Reference-only code/assets excluded from default shipping build.
 

@@ -1,0 +1,439 @@
+{
+  "date": "2026-09-15",
+  "milestone": "replayable real-time inspection and instrumented performance baseline",
+  "engineering_status": "PASS",
+  "isolation": {
+    "status": "PASS",
+    "steps": [
+      {
+        "name": "prepare-genshin-odette",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "prepare-gacha-authoring",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "synthetic-rebuild",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "cpu",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "missing-gpu-is-blocked",
+        "exit_code": 2,
+        "expected": 2
+      },
+      {
+        "name": "missing-baseline-is-blocked",
+        "exit_code": 2,
+        "expected": 2
+      },
+      {
+        "name": "gpu",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "asset-integration",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "inspector-unit",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "inspector",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "realtime-scan",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "realtime-measure",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "character-reference-diagnostic",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "character-reference-strict",
+        "exit_code": 0,
+        "expected": 0
+      }
+    ],
+    "gacha_release": "v3.6.4",
+    "character_parity_status": "PASS",
+    "parity_status": "PASS",
+    "scope": "independence and current supported static character parity; archived upstream versions are outside acceptance",
+    "source_sha256": "39c380fd447038b335c6336b2d5ed8b01e9068443f68c7dc0b00bc49c5175da9",
+    "source_copy": "/tmp/stylized-independent-kioql0lb/source with spaces",
+    "log": "/home/x/Projects/bevy-stylized/target/stylized/isolated.log",
+    "exit_code": 0,
+    "network": "disabled during all build/test jobs",
+    "inputs": "verified raw sources and toolchains only"
+  },
+  "cpu": {
+    "passed": 166,
+    "failed": 0,
+    "ignored": 33
+  },
+  "gpu": {
+    "suite": "gpu-required",
+    "expected": 20,
+    "executed": 20,
+    "passed": 20,
+    "failed": 0,
+    "blocked": 0,
+    "not_executed": 0,
+    "exit_code": 0,
+    "log": "/home/x/Projects/bevy-stylized/target/stylized/gpu-required.log",
+    "status": "PASS"
+  },
+  "scan": {
+    "status": "PASS",
+    "sampled_states": 720,
+    "images": 1440,
+    "loop_closure": [
+      {
+        "identical": true,
+        "phase": "orbit"
+      },
+      {
+        "identical": true,
+        "phase": "light"
+      },
+      {
+        "identical": true,
+        "phase": "zoom"
+      }
+    ],
+    "nonempty_geometry": true,
+    "report": "target/stylized/realtime-validated/scan/report.json",
+    "review_page": "target/stylized/realtime-validated/scan/index.html"
+  },
+  "visual_review": {
+    "status": "SAMPLED_FRAMES_REVIEWED",
+    "scope": "evenly spaced full-frame contact sheets plus 32 face-light samples inspected; no obvious mesh loss or abnormal discontinuity observed in reviewed samples",
+    "not_claimed": "exhaustive shimmer-free temporal quality, full-precision animated-character parity, or independent upstream parity for every scan angle"
+  },
+  "performance": {
+    "schema": "bevy_stylized.realtime-validation/v1",
+    "collection_status": "PASS",
+    "replay_status": "PASS",
+    "temporal_visual_status": "REQUIRES_REVIEW",
+    "draw_calls": "UNAVAILABLE; no inferred mesh-count replacement",
+    "scope": "instrumented two-view inspector render graph, not presented FPS or an accepted shipping budget",
+    "cells": [
+      {
+        "resolution_per_view": [
+          512,
+          512
+        ],
+        "views": 2,
+        "mode": "beauty",
+        "gpu_mean_ms": 0.4171350619765491,
+        "runs": [
+          {
+            "report": "perf-512-0/report.json",
+            "gpu_mean_ms": 0.41699269681742,
+            "gpu_p95_ms": 0.430336,
+            "gpu_samples": 597,
+            "app_update_wall_ms": {
+              "count": 600,
+              "max": 2.3455820000000003,
+              "mean": 0.8090334133333331,
+              "median": 0.800377,
+              "min": 0.776107,
+              "p95": 0.8154800000000001
+            },
+            "memory": {
+              "allocated_bytes": 179835280,
+              "reserved_bytes": 536870912,
+              "scope": "wgpu device allocator, not total process VRAM"
+            }
+          },
+          {
+            "report": "perf-512-1/report.json",
+            "gpu_mean_ms": 0.4164485360134003,
+            "gpu_p95_ms": 0.429056,
+            "gpu_samples": 597,
+            "app_update_wall_ms": {
+              "count": 600,
+              "max": 2.404663,
+              "mean": 0.8324878566666656,
+              "median": 0.821642,
+              "min": 0.797627,
+              "p95": 0.845426
+            },
+            "memory": {
+              "allocated_bytes": 179835280,
+              "reserved_bytes": 536870912,
+              "scope": "wgpu device allocator, not total process VRAM"
+            }
+          },
+          {
+            "report": "perf-512-2/report.json",
+            "gpu_mean_ms": 0.417963953098827,
+            "gpu_p95_ms": 0.430592,
+            "gpu_samples": 597,
+            "app_update_wall_ms": {
+              "count": 600,
+              "max": 2.3717420000000002,
+              "mean": 0.8315174366666667,
+              "median": 0.8211715,
+              "min": 0.796335,
+              "p95": 0.845347
+            },
+            "memory": {
+              "allocated_bytes": 179835936,
+              "reserved_bytes": 536870912,
+              "scope": "wgpu device allocator, not total process VRAM"
+            }
+          }
+        ]
+      },
+      {
+        "resolution_per_view": [
+          512,
+          512
+        ],
+        "views": 2,
+        "mode": "lighting",
+        "gpu_mean_ms": 0.39553286432160795,
+        "runs": [
+          {
+            "report": "perf-512-0/report.json",
+            "gpu_mean_ms": 0.39496983584589607,
+            "gpu_p95_ms": 0.40704,
+            "gpu_samples": 597,
+            "app_update_wall_ms": {
+              "count": 600,
+              "max": 2.453615,
+              "mean": 0.8255516816666667,
+              "median": 0.8119784999999999,
+              "min": 0.774714,
+              "p95": 0.849084
+            },
+            "memory": {
+              "allocated_bytes": 179836240,
+              "reserved_bytes": 536870912,
+              "scope": "wgpu device allocator, not total process VRAM"
+            }
+          },
+          {
+            "report": "perf-512-1/report.json",
+            "gpu_mean_ms": 0.39518938693467337,
+            "gpu_p95_ms": 0.407296,
+            "gpu_samples": 597,
+            "app_update_wall_ms": {
+              "count": 600,
+              "max": 2.389014,
+              "mean": 0.8320816366666658,
+              "median": 0.8204500000000001,
+              "min": 0.797717,
+              "p95": 0.839496
+            },
+            "memory": {
+              "allocated_bytes": 179836240,
+              "reserved_bytes": 536870912,
+              "scope": "wgpu device allocator, not total process VRAM"
+            }
+          },
+          {
+            "report": "perf-512-2/report.json",
+            "gpu_mean_ms": 0.39643937018425446,
+            "gpu_p95_ms": 0.408576,
+            "gpu_samples": 597,
+            "app_update_wall_ms": {
+              "count": 600,
+              "max": 2.419801,
+              "mean": 0.8346858433333331,
+              "median": 0.8229599999999999,
+              "min": 0.7957230000000001,
+              "p95": 0.843062
+            },
+            "memory": {
+              "allocated_bytes": 179836896,
+              "reserved_bytes": 536870912,
+              "scope": "wgpu device allocator, not total process VRAM"
+            }
+          }
+        ]
+      },
+      {
+        "resolution_per_view": [
+          1024,
+          1024
+        ],
+        "views": 2,
+        "mode": "beauty",
+        "gpu_mean_ms": 0.45736594081518683,
+        "runs": [
+          {
+            "report": "perf-1024-0/report.json",
+            "gpu_mean_ms": 0.4566512562814068,
+            "gpu_p95_ms": 0.47232,
+            "gpu_samples": 597,
+            "app_update_wall_ms": {
+              "count": 600,
+              "max": 2.364888,
+              "mean": 0.8336718000000007,
+              "median": 0.8244825,
+              "min": 0.7945110000000001,
+              "p95": 0.845046
+            },
+            "memory": {
+              "allocated_bytes": 249041952,
+              "reserved_bytes": 536870912,
+              "scope": "wgpu device allocator, not total process VRAM"
+            }
+          },
+          {
+            "report": "perf-1024-1/report.json",
+            "gpu_mean_ms": 0.45820912562814026,
+            "gpu_p95_ms": 0.475392,
+            "gpu_samples": 597,
+            "app_update_wall_ms": {
+              "count": 600,
+              "max": 2.47742,
+              "mean": 0.833021108333334,
+              "median": 0.821612,
+              "min": 0.7874979999999999,
+              "p95": 0.845506
+            },
+            "memory": {
+              "allocated_bytes": 249041952,
+              "reserved_bytes": 536870912,
+              "scope": "wgpu device allocator, not total process VRAM"
+            }
+          },
+          {
+            "report": "perf-1024-2/report.json",
+            "gpu_mean_ms": 0.4572374405360135,
+            "gpu_p95_ms": 0.473088,
+            "gpu_samples": 597,
+            "app_update_wall_ms": {
+              "count": 600,
+              "max": 2.3557420000000002,
+              "mean": 0.8200183016666664,
+              "median": 0.8072855,
+              "min": 0.777208,
+              "p95": 0.838614
+            },
+            "memory": {
+              "allocated_bytes": 249041952,
+              "reserved_bytes": 536870912,
+              "scope": "wgpu device allocator, not total process VRAM"
+            }
+          }
+        ]
+      },
+      {
+        "resolution_per_view": [
+          1024,
+          1024
+        ],
+        "views": 2,
+        "mode": "lighting",
+        "gpu_mean_ms": 0.43446187381351214,
+        "runs": [
+          {
+            "report": "perf-1024-0/report.json",
+            "gpu_mean_ms": 0.4341284020100504,
+            "gpu_p95_ms": 0.450048,
+            "gpu_samples": 597,
+            "app_update_wall_ms": {
+              "count": 600,
+              "max": 2.423058,
+              "mean": 0.8380731666666662,
+              "median": 0.825204,
+              "min": 0.7897219999999999,
+              "p95": 0.847531
+            },
+            "memory": {
+              "allocated_bytes": 249042912,
+              "reserved_bytes": 536870912,
+              "scope": "wgpu device allocator, not total process VRAM"
+            }
+          },
+          {
+            "report": "perf-1024-1/report.json",
+            "gpu_mean_ms": 0.43514468341708556,
+            "gpu_p95_ms": 0.450816,
+            "gpu_samples": 597,
+            "app_update_wall_ms": {
+              "count": 600,
+              "max": 2.4090510000000003,
+              "mean": 0.8310972016666668,
+              "median": 0.8199690000000001,
+              "min": 0.793419,
+              "p95": 0.836551
+            },
+            "memory": {
+              "allocated_bytes": 249042912,
+              "reserved_bytes": 536870912,
+              "scope": "wgpu device allocator, not total process VRAM"
+            }
+          },
+          {
+            "report": "perf-1024-2/report.json",
+            "gpu_mean_ms": 0.43411253601340044,
+            "gpu_p95_ms": 0.449792,
+            "gpu_samples": 597,
+            "app_update_wall_ms": {
+              "count": 600,
+              "max": 2.3824110000000003,
+              "mean": 0.8218843216666663,
+              "median": 0.8111524999999999,
+              "min": 0.7832899999999999,
+              "p95": 0.826702
+            },
+            "memory": {
+              "allocated_bytes": 249042912,
+              "reserved_bytes": 536870912,
+              "scope": "wgpu device allocator, not total process VRAM"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "fixes": [
+    "outline replicas synchronize updated/removed mesh-local source bounds",
+    "explicit external head transform consumption updates face instance fields without cloning materials",
+    "inspector light controls run before view synchronization",
+    "face focus prefers actual face-SDF surface bounds"
+  ],
+  "limitations": [
+    "draw-command count remains unavailable; no mesh-count proxy",
+    "memory is wgpu allocator accounting, not total process VRAM",
+    "GPU span is instrumented render-graph time, not presented FPS",
+    "external Hero face binding uses existing 1/254 MeshTag threshold quantization; storage slots and material-side overrides are rejected"
+  ],
+  "clippy": "workspace/all-targets/all-features -D warnings PASS",
+  "resource_negative_check": {
+    "missing_gpu_exit": 2,
+    "output_created": false
+  },
+  "excluded_timing_probe": {
+    "path": "target/stylized/performance-probe",
+    "reason": "initial encoder bookends were ordered after render buffers and did not measure full render work; excluded from all summaries"
+  },
+  "post_isolation_change": "Python realtime runner resource-error classification, verified on host with disabled GPU; rendering code unchanged",
+  "host_return_checks": 2
+}

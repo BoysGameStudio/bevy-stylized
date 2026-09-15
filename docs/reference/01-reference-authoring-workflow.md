@@ -1,111 +1,54 @@
-# Blender + Gacha Setup / Genshin Reference Authoring Workflow
+# Independent reference and authoring workflow
 
-> **Status:** Normative architecture specification
-> **Authority:** This document is authoritative for its domain; the archived Master Plan is historical only.
+> Status: Current normative workflow. Historical migration-renderer instructions
+> are retained under docs/history and are not active prerequisites.
 
+There are two renderer sources and three forms of evidence: upstream Blender/Gacha
+behavior, regression against accepted production images, and independent semantic
+fixtures/assertions. The current production image is never used to manufacture its
+own upstream truth. The retired engine-reference implementation is not compiled.
 
-Blender 与 Gacha Setup 必须正式纳入 Reference Workflow，但它们属于 **dev/reference toolchain**，不是 Runtime dependency。
+## Current upstream acceptance
 
-V1 Reference Scope 明确为：
+Only the latest stable Gacha Setup release is a support target. Verified on
+2026-09-15: [v3.6.4](https://github.com/PaoloESAN/gacha-setup/releases/tag/v3.6.4).
+The exact qualified archive/hash is pinned in `assets/sources/gacha-authoring.json`;
+ordinary builds do not silently download a moving version. When upstream releases
+a new stable version, qualify a fresh candidate and advance this single target.
+No compatibility matrix for retired Gacha versions is required.
 
-```text
-Genshin Reference Family
+```sh
+python3 tools/dev.py assets prepare --pack genshin-odette
+python3 tools/dev.py assets prepare --pack gacha-authoring
+python3 tools/dev.py assets build --pack genshin-odette --blender blender
+python3 tools/dev.py check --lane character-reference --required --case BUILD/character-matched/case.json --out target/stylized/NEW_RUN
 ```
 
-而不是所有 Gacha Setup 支持的游戏。
+The current static scope and unchanged image gates are defined by the
+[capture contract](09-static-character-capture.md). The isolation gate rebuilds
+this workflow from raw inputs and requires strict parity to pass. A rendering
+failure is not accepted merely because it was already known.
 
-完整工作流必须分成三个验证层：
+## Historical reference evidence
 
-```text
-Legally usable Reference Fixture
-          │
-          ▼
-Reference Toolchain Lock
-├─ Exact Blender version
-├─ Exact Gacha Setup release/tag/commit
-├─ Genshin main/outline/post artifact digests
-├─ Render engine + color-management contract
-├─ Export contract
-└─ Genshin profile schema
-          │
-          ▼
-Blender + Gacha Setup + locked Genshin artifacts
-          │
-          ├─────────────────────────────────────┐
-          │                                     │
-          ▼                                     ▼
-LEVEL 0: Upstream Reference                Runtime Export Preparation
-Direct Blender Render                      ├─ Mesh/UV/Normal/Tangent
-├─ Camera                                  ├─ Skin/Morph/Animation
-├─ Lighting                                ├─ _NPR_* Attributes
-├─ Material Node Graph                     ├─ Textures
-├─ Compositor/Post                         └─ bevy_stylized extras/sidecar
-└─ Color Management                              │
-          │                                      ▼
-          ▼                              Blender glTF 2.0 Export
-   Upstream Golden                               │
-          │                                      ▼
-          │                              GLB/GLTF + Sidecar/Manifest
-          │                                      │
-          │                                      ▼
-          │                              bevy-stylized validate
-          │                                      │
-          │                                      ▼
-          │                              StylizedMaterialDescriptor
-          │                                      │
-          └──────────────────┬───────────────────┘
-                             ▼
-                LEVEL 1: Engine Reference Renderer
-                             │
-                             ▼
-                   Engine Reference Golden
-                             │
-            ┌────────────────┴────────────────┐
-            │ Translation validation         │
-            │ against Upstream Golden        │
-            └────────────────┬────────────────┘
-                             ▼
-                 LEVEL 2: Production Renderer
-             SurfaceClass × ExecutionTier
-                             │
-                             ▼
-                    Production Regression
-```
+`gacha-reference`, `assets build --pack reference` and `check --lane reference`
+retain explicit access to the locked v3.6.2 experiment for historical investigation.
+They are not part of default acceptance, do not require repair and are not current
+project blockers. Dated failure reports remain unchanged. The historical
+`reference-toolchain.toml` must not be used as the current authoring version lock.
 
-这个结构分别回答两个问题：
+## Authoring and runtime artifacts
 
-1. **Authoring/Export/Profile Translation 是否正确？** → Engine Reference 与 Upstream Golden 比。
-2. **Production Optimization 是否正确？** → Production 与 Engine Reference（以及关键 Upstream probes）比。
+Source manifests identify original assets and tool archives. Recipes state mesh,
+material, pose and feature scope. Authoring outputs preserve the packed reference
+blend and audit; runtime export uses a separate transient scene without upstream
+outline geometry and widgets. Strict profile compilation creates typed runtime
+material data and an atomic new bundle. See the [integration guide](../authoring/05-integration-guide.md).
 
-禁止让 Engine Reference 与 Production 共用同一错误翻译后再互相验证，从而出现“两个实现一起错、测试仍通过”。
+## First-party regression
 
-### glTF 的边界
-
-Blender glTF 负责稳定传输：
-
-```text
-Mesh / Primitive
-UV
-Normal / Tangent
-Vertex Color
-Application-specific _NPR_* attributes
-Skinning / Morph / Animation
-Standard glTF material inputs
-Textures
-Custom Properties / extras
-```
-
-复杂 Gacha/Genshin Shader Node Graph、Compositor Graph、Blender driver/setup 行为不是 vanilla glTF 的 Runtime Shader Serialization 格式。
-
-因此：
-
-```text
-Blender Node Graph = Upstream behavior truth
-Runtime glTF/sidecar = runtime input data
-Genshin Profile = explicit semantic mapping
-Production Renderer = optimized implementation
-```
-
-游戏运行、Cargo Build、Portable Runtime 都不能要求安装 Blender 或 Gacha Setup。
-
----
+The mandatory public lane uses self-made geometry and the self-made skinned/morph
+character. Accepted images live in fixtures/golden; diagnostic output is separate.
+External art and historical snapshots remain under ignored assets/local. See
+[comparison criteria](08-golden-tolerance-and-cross-layer-criteria.md) and
+[upgrade policy](04-upstream-contract-upgrade-and-golden.md).

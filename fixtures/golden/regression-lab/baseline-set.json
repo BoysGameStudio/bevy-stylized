@@ -1,0 +1,12 @@
+{
+  "schema": "bevy_stylized.baseline-set/v1",
+  "asset_ownership": "first-party",
+  "source_record": "docs/performance/baselines/sweep-nvidia-geforce-rtx-5090--vulkan-2026-09-12.json",
+  "migration": "image bytes preserved; not rebaselined",
+  "files": {
+    "strip_bind_512x512_standard_night.png": "19513e9d4a79b3558672fb1f597404cef07b8425bb81e518f51d72e64adf9c41",
+    "crowd_n100_512x512_standard_night.png": "5d789b942775ef108396be91a24521139ea8919b7cf28843ecf01f31e3487048",
+    "crowd_n1000_1280x720_portable_day.png": "ee24a773a3514ef869cb18be1623f2d31c3997ba5dd3b6cd6f6718a96d462e4b",
+    "strip_animated_1280x720_portable_day.png": "cb277dcf18b576181339b2e7516e599276324bf43cda01d8b5dc8fffe901808a"
+  }
+}

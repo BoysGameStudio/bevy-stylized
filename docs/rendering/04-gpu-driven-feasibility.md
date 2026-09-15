@@ -12,7 +12,7 @@
 
 1. **API 调研**：直接读 vendored Bevy 0.19.1 源码（`~/.cargo/registry/.../
    bevy_pbr-0.19.1`、`bevy_render-0.19.1`），逐特性判定可用性；
-2. **Spike 测量**：`crates/dev/gpu-driven-spike`（publish=false）——
+2. **Spike 测量**：`labs/spikes/gpu-driven`（publish=false）——
    compute shader 视锥剔除 + 实例压缩原型，10k/50k/100k 实例，
    GPU 路径 vs CPU 同数学参考，计数相等作为正确性门。
 
@@ -77,6 +77,6 @@
 
 ## 证据文件
 
-- `crates/dev/gpu-driven-spike/`（spike crate；测试 = 正确性门 + 测量）
+- `labs/spikes/gpu-driven/`（spike crate；测试 = 正确性门 + 测量）
 - `target/tmp/gpu-driven-spike/spike_results.json`（本机测量原始数据，
   gitignored）

@@ -5,7 +5,7 @@
 //!
 //! ## 预算（超出 Cel 的 interim 子预算，实际计数见 interim_budget 测试输出）
 //!
-//! 7 纹理 / 7 sampler / 1 UBO（base + ILM + face SDF + authored ramp +
+//! 8 纹理 / 8 sampler / 1 UBO（base + ILM + face SDF + authored ramp +
 //! packed normal + matcap + spec ramp）。ILM 通道约定：R=AO、G=hair mask、
 //! B=metal mask、A=emission mask。Portable 合法性：全部 fixed binding +
 //! filterable float 纹理，无 storage/compute/bindless——超限的是
@@ -44,9 +44,51 @@ pub const HERO_FLAG_PORTABLE_FALLBACK: u32 = 1 << 4;
 /// Genshin-profile ramp 寻址（docs/reference/07 §3.1 已核实公式）启用位；
 /// 未设置时走通用 MeshTag 行寻址。
 pub const HERO_FLAG_GENSHIN_RAMP: u32 = 1 << 5;
+/// Genshin Face Factor control-map interpretation.
+pub const HERO_FLAG_GENSHIN_FACE: u32 = 1 << 6;
+/// Authored transparent/emissive pupil highlight composition.
+pub const HERO_FLAG_PUPIL_HIGHLIGHT: u32 = 1 << 7;
+/// Reconstruct a raw authored diffuse image using cubic B-splines.
+pub const HERO_FLAG_CUBIC_BASE: u32 = 1 << 8;
+
+/// Genshin lighting fields, packed as vec4s without extra texture bindings.
+#[derive(Clone, Copy, Debug, PartialEq, Reflect, ShaderType)]
+pub struct StylizedGenshinLightingParams {
+    /// x: lightmap AO; y: ramp enabled; z: body interpretation; w: vertex AO or face tints.
+    pub controls: bevy::math::Vec4,
+    /// Fallback lightmap when the authored shader has no image.
+    pub lightmap_constant: bevy::math::Vec4,
+    /// Non-metallic specular color.
+    pub specular_color: bevy::math::Vec4,
+    /// Body: shininess, multiplier, enabled, reserved per band; face: day tint rows.
+    pub specular_rows: [bevy::math::Vec4; 5],
+    /// Body: transition range, softness, reserved, reserved; face: night tint rows.
+    pub shadow_rows: [bevy::math::Vec4; 5],
+    /// Highlight second-ramp endpoint, opacity endpoint, reserved, reserved.
+    pub highlight_curve: bevy::math::Vec4,
+    /// Highlight first tint RGB and first-ramp endpoint.
+    pub highlight_primary: bevy::math::Vec4,
+    /// Highlight second tint RGB and second-ramp start.
+    pub highlight_secondary: bevy::math::Vec4,
+}
+impl Default for StylizedGenshinLightingParams {
+    fn default() -> Self {
+        use bevy::math::Vec4;
+        Self {
+            controls: Vec4::ZERO,
+            lightmap_constant: Vec4::ONE,
+            specular_color: Vec4::ONE,
+            specular_rows: [Vec4::new(10., 0.1, 1., 0.); 5],
+            shadow_rows: [Vec4::new(0.01, 0.5, 0., 0.); 5],
+            highlight_curve: Vec4::new(0.7, 0.2, 0., 0.),
+            highlight_primary: Vec4::new(1., 1., 1., 0.2),
+            highlight_secondary: Vec4::new(1., 1., 1., 0.25),
+        }
+    }
+}
 
 /// Hero 材质 GPU uniform：character 参数 + hero 扩展 2×vec4（packed 单
-/// UBO，240B）。
+/// UBO，496B）。
 #[derive(Clone, Copy, Debug, PartialEq, Reflect, ShaderType)]
 pub struct StylizedHeroParams {
     /// Character 层参数（face/hair/emission/cel 基础 + palette + face up）。
@@ -56,6 +98,8 @@ pub struct StylizedHeroParams {
     pub hero_a: bevy::math::Vec4,
     /// rgb = matcap 染色（线性），w = 位标志（bitcast u32，见 `HERO_FLAG_*`）。
     pub hero_b: bevy::math::Vec4,
+    /// Explicit Genshin body lighting; disabled by default.
+    pub genshin: StylizedGenshinLightingParams,
 }
 
 impl Default for StylizedHeroParams {
@@ -64,6 +108,7 @@ impl Default for StylizedHeroParams {
             character: StylizedCharacterParams::default(),
             hero_a: bevy::math::Vec4::new(0.0, 0.0, 0.5, 1.0),
             hero_b: bevy::math::Vec4::new(1.0, 1.0, 1.0, 0.0),
+            genshin: StylizedGenshinLightingParams::default(),
         }
     }
 }
@@ -146,10 +191,42 @@ pub fn hero_params_for_variant(
     }
 }
 
+/// Optional renderer diagnostics; beauty has no additional shader work or bindings.
+#[derive(Default, Eq, PartialEq, Hash, Copy, Clone, Debug, Reflect)]
+pub enum StylizedHeroDebugView {
+    /// Normal stylized rendering.
+    #[default]
+    Beauty,
+    /// RGB = soft lighting factor, sharp lighting factor, geometry coverage.
+    LightingFactors,
+    /// Base-color texture/factor before stylized lighting.
+    BaseColor,
+    /// Diffuse/ramp/specular composition before the lighting palette.
+    PrePalette,
+    /// Normal/half-vector dot product used by specular lighting.
+    NormalHalfDot,
+}
+
+/// Interpretation of the mutually exclusive surface-control texture.
+#[derive(Default, Clone, Copy, Debug, PartialEq, Eq, Reflect)]
+pub enum StylizedHeroSurfaceControl {
+    /// No auxiliary surface control.
+    #[default]
+    None,
+    /// Linear G/A face-shadow controls.
+    GenshinFace,
+    /// sRGB-encoded red-channel highlight controls.
+    GenshinHighlight,
+}
+
 /// Hero 材质的 pipeline 特化键。
 #[repr(C)]
 #[derive(Eq, PartialEq, Hash, Copy, Clone, Debug)]
 pub struct StylizedHeroMaterialKey {
+    /// The pupil remains a depth-owning surface while its highlight closure blends.
+    pub highlight_depth_write: bool,
+    /// Compile-time diagnostic output selection.
+    pub debug_view: StylizedHeroDebugView,
     /// 双面渲染。
     pub double_sided: bool,
 }
@@ -158,6 +235,8 @@ impl From<&StylizedHeroMaterial> for StylizedHeroMaterialKey {
     fn from(material: &StylizedHeroMaterial) -> Self {
         Self {
             double_sided: material.double_sided,
+            highlight_depth_write: material.params.has_flag(HERO_FLAG_PUPIL_HIGHLIGHT),
+            debug_view: material.debug_view,
         }
     }
 }
@@ -166,6 +245,10 @@ impl From<&StylizedHeroMaterial> for StylizedHeroMaterialKey {
 #[derive(Asset, AsBindGroup, Clone, Debug, Reflect)]
 #[bind_group_data(StylizedHeroMaterialKey)]
 pub struct StylizedHeroMaterial {
+    /// Explicit interpretation of the auxiliary control texture.
+    pub surface_control: StylizedHeroSurfaceControl,
+    /// Optional diagnostic output; defaults to beauty. Not serialized in asset descriptors.
+    pub debug_view: StylizedHeroDebugView,
     /// 材质 uniform（见 [`StylizedHeroParams`]）。
     #[uniform(0)]
     pub params: StylizedHeroParams,
@@ -173,7 +256,8 @@ pub struct StylizedHeroMaterial {
     #[texture(1)]
     #[sampler(2)]
     pub base_color_texture: Option<Handle<Image>>,
-    /// ILM/control 纹理（R=AO，G=hair mask，B=metal mask，A=emission mask）。
+    /// ILM/control：R=metal，G=AO，B=specular suppression，A=material band。
+    /// 显式 Genshin 模式将 G 直接输入 AO 门控；通用模式保留其原有 AO 映射。
     #[texture(3)]
     #[sampler(4)]
     pub ilm_texture: Option<Handle<Image>>,
@@ -197,6 +281,10 @@ pub struct StylizedHeroMaterial {
     #[texture(13)]
     #[sampler(14)]
     pub spec_ramp_texture: Option<Handle<Image>>,
+    /// Genshin face control map (G: coverage factor, A: fixed-shadow bands), linear.
+    #[texture(15)]
+    #[sampler(16)]
+    pub surface_control_texture: Option<Handle<Image>>,
     /// 双面渲染（false = 继承默认背面剔除）。
     pub double_sided: bool,
 }
@@ -205,6 +293,7 @@ impl Default for StylizedHeroMaterial {
     fn default() -> Self {
         let mut material = Self {
             params: StylizedHeroParams::default(),
+            debug_view: StylizedHeroDebugView::Beauty,
             base_color_texture: None,
             ilm_texture: None,
             face_sdf_texture: None,
@@ -212,6 +301,8 @@ impl Default for StylizedHeroMaterial {
             packed_normal_texture: None,
             matcap_texture: None,
             spec_ramp_texture: None,
+            surface_control_texture: None,
+            surface_control: StylizedHeroSurfaceControl::None,
             double_sided: false,
         };
         material.sync_flags();
@@ -220,8 +311,192 @@ impl Default for StylizedHeroMaterial {
 }
 
 impl StylizedHeroMaterial {
+    /// Construct a Hero material from engine-neutral descriptors.
+    /// Texture loading remains the application's responsibility.
+    #[must_use]
+    pub fn from_descriptor(
+        descriptor: &bevy_stylized_core::StylizedMaterialDescriptor,
+        mut load_texture: impl FnMut(&str) -> bevy::asset::Handle<bevy::image::Image>,
+    ) -> Self {
+        let character = StylizedCharacterMaterial::from_descriptor(descriptor, &mut load_texture);
+        let mut material = Self {
+            base_color_texture: character.base_color_texture,
+            ilm_texture: character.ilm_texture,
+            face_sdf_texture: character.face_sdf_texture,
+            double_sided: descriptor.static_flags.double_sided,
+            ..Default::default()
+        };
+        material.params.character = character.params;
+        material.params.set_flag(
+            HERO_FLAG_CUBIC_BASE,
+            descriptor
+                .static_params
+                .get("cubic_base_color")
+                .is_some_and(|v| *v > 0.5),
+        );
+        for (index, texture) in descriptor.textures.iter().enumerate() {
+            if descriptor
+                .static_params
+                .get("surface_control_index")
+                .is_some_and(|v| *v == index as f32)
+            {
+                material.surface_control_texture = Some(load_texture(&texture.uri));
+                material.surface_control = if descriptor
+                    .static_params
+                    .get("pupil_highlight")
+                    .copied()
+                    .unwrap_or(0.)
+                    > 0.5
+                {
+                    StylizedHeroSurfaceControl::GenshinHighlight
+                } else {
+                    StylizedHeroSurfaceControl::GenshinFace
+                };
+                material.params.hero_a.z = descriptor
+                    .static_params
+                    .get("shadow_position")
+                    .copied()
+                    .unwrap_or(0.55);
+                continue;
+            }
+
+            match texture.semantic {
+                bevy_stylized_core::StylizedTextureSemantic::ContinuousMask
+                    if descriptor
+                        .static_params
+                        .get("genshin_face")
+                        .copied()
+                        .unwrap_or(0.0)
+                        > 0.0 =>
+                {
+                    material.surface_control_texture = Some(load_texture(&texture.uri));
+                    material.surface_control = StylizedHeroSurfaceControl::GenshinFace;
+                    material.params.hero_a.z = descriptor
+                        .static_params
+                        .get("shadow_position")
+                        .copied()
+                        .unwrap_or(0.55);
+                }
+                bevy_stylized_core::StylizedTextureSemantic::Ramp => {
+                    material.ramp_texture = Some(load_texture(&texture.uri))
+                }
+                bevy_stylized_core::StylizedTextureSemantic::Normal => {
+                    material.packed_normal_texture = Some(load_texture(&texture.uri))
+                }
+                bevy_stylized_core::StylizedTextureSemantic::MatCap => {
+                    material.matcap_texture = Some(load_texture(&texture.uri))
+                }
+                _ => {}
+            }
+        }
+        let get = |key: &str, default: f32| {
+            descriptor
+                .static_params
+                .get(key)
+                .copied()
+                .unwrap_or(default)
+        };
+        if get("genshin_ramp", 0.0) != 0.0 {
+            material.params = material
+                .params
+                .with_genshin_ramp(get("shadow_position", 0.5), get("ramp_width", 1.0));
+        }
+        material.params.character = material
+            .params
+            .character
+            .with_day_night(get("day_night", 1.0));
+        for (key, color) in [
+            (
+                "palette_soft_lit",
+                &mut material.params.character.palette_soft_lit,
+            ),
+            (
+                "palette_soft_shadow",
+                &mut material.params.character.palette_soft_shadow,
+            ),
+            (
+                "palette_sharp_lit",
+                &mut material.params.character.palette_sharp_lit,
+            ),
+            (
+                "palette_sharp_shadow",
+                &mut material.params.character.palette_sharp_shadow,
+            ),
+        ] {
+            color.x = get(&format!("{key}_r"), color.x);
+            color.y = get(&format!("{key}_g"), color.y);
+            color.z = get(&format!("{key}_b"), color.z);
+        }
+        if get("genshin_lighting", 0.) > 0.5 {
+            use bevy::math::Vec4;
+            let vector = |key: &str, fallback: Vec4| {
+                Vec4::from_array(std::array::from_fn(|i| {
+                    get(&format!("{key}_{i}"), fallback[i])
+                }))
+            };
+            material.params.hero_a.z = get("shadow_position", 0.55);
+            let g = &mut material.params.genshin;
+            g.controls = Vec4::new(
+                get("use_lightmap_ao", 1.),
+                get("use_shadow_ramp", 1.),
+                1.,
+                get("use_vertex_ao", 0.),
+            );
+            g.lightmap_constant = vector("lightmap_constant", g.lightmap_constant);
+            g.specular_color = vector("specular_color", g.specular_color);
+            g.highlight_curve = vector("highlight_curve", g.highlight_curve);
+            g.highlight_primary = vector("highlight_primary", g.highlight_primary);
+            g.highlight_secondary = vector("highlight_secondary", g.highlight_secondary);
+            for i in 0..5 {
+                g.specular_rows[i] = vector(&format!("specular_rows_{i}"), g.specular_rows[i]);
+                g.shadow_rows[i] = vector(&format!("shadow_rows_{i}"), g.shadow_rows[i]);
+            }
+        }
+        if get("face_tints", 0.) > 0.5 {
+            material.params.genshin.controls.w = 1.0;
+            for r in 0..3 {
+                for c in 0..4 {
+                    material.params.genshin.specular_rows[r][c] =
+                        get(&format!("face_day_{r}_{c}"), 1.0);
+                    material.params.genshin.shadow_rows[r][c] =
+                        get(&format!("face_night_{r}_{c}"), 1.0);
+                }
+            }
+        }
+        for (key, field) in [
+            (
+                "highlight_primary",
+                &mut material.params.genshin.highlight_primary,
+            ),
+            (
+                "highlight_secondary",
+                &mut material.params.genshin.highlight_secondary,
+            ),
+            (
+                "highlight_curve",
+                &mut material.params.genshin.highlight_curve,
+            ),
+        ] {
+            for i in 0..4 {
+                field[i] = get(&format!("{key}_{i}"), field[i]);
+            }
+        }
+        material.sync_flags();
+        material
+    }
+
     /// 同步纹理存在性标志位（资产事件驱动）。
     pub fn sync_flags(&mut self) {
+        self.params.set_flag(
+            HERO_FLAG_PUPIL_HIGHLIGHT,
+            self.surface_control_texture.is_some()
+                && self.surface_control == StylizedHeroSurfaceControl::GenshinHighlight,
+        );
+        self.params.set_flag(
+            HERO_FLAG_GENSHIN_FACE,
+            self.surface_control_texture.is_some()
+                && self.surface_control == StylizedHeroSurfaceControl::GenshinFace,
+        );
         self.params
             .set_flag(HERO_FLAG_RAMP_TEXTURE, self.ramp_texture.is_some());
         self.params.set_flag(
@@ -251,7 +526,23 @@ impl StylizedHeroMaterial {
 
     /// 标志位是否已与纹理句柄一致（避免事件回声）。
     fn flags_consistent(&self) -> bool {
-        self.params.has_flag(HERO_FLAG_RAMP_TEXTURE) == self.ramp_texture.is_some()
+        self.params.has_flag(HERO_FLAG_PUPIL_HIGHLIGHT)
+            == (self.surface_control_texture.is_some()
+                && self.surface_control == StylizedHeroSurfaceControl::GenshinHighlight)
+            && self.params.has_flag(HERO_FLAG_GENSHIN_FACE)
+                == (self.surface_control_texture.is_some()
+                    && self.surface_control == StylizedHeroSurfaceControl::GenshinFace)
+            && self.params.has_flag(HERO_FLAG_RAMP_TEXTURE) == self.ramp_texture.is_some()
+            && self
+                .params
+                .character
+                .has_flag(crate::character::CHAR_FLAG_ILM_TEXTURE)
+                == self.ilm_texture.is_some()
+            && self
+                .params
+                .character
+                .has_flag(crate::character::CHAR_FLAG_FACE_SDF_TEXTURE)
+                == self.face_sdf_texture.is_some()
             && self.params.has_flag(HERO_FLAG_PACKED_NORMAL) == self.packed_normal_texture.is_some()
             && self.params.has_flag(HERO_FLAG_MATCAP)
                 == (self.matcap_texture.is_some() && self.params.hero_a.x > 0.0)
@@ -270,6 +561,9 @@ impl Material for StylizedHeroMaterial {
     }
 
     fn alpha_mode(&self) -> bevy::material::AlphaMode {
+        if self.params.has_flag(HERO_FLAG_PUPIL_HIGHLIGHT) {
+            return bevy::material::AlphaMode::Blend;
+        }
         if self
             .params
             .character
@@ -299,6 +593,23 @@ impl Material for StylizedHeroMaterial {
         _layout: &bevy::mesh::MeshVertexBufferLayoutRef,
         key: bevy::pbr::MaterialPipelineKey<Self>,
     ) -> Result<(), bevy::render::render_resource::SpecializedMeshPipelineError> {
+        let debug_define = match key.bind_group_data.debug_view {
+            StylizedHeroDebugView::Beauty => None,
+            StylizedHeroDebugView::LightingFactors => Some("STYLIZED_LIGHTING_FACTORS"),
+            StylizedHeroDebugView::BaseColor => Some("STYLIZED_BASE_COLOR"),
+            StylizedHeroDebugView::PrePalette => Some("STYLIZED_PRE_PALETTE"),
+            StylizedHeroDebugView::NormalHalfDot => Some("STYLIZED_NDOTH"),
+        };
+        if let Some(name) = debug_define
+            && let Some(fragment) = descriptor.fragment.as_mut()
+        {
+            fragment.shader_defs.push(name.into());
+        }
+        if key.bind_group_data.highlight_depth_write
+            && let Some(depth) = descriptor.depth_stencil.as_mut()
+        {
+            depth.depth_write_enabled = Some(true);
+        }
         if key.bind_group_data.double_sided {
             descriptor.primitive.cull_mode = None;
         }
@@ -361,5 +672,28 @@ mod tests {
         assert!(!material.params.has_flag(HERO_FLAG_MATCAP));
         assert!(!material.params.has_flag(HERO_FLAG_SPEC_RAMP));
         assert!(!material.params.has_flag(HERO_FLAG_PACKED_NORMAL));
+    }
+}
+
+#[cfg(test)]
+mod texture_flag_regression {
+    use super::*;
+    #[test]
+    fn inherited_texture_changes_invalidate_hero_flags() {
+        let mut material = StylizedHeroMaterial::default();
+        assert!(material.flags_consistent());
+        material.ilm_texture = Some(Handle::default());
+        assert!(!material.flags_consistent());
+        material.sync_flags();
+        assert!(material.flags_consistent());
+        material.face_sdf_texture = Some(Handle::default());
+        assert!(!material.flags_consistent());
+        material.sync_flags();
+        assert!(material.flags_consistent());
+        material.ilm_texture = None;
+        material.face_sdf_texture = None;
+        assert!(!material.flags_consistent());
+        material.sync_flags();
+        assert!(material.flags_consistent());
     }
 }

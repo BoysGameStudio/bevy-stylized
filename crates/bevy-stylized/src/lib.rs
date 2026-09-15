@@ -32,6 +32,12 @@
 //! `GltfPlugin`（见该函数文档）。
 
 mod capability;
+#[cfg(all(feature = "gltf", feature = "render"))]
+pub mod integration;
+#[cfg(all(feature = "gltf", feature = "render"))]
+pub use integration::{
+    StylizedAssetIntegrationPlugin, StylizedMaterialAdoption, StylizedMaterialSet,
+};
 // `dynamic_quality` 依赖 render crate 的 `StylizedTierOverride`（V2-b 起
 // tier override 由 LOD 系统与 governor 共同消费，单一真源在 render）。
 #[cfg(feature = "render")]
@@ -165,8 +171,7 @@ pub struct StylizedQualityPolicyResource(pub StylizedQualityPolicy);
 ///
 /// ```ignore
 /// App::new()
-///     .add_plugins(DefaultPlugins.build().disable::<GltfPlugin>())
-///     .add_plugins(stylized_gltf_plugin())
+///     .add_plugins(DefaultPlugins.build().set(stylized_gltf_plugin()))
 ///     .add_plugins(StylizedPlugin::default());
 /// ```
 #[cfg(feature = "gltf")]

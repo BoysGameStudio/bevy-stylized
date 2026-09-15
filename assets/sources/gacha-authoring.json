@@ -1,0 +1,14 @@
+{
+  "schema": "bevy_stylized.source/v1",
+  "id": "gacha-authoring",
+  "release": "v3.6.4",
+  "archive": "Gacha_Setup-v3.6.4.zip",
+  "files": [
+    {
+      "path": "Gacha_Setup-v3.6.4.zip",
+      "bytes": 20298723,
+      "sha256": "7042aeeaac488ac60515773a1414bd643175f91c950bba2a05b2e6d826744321",
+      "url": "https://github.com/PaoloESAN/gacha-setup/releases/download/v3.6.4/Gacha_Setup-v3.6.4.zip"
+    }
+  ]
+}

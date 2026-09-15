@@ -1,0 +1,72 @@
+{
+  "date": "2026-09-15",
+  "policy": "latest stable Gacha Setup only; no retired-version compatibility obligation",
+  "latest_verified_release": "v3.6.4",
+  "release_source": "https://github.com/PaoloESAN/gacha-setup/releases/tag/v3.6.4",
+  "validation": {
+    "status": "PASS",
+    "steps": [
+      {
+        "name": "prepare-genshin-odette",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "prepare-gacha-authoring",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "synthetic-rebuild",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "cpu",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "missing-gpu-is-blocked",
+        "exit_code": 2,
+        "expected": 2
+      },
+      {
+        "name": "missing-baseline-is-blocked",
+        "exit_code": 2,
+        "expected": 2
+      },
+      {
+        "name": "gpu",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "asset-integration",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "character-reference-diagnostic",
+        "exit_code": 0,
+        "expected": 0
+      },
+      {
+        "name": "character-reference-strict",
+        "exit_code": 0,
+        "expected": 0
+      }
+    ],
+    "gacha_release": "v3.6.4",
+    "character_parity_status": "PASS",
+    "parity_status": "PASS",
+    "scope": "independence and current supported static character parity; archived upstream versions are outside acceptance",
+    "source_sha256": "1fdc65ec83db3f138ca0ea05230cfc1aabd3b14afcb0bea87aa555f4b58828e5",
+    "source_copy": "/tmp/stylized-independent-gfrcxf7z/source with spaces",
+    "log": "/home/x/Projects/bevy-stylized/target/stylized/isolated.log",
+    "exit_code": 0,
+    "network": "disabled during all build/test jobs",
+    "inputs": "verified raw sources and toolchains only"
+  },
+  "historical_evidence": "Earlier dated reports retain their original outcomes and are not current blockers."
+}

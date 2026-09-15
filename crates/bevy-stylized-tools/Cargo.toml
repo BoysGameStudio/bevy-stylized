@@ -1,7 +1,11 @@
 [package]
 name = "bevy-stylized-tools"
+default-run = "bevy-stylized"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+readme = "../../README.md"
 publish = false
 description = "bevy-stylized CLI: validate / inspect glTF assets against the _NPR_* contract."
 
@@ -10,13 +14,23 @@ name = "bevy-stylized"
 path = "src/main.rs"
 
 [dependencies]
-bevy-stylized-core = { path = "../bevy-stylized-core" }
-bevy-stylized-gltf = { path = "../bevy-stylized-gltf" }
+bevy-stylized-core = { version = "0.1.0", path = "../bevy-stylized-core" }
+bevy-stylized-gltf = { version = "0.1.0", path = "../bevy-stylized-gltf", default-features = false }
 gltf.workspace = true
 image.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
+tempfile.workspace = true
+
+bevy-stylized-profile-genshin = { version = "0.1.0", path = "../bevy-stylized-profile-genshin", optional = true }
+
+schemars = { workspace = true, optional = true }
+
+[features]
+default = []
+schema = ["dep:schemars", "bevy-stylized-core/schema", "bevy-stylized-gltf/schema"]
+profile-genshin = ["dep:bevy-stylized-profile-genshin"]
 
 [dev-dependencies]
 serde_json.workspace = true
@@ -24,3 +38,8 @@ tempfile.workspace = true
 
 [lints]
 workspace = true
+
+[[bin]]
+name = "stylized-schema"
+path = "src/bin/schema.rs"
+required-features = ["schema"]

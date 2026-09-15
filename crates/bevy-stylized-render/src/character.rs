@@ -322,14 +322,32 @@ impl StylizedCharacterMaterial {
         descriptor: &StylizedMaterialDescriptor,
         mut load_texture: impl FnMut(&str) -> Handle<Image>,
     ) -> Self {
-        let mut material = StylizedCharacterMaterial::default();
-        for texture in &descriptor.textures {
+        let mut material = StylizedCharacterMaterial {
+            double_sided: descriptor.static_flags.double_sided,
+            ..Default::default()
+        };
+        for (index, texture) in descriptor.textures.iter().enumerate() {
+            if descriptor
+                .static_params
+                .get("surface_control_index")
+                .is_some_and(|v| *v == index as f32)
+            {
+                continue;
+            }
             match texture.semantic {
                 StylizedTextureSemantic::Color => {
                     material.base_color_texture = Some(load_texture(&texture.uri));
                 }
                 StylizedTextureSemantic::ContinuousMask => {
-                    material.ilm_texture = Some(load_texture(&texture.uri));
+                    if descriptor
+                        .static_params
+                        .get("genshin_face")
+                        .copied()
+                        .unwrap_or(0.0)
+                        == 0.0
+                    {
+                        material.ilm_texture = Some(load_texture(&texture.uri));
+                    }
                 }
                 StylizedTextureSemantic::DiscreteClassification => {
                     material.face_sdf_texture = Some(load_texture(&texture.uri));
@@ -339,6 +357,18 @@ impl StylizedCharacterMaterial {
         }
         let params = &descriptor.static_params;
         let get = |key: &str| params.get(key).copied();
+        material.params.cel.base_color_factor = bevy::math::Vec4::new(
+            get("base_color_r").unwrap_or(1.0),
+            get("base_color_g").unwrap_or(1.0),
+            get("base_color_b").unwrap_or(1.0),
+            get("base_color_a").unwrap_or(1.0),
+        );
+        if descriptor.static_flags.alpha_test {
+            material.params.cel = material
+                .params
+                .cel
+                .with_alpha_cutoff(get("alpha_cutoff").unwrap_or(0.5));
+        }
         if let (Some(x), Some(y), Some(z)) = (
             get("face_forward_x"),
             get("face_forward_y"),
@@ -348,6 +378,10 @@ impl StylizedCharacterMaterial {
                 bevy::math::Vec3::new(x, y, z),
                 get("face_softness").unwrap_or(0.02),
             );
+        }
+        if let (Some(x), Some(y), Some(z)) = (get("face_up_x"), get("face_up_y"), get("face_up_z"))
+        {
+            material.params.face_up = bevy::math::Vec4::new(x, y, z, 0.0);
         }
         if let Some(bias) = get("face_threshold_bias") {
             material.params = material.params.with_face_threshold_bias(bias);

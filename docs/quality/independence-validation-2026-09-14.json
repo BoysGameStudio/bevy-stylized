@@ -1,0 +1,148 @@
+{
+  "schema": "bevy_stylized.independence-validation/v1",
+  "date": "2026-09-14",
+  "engineering_status": "PASS",
+  "validated_source_sha256": "6a32fb15a75114d8e37137e0b7f0bfa503d834a5ba781923ac8ce43306bee9a8",
+  "environment": {
+    "rust": "1.98.0",
+    "bevy": "0.19.1",
+    "blender": "5.2.1 LTS",
+    "authoring_gacha": "v3.6.4",
+    "reference_gacha": "v3.6.2",
+    "gpu": "NVIDIA GeForce RTX 5090 / Vulkan",
+    "driver": "615.71.09"
+  },
+  "isolation": {
+    "git_metadata": false,
+    "sibling_projects_visible": false,
+    "initial_asset_cache": "empty",
+    "network": "disabled",
+    "inputs": "verified original sources and toolchain packages only"
+  },
+  "cpu": {
+    "passed": 157,
+    "failed": 0,
+    "ignored_gpu_or_environment_cases": 24
+  },
+  "gpu": {
+    "suite": "gpu-required",
+    "expected": 11,
+    "executed": 11,
+    "passed": 11,
+    "failed": 0,
+    "blocked": 0,
+    "not_executed": 0,
+    "exit_code": 0,
+    "status": "PASS"
+  },
+  "synthetic_import": {
+    "suite": "synthetic-import",
+    "expected": 1,
+    "executed": 1,
+    "passed": 1,
+    "failed": 0,
+    "blocked": 0,
+    "not_executed": 0,
+    "exit_code": 0,
+    "status": "PASS"
+  },
+  "external_asset_integration": {
+    "suite": "asset-integration-required",
+    "expected": 1,
+    "executed": 1,
+    "passed": 1,
+    "failed": 0,
+    "blocked": 0,
+    "not_executed": 0,
+    "exit_code": 0,
+    "status": "PASS"
+  },
+  "steps": [
+    {
+      "name": "prepare-genshin-odette",
+      "exit_code": 0,
+      "expected": 0
+    },
+    {
+      "name": "prepare-gacha-authoring",
+      "exit_code": 0,
+      "expected": 0
+    },
+    {
+      "name": "prepare-gacha-reference",
+      "exit_code": 0,
+      "expected": 0
+    },
+    {
+      "name": "synthetic-rebuild",
+      "exit_code": 0,
+      "expected": 0
+    },
+    {
+      "name": "cpu",
+      "exit_code": 0,
+      "expected": 0
+    },
+    {
+      "name": "missing-gpu-is-blocked",
+      "exit_code": 2,
+      "expected": 2
+    },
+    {
+      "name": "missing-baseline-is-blocked",
+      "exit_code": 2,
+      "expected": 2
+    },
+    {
+      "name": "gpu",
+      "exit_code": 0,
+      "expected": 0
+    },
+    {
+      "name": "asset-integration",
+      "exit_code": 0,
+      "expected": 0
+    },
+    {
+      "name": "reference-capture",
+      "exit_code": 0,
+      "expected": 0
+    },
+    {
+      "name": "reference-strict",
+      "exit_code": 1,
+      "expected": 1
+    }
+  ],
+  "parity_status": "FAIL",
+  "parity": {
+    "case": "production_vs_upstream",
+    "max_abs_delta_nonedge": 0.7294118,
+    "mean_abs_delta": 0.037924774,
+    "psnr_db": 20.960993,
+    "edge_fraction": 0.03656006,
+    "shadow_iou": 0.8957354,
+    "silhouette_iou": 0.9960536,
+    "passed": false,
+    "violations": [
+      "non-edge max delta 0.7294 exceeds 0.0627",
+      "mean abs delta 0.0379 exceeds 0.0157",
+      "PSNR 20.96dB below 30.00dB",
+      "shadow mask IoU 0.8957 below 0.9500"
+    ]
+  },
+  "coverage_dispositions": 194,
+  "workspace": {
+    "products": 6,
+    "members": 13,
+    "active_legacy_members": 0
+  },
+  "qualification_limits": [
+    "full rig/effects are outside the declared static recipe",
+    "upstream visual parity remains FAIL",
+    "GPU CI runner not provisioned",
+    "publication/license gates remain open"
+  ],
+  "view_schema": "1.2 (optional authored ambient; defaults preserved)",
+  "upstream_reproduction_pixels_equal": true
+}

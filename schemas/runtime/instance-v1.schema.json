@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "StylizedInstanceGpuRecord",
+  "description": "Instance 层全精度记录（V2-e GPU Instance Database 的记录 schema；\nprovisional pending ADR-0004）。\n\n**两档保真契约**（同一逻辑数据的两条传输通道）：\n\n- **Portable（MeshTag 位打包）**：只携带粗粒度子集——\n  `face_threshold` u8 量化（1/254 步进）、`face_side` 1 bit、\n  `outline_scale` u7（0..=2）、`profile_index` u8、`quality_flags` 的\n  低 8 bit；`palette_index` 与 `light_tint` **不可表达**；\n- **Standard+（StorageTable）**：本记录全字段全精度（f32 / u32），\n  MeshTag 退化为 24-bit 槽位索引。\n\n通道选择由 resolver 决定（tier ≥ Standard 且设备具备 storage buffer\n⇒ StorageTable；否则 MeshTagBits + 登记\n[`StylizedFallbackStep::InstanceTableToMeshTag`](crate::StylizedFallbackStep::InstanceTableToMeshTag)\n语义）。",
+  "type": "object",
+  "properties": {
+    "face_side": {
+      "description": "Face 基准侧（0/1）。",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "face_threshold": {
+      "description": "Face SDF 阈值（全精度；MeshTag 通道量化为 1/254）。",
+      "type": "number",
+      "format": "float"
+    },
+    "light_tint": {
+      "description": "Lighting override 染色（线性；MeshTag 通道不可表达）。",
+      "$ref": "#/$defs/LinearColorSchema"
+    },
+    "outline_scale": {
+      "description": "描边宽度缩放（0..=2；MeshTag 通道 u7 量化）。",
+      "type": "number",
+      "format": "float"
+    },
+    "palette_index": {
+      "description": "Palette override 索引（MeshTag 通道不可表达）。",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "profile_index": {
+      "description": "Profile / ramp 行索引（MeshTag 通道限 u8）。",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "quality_flags": {
+      "description": "Quality override 位（LOD/quality 语义位，render 侧解释）。",
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "schema_version": {
+      "description": "内容所声明的 schema 版本（命名空间固定为\n[`SCHEMA_ID_INSTANCE_V1`](crate::schema::SCHEMA_ID_INSTANCE_V1)）。",
+      "$ref": "#/$defs/StylizedSchemaVersion",
+      "default": {
+        "major": 1,
+        "minor": 0
+      }
+    }
+  },
+  "required": [
+    "face_threshold",
+    "face_side",
+    "outline_scale",
+    "profile_index",
+    "palette_index",
+    "quality_flags",
+    "light_tint"
+  ],
+  "$defs": {
+    "LinearColorSchema": {
+      "description": "JSON representation of Bevy LinearRgba, used only by schema generation.",
+      "type": "object",
+      "properties": {
+        "alpha": {
+          "type": "number",
+          "format": "float"
+        },
+        "blue": {
+          "type": "number",
+          "format": "float"
+        },
+        "green": {
+          "type": "number",
+          "format": "float"
+        },
+        "red": {
+          "type": "number",
+          "format": "float"
+        }
+      },
+      "required": [
+        "red",
+        "green",
+        "blue",
+        "alpha"
+      ]
+    },
+    "StylizedSchemaVersion": {
+      "description": "Schema 版本号（`major.minor`）。\n\n`Display` 为 `v<major>.<minor>`；`FromStr` 接受 `v1`、`v1.2`、`1`、`1.2`。",
+      "type": "object",
+      "properties": {
+        "major": {
+          "description": "主版本：破坏性变更时递增（见模块文档的演进规则）。",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "minor": {
+          "description": "次版本：additive 变更时递增。",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "major",
+        "minor"
+      ]
+    }
+  }
+}

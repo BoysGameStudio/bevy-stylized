@@ -136,27 +136,13 @@ Authored Profile
 
 ---
 
-## Engine Reference Renderer
+## Independent reference evidence
 
-当前 Tenacity 中高还原、Genshin-targeted 的 shader 应在修复明确 correctness 问题后冻结为：
+Current upstream validation uses Blender/Gacha captures directly. Production
+regression uses approved first-party baselines and independent semantic fixtures.
+The former migration renderer has been retired; it is not a current prerequisite.
+See [the active reference workflow](../reference/01-reference-authoring-workflow.md).
 
-```text
-Engine Reference Renderer
-```
-
-它的目标是尽量复现锁定的 Upstream Blender/Genshin Reference，但**真正的一级视觉 Oracle 是 Blender 直接生成的 Upstream Golden**。
-
-Engine Reference 的职责：
-
-```text
-验证 Blender/glTF/Profile Translation
-+
-为 Production optimization 提供 engine-side oracle
-```
-
-它不以 Production Performance 为目标。Shipping 默认不编译 Reference；推荐 `reference` compile capability 默认关闭或放入独立 dev/test package。
-
----
 
 ## Ramp Fast Path
 
@@ -335,6 +321,13 @@ Meshlet
 
 同一材质的：alpha discard、culling、skinning、morph、double-sided 语义必须在 Main/Shadow/Prepass 一致。
 
+Hull 副本在 PostUpdate 的引擎动画求值之后、transform propagation 和 bounds
+计算之前同步源 mesh、材质 handle、skin 与 morph 组件，并移除已经不存在的
+变形组件。源 mesh 或 outline 组件移除时清理副本。自定义 PostUpdate 输入系统
+需要显式排在 `sync_outline_replicas` 之前。此同步只消费外部求值状态，不控制动画。
+已有连续 morph GPU 回归不等价于完整的动态 bounds、LOD 或所有 prepass 验证；
+ADR-0008 仍未关闭。
+
 ## Alpha / Transparency / Shadow / Prepass Matrix（V1 必需）
 
 Bevy 0.19 Material 支持 Opaque、Mask、Blend、Premultiplied、AlphaToCoverage、Add、Multiply；同时 Bevy prepass 只处理 opaque 与 alpha-mask，透明材质会被忽略。
@@ -353,3 +346,21 @@ Bevy 0.19 Material 支持 Opaque、Mask、Blend、Premultiplied、AlphaToCoverag
 Hair cards、半透明眼睛/饰品、特效材质必须通过这张 Contract 表声明真实能力。
 
 ---
+
+## Genshin AO regression
+
+The explicit Hero Genshin ramp mode consumes ILM.G directly in the existing
+` smoothstep(0.01, 0.4, ao) ` lighting gate. Mapping G to [0.5,1] made that gate
+always fully lit and lost authored occlusion. Generic modes keep their previous
+AO mapping. `genshin_ilm_zero_ao_preserves_shadow_gate` supplies a zero/full-AO
+texture pair to the GPU and requires a visible lighting difference; it is part
+of the required suite. Hero asset-event consistency also includes its inherited
+ILM and Face SDF presence flags. This fixes the scoped behavior, not complete
+upstream material equivalence.
+
+### Externally updated bounds
+
+Outline replicas follow producer AABB changes even when the mesh handle is stable.
+When source bounds are removed, mirrored replica bounds are removed so automatic
+calculation can resume. The external deformation producer owns source-bound
+correctness; this synchronization does not implement deformation or physics.

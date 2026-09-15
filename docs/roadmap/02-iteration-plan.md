@@ -1,7 +1,12 @@
-# 迭代计划（Iteration Plan）
+# 历史迭代计划（Iteration Plan）
+
+> 2026-09-15 范围修正：Gacha Setup 仅验收最新稳定版，当前为 3.6.4。
+> 下文涉及 3.6.2 的既有步骤属于历史记录，不构成当前兼容或修复任务。
+
+> 历史执行记录，不再规定当前工程操作。当前实施与架构以独立项目计划和仓库架构规范为准。
 
 > **Status:** Working plan — 执行规划文件，非规范性架构契约。
-> **Authority:** 规范性来源仍为 `docs/roadmap/01-v1-v2-v3-roadmap.md`、`docs/migration/01-tenacity-migration-plan.md`、`docs/release/02-v1-release-gate.md` 与各 ADR。本文件只把上述规范落成可执行、可验证的迭代序列；如与规范冲突，以规范为准并修订本文件。
+> **Authority:** 规范性来源仍为 `docs/roadmap/01-v1-v2-v3-roadmap.md`、`docs/history/tenacity-migration.md`、`docs/release/02-v1-release-gate.md` 与各 ADR。本文件只把上述规范落成可执行、可验证的迭代序列；如与规范冲突，以规范为准并修订本文件。
 > **Revision:** v3（2026-09-11）— 经两轮对抗性评审修订：v2 闭环首轮全部 critical/high；v3 闭环复审残留（checklist 行映射对齐真实结构、It-3 拆分、跨层 Golden 判据、Golden 基线存储归属、Phase 0 步骤 6 归属）。
 
 ## 0. 基线快照（2026-09-11）
@@ -10,7 +15,7 @@
 
 - workspace 仅含 `crates/legacy/bevy-cel` 与 `crates/legacy/bevy-cel-metadata`（Tenacity commit `b5b26ac` 冻结导入的 Reference Oracle），`cargo check --workspace` 通过（Bevy 0.19.1）。
 - `bevy-stylized` facade 及 `-core` / `-render` / `-gltf` / `-profile-genshin` / `-tools` 六个目标 crate 均不存在。
-- `python3 tools/check_docs.py` PASS（86 篇文档、29 个 ADR）。
+- `python3 tools/checks/check_docs.py` PASS（86 篇文档、29 个 ADR）。
 - CI 仅有 `.github/workflows/docs.yml`（文档治理校验）；无 Rust 构建/测试 CI。
 - `docs/release/V1_RELEASE_CHECKLIST.md` 几乎全部未勾选；9 个 ADR 处于 V1 Blocker 状态。
 - 迁移进度：Phase 0 的 10 步均未关闭；其前置工作（Legacy Reference Path 导入并冻结为 Reference Oracle）已完成。注意 legacy 导入本身不在 Phase 0 的 10 步之内。
@@ -61,7 +66,7 @@
   4. ADR-0027 临时条款（写入 ADR-0027 草案）：**V1 开发期锁定 Bevy 0.19.x**，升级须走 ADR-0027 正式流程，避免开发期跨多个 Bevy 发布窗口无章可循；
   5. **Checklist 对齐**：对照 §7 核对 `docs/release/V1_RELEASE_CHECKLIST.md`，增补缺失行（toolchain lock、export contract、upgrade policy、Engine Golden 设施等），走文档治理流程，使 §7 映射的每一行都真实存在。
 - 验证：CI 在 push 触发全绿。
-- 退出条件：CI workflow 合入且全绿；checklist 增补合入且 `tools/check_docs.py` PASS。注：GitHub 分支保护（branch protection）属平台设置，列为维护者配合事项，不作为本迭代退出的阻塞条件。
+- 退出条件：CI workflow 合入且全绿；checklist 增补合入且 `tools/checks/check_docs.py` PASS。注：GitHub 分支保护（branch protection）属平台设置，列为维护者配合事项，不作为本迭代退出的阻塞条件。
 
 ### It-1a — Reference 锁定与导出桥（Phase 0 步骤 2–5）
 
@@ -74,7 +79,7 @@
   5. Blender Reference Export Bridge：Blender 内 Python 导出脚本 + 批处理 runner，输出 Node-Graph Signature 与 Export Manifest，fail closed；
   6. **ADR-0017 可发布性子决策（前置，阻塞涉外资产入库）**：Golden/fixture 的可发布性边界（公开仓库 fixture 自制或 CC0）与"行为复刻 vs 代码复制"边界两项先行决策——Genshin lineage 为 GPL-3.0，该边界决定 It-1b 起所有入库资产的形态。记录形态：作为 ADR-0017 的部分 Decision 写入该 ADR 正文，ADR-0017 整体状态保持 V1 Blocker 至 It-10 最终关闭；子决策未获维护者确认前，It-1b 以纯自制/CC0 fixture 推进、涉 upstream 派生资产暂缓入库；
   7. ADR-0011 / 0012 / 0015 的 Decision/Evidence/Consequences 草案，提请维护者确认。
-- 验证：`tools/check_docs.py` PASS；toolchain lock 覆盖 source register §Required provenance records 中工具链相关条目；export bridge 对样例 blend 输出 signature + manifest 且缺依赖时 fail closed。
+- 验证：`tools/checks/check_docs.py` PASS；toolchain lock 覆盖 source register §Required provenance records 中工具链相关条目；export bridge 对样例 blend 输出 signature + manifest 且缺依赖时 fail closed。
 - 退出条件：checklist Authoring 段 "Blender export bridge is scriptable and fail-closed" 行及 Reference 段 "Reference artifact provenance complete" 行的工具链/导出部分可勾选（§7）。
 
 ### It-1b — Upstream Golden 基线（Phase 0 步骤 1、7–10）
@@ -94,14 +99,14 @@
 
 - 目标：核验并修复 Reference Oracle 的已知正确性缺陷，同时建立 Engine 侧 Golden 捕获设施（后续所有 Golden 对照的机器）。
 - 交付物（按序）：
-  1. **评审发现核验（前置）**：对照 `docs/reviews/01-current-implementation-adversarial-review.md` 在导入快照 `b5b26ac` 上逐条复现 6 项发现，核验结果记录到迁移状态记录；已不存在/已变质的发现相应调整修复项；
+  1. **评审发现核验（前置）**：对照 `docs/history/legacy-implementation-review.md` 在导入快照 `b5b26ac` 上逐条复现 6 项发现，核验结果记录到迁移状态记录；已不存在/已变质的发现相应调整修复项；
   2. InternalEdge ABI 修复（独立 vertex shader 或独立 uniform 布局）+ 回归测试；
   3. Character cull mode 默认 Inherit；
   4. 真实 Pipeline 创建测试（非源码字符串断言）；
   5. WGSL/Naga 校验纳入测试；
   6. Outline 生命周期契约（replica 的 immutable/mutable 语义）；
   7. Camera/Post 组件所有权统一；
-  8. **Engine 侧 Golden 设施**：headless Bevy 渲染 → 帧捕获 → 图像 diff → 容差判定 → 基线存储的完整 harness。形态：独立 dev-only crate `crates/dev/golden-harness`（`publish = false`，不依赖任何 legacy 或 production crate），legacy 与 production 测试均以 dev-dependency 使用；Golden 基线文件存仓库内 `fixtures/golden/`（PNG + provenance JSON，复用 It-1b 元数据格式），体积失控时转 Git LFS 的决策点写明；
+  8. **Engine 侧 Golden 设施**：headless Bevy 渲染 → 帧捕获 → 图像 diff → 容差判定 → 基线存储的完整 harness。形态：独立 dev-only crate `tests/harness`（`publish = false`，不依赖任何 legacy 或 production crate），legacy 与 production 测试均以 dev-dependency 使用；Golden 基线文件存仓库内 `fixtures/golden/`（PNG + provenance JSON，复用 It-1b 元数据格式），体积失控时转 Git LFS 的决策点写明；
   9. 用该 harness 捕获修复后的 Engine Reference Golden，并按 ADR-0007 跨层判据与 Upstream Golden 对比；
   10. **修复后重新冻结**：更新 legacy 冻结状态与 provenance 记录（迁移状态记录追加条目），明确修复后快照即新 Reference Oracle。
 - 验证：`cargo test --workspace` 全绿且新增回归测试覆盖核验后的修复项；Engine Reference Golden 捕获可重跑，跨层对比按 ADR-0007 判据通过（或差异列入已知偏差清单）。
@@ -244,8 +249,8 @@
 
 1. 按 §7 映射更新 `docs/release/V1_RELEASE_CHECKLIST.md` 相应勾选（只勾选物理上已满足的行）；
 2. 更新 `TRACEABILITY.md` 相应需求的 evidence 链接（provisional 证据须标注）；
-3. 在 `docs/migration/01-tenacity-migration-plan.md` §迁移状态记录追加日期条目；
-4. `python3 tools/check_docs.py` 与 `cargo test --workspace` 全绿方可关闭迭代；
+3. 在 `docs/history/tenacity-migration.md` §迁移状态记录追加日期条目；
+4. `python3 tools/checks/check_docs.py` 与 `cargo test --workspace` 全绿方可关闭迭代；
 5. 涉及公共契约变化时同步更新相应子系统规范或 ADR。
 
 ## 7. 迭代 → Release Checklist 行映射

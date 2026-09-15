@@ -1,3 +1,5 @@
+# HISTORICAL v3.6.2 experiment only; not a current acceptance or authoring lock.
+# Current target: assets/sources/gacha-authoring.json.
 # Validated 2026-09-11, see upstream-qualification record. PENDING = not yet validated.
 #
 # 验证记录：docs/reference/upstream-qualification-2026-09-11.md（含同日修正节）
@@ -20,17 +22,17 @@ sha256 = "f5ab8206464130962234a7ccab19c7d212a048c848ce3e69518f84fc41a39999"
 license = "GPL-3.0-or-later"   # bl_info license 字段；仓库根 LICENSE 与包内 README License 节均为 GPL-3.0 文本
 
 [export]
-contract = "blender-gltf-npr-v1"   # 形态已定稿为 Draft（docs/reference/06-export-contract-blender-gltf-npr-v1.md），pending ADR-0012 维护者确认；机器可读载体 tools/blender-reference-export/contracts/
+contract = "blender-gltf-npr-v1"   # 形态已定稿为 Draft（docs/reference/06-export-contract-blender-gltf-npr-v1.md），pending ADR-0012 维护者确认；机器可读载体 schemas/authoring/
 
 [fixture]
 # 自制 Reference fixture（It-1b）：generator 确定性构建，blend 与 glb 均为纯自制内容，可入库。
 # v2（2026-09-12）：FixtureHairCard 增加 UV 层（wizard-injection 模拟的 lightmap 采样需要 UV）。
 id = "reference_scene_v2"
-generator = "tools/blender-reference-export/make_reference_scene.py"
+generator = "tools/blender/make_reference_scene.py"
 generator_sha256 = "bb1f5bbc6667edc022fa6ac60b536f3ca69edabffc2149e0b0700128485bafad"
-blend = "fixtures/reference/reference_scene.blend"
+blend = "fixtures/synthetic/reference-scene/reference_scene.blend"
 blend_sha256 = "d77eeb2a709d924f89dd112e6465102f2e4217bceaadd67556191a1400e96daa"
-glb = "fixtures/reference/reference_scene.glb"
+glb = "fixtures/synthetic/reference-scene/reference_scene.glb"
 glb_sha256 = "0b00b8a851d90c0c77c04ea73060d54e3592c37dec40f1a0da2544cec359a024"
 
 [golden]

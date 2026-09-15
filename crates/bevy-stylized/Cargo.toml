@@ -2,15 +2,18 @@
 name = "bevy-stylized"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+readme = "../../README.md"
 publish = false
 description = "bevy-stylized facade crate: StylizedPlugin, two-phase capability plumbing, and stable re-exports."
 
 [dependencies]
 bevy = { workspace = true, features = ["bevy_asset", "bevy_render"] }
-bevy-stylized-core = { path = "../bevy-stylized-core" }
-bevy-stylized-gltf = { path = "../bevy-stylized-gltf", optional = true }
-bevy-stylized-render = { path = "../bevy-stylized-render", optional = true }
-bevy-stylized-profile-genshin = { path = "../bevy-stylized-profile-genshin", optional = true }
+bevy-stylized-core = { version = "0.1.0", path = "../bevy-stylized-core" }
+bevy-stylized-gltf = { version = "0.1.0", path = "../bevy-stylized-gltf", optional = true }
+bevy-stylized-render = { version = "0.1.0", path = "../bevy-stylized-render", optional = true }
+bevy-stylized-profile-genshin = { version = "0.1.0", path = "../bevy-stylized-profile-genshin", optional = true }
 
 [features]
 default = ["gltf", "render"]

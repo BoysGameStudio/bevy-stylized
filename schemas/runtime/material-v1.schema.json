@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "StylizedMaterialDescriptor",
+  "description": "Material 层描述符：纹理/Ramp、静态开关与 Hair/Metal 等静态参数。\n\n**禁止**存放 Face Transform、Day/Night、相机后处理等 instance/view 状态。",
+  "type": "object",
+  "properties": {
+    "name": {
+      "description": "材质名（与 glTF material name 对应）。",
+      "type": "string",
+      "default": ""
+    },
+    "schema_version": {
+      "description": "内容所声明的 schema 版本（命名空间固定为\n[`SCHEMA_ID_MATERIAL_V1`]，故此处只携带版本号）。",
+      "$ref": "#/$defs/StylizedSchemaVersion",
+      "default": {
+        "major": 1,
+        "minor": 0
+      }
+    },
+    "static_flags": {
+      "description": "静态材质开关。",
+      "$ref": "#/$defs/StylizedMaterialFlags",
+      "default": {
+        "alpha_test": false,
+        "double_sided": false,
+        "use_vertex_color_ao": false
+      }
+    },
+    "static_params": {
+      "description": "Hair/Metal 等静态 Profile 参数（键名为 profile 契约定义）。",
+      "type": "object",
+      "additionalProperties": {
+        "type": "number",
+        "format": "float"
+      },
+      "default": {}
+    },
+    "surface_class": {
+      "description": "表面风格分类。",
+      "$ref": "#/$defs/StylizedSurfaceClass",
+      "default": "cel"
+    },
+    "textures": {
+      "description": "纹理引用（含 Ramp，经 [`StylizedTextureSemantic::Ramp`] 表达）。",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/StylizedTextureRef"
+      }
+    }
+  },
+  "$defs": {
+    "StylizedMaterialFlags": {
+      "description": "静态材质开关（帧间不变，属 Material 层）。",
+      "type": "object",
+      "properties": {
+        "alpha_test": {
+          "description": "Alpha 测试（cutout）。",
+          "type": "boolean",
+          "default": false
+        },
+        "double_sided": {
+          "description": "双面渲染。",
+          "type": "boolean",
+          "default": false
+        },
+        "use_vertex_color_ao": {
+          "description": "使用顶点色 AO。",
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "StylizedSchemaVersion": {
+      "description": "Schema 版本号（`major.minor`）。\n\n`Display` 为 `v<major>.<minor>`；`FromStr` 接受 `v1`、`v1.2`、`1`、`1.2`。",
+      "type": "object",
+      "properties": {
+        "major": {
+          "description": "主版本：破坏性变更时递增（见模块文档的演进规则）。",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "minor": {
+          "description": "次版本：additive 变更时递增。",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "major",
+        "minor"
+      ]
+    },
+    "StylizedSurfaceClass": {
+      "description": "表面风格分类：材质/角色必须表达的视觉语义。",
+      "oneOf": [
+        {
+          "description": "基础卡通/赛璐璐表面。",
+          "type": "string",
+          "const": "cel"
+        },
+        {
+          "description": "角色表面（Face / Hair / Rim / Emission 等角色语义）。",
+          "type": "string",
+          "const": "character"
+        },
+        {
+          "description": "主角级表面（完整上游参考语义，如 Gacha ILM / Face Correction）。",
+          "type": "string",
+          "const": "hero"
+        }
+      ]
+    },
+    "StylizedTextureRef": {
+      "description": "纹理引用（schema-neutral）：uri 为资产路径/URI，不含 GPU 句柄。",
+      "type": "object",
+      "properties": {
+        "semantic": {
+          "description": "纹理语义。",
+          "$ref": "#/$defs/StylizedTextureSemantic",
+          "default": "color"
+        },
+        "uri": {
+          "description": "资产路径或 URI。",
+          "type": "string",
+          "default": ""
+        }
+      }
+    },
+    "StylizedTextureSemantic": {
+      "description": "纹理语义（docs/authoring/03）：决定 sRGB/Linear、压缩、过滤、Mipmap 与精度。",
+      "oneOf": [
+        {
+          "description": "基色等颜色纹理（sRGB）。",
+          "type": "string",
+          "const": "color"
+        },
+        {
+          "description": "法线纹理（Linear）。",
+          "type": "string",
+          "const": "normal"
+        },
+        {
+          "description": "连续 Mask（如 ILM 通道），不得因压缩产生语义漂移。",
+          "type": "string",
+          "const": "continuous_mask"
+        },
+        {
+          "description": "离散分类（如 Material ID），压缩不得导致 ID 漂移。",
+          "type": "string",
+          "const": "discrete_classification"
+        },
+        {
+          "description": "Ramp / 阴影阶调查找。",
+          "type": "string",
+          "const": "ramp"
+        },
+        {
+          "description": "MatCap 查找。",
+          "type": "string",
+          "const": "mat_cap"
+        }
+      ]
+    }
+  }
+}

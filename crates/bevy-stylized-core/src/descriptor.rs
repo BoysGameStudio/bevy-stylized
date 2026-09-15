@@ -30,6 +30,7 @@ use crate::{
     derive(serde::Serialize, serde::Deserialize),
     serde(rename_all = "snake_case")
 )]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum StylizedTextureSemantic {
     /// 基色等颜色纹理（sRGB）。
     #[default]
@@ -49,6 +50,7 @@ pub enum StylizedTextureSemantic {
 /// 纹理引用（schema-neutral）：uri 为资产路径/URI，不含 GPU 句柄。
 #[derive(Clone, Debug, Default, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct StylizedTextureRef {
     /// 纹理语义。
     #[cfg_attr(feature = "serde", serde(default = "default_texture_semantic"))]
@@ -66,6 +68,7 @@ fn default_texture_semantic() -> StylizedTextureSemantic {
 /// 静态材质开关（帧间不变，属 Material 层）。
 #[derive(Clone, Debug, Default, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct StylizedMaterialFlags {
     /// 双面渲染。
     #[cfg_attr(feature = "serde", serde(default))]
@@ -88,6 +91,7 @@ fn default_material_schema_version() -> StylizedSchemaVersion {
 /// **禁止**存放 Face Transform、Day/Night、相机后处理等 instance/view 状态。
 #[derive(Clone, Debug, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct StylizedMaterialDescriptor {
     /// 内容所声明的 schema 版本（命名空间固定为
     /// [`SCHEMA_ID_MATERIAL_V1`]，故此处只携带版本号）。
@@ -129,6 +133,7 @@ impl Default for StylizedMaterialDescriptor {
 /// GPU 传输机制由 ADR-0004 决定，本类型不承诺任何内存布局。
 #[derive(Clone, Debug, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct StylizedInstanceDescriptor {
     /// Face SDF 阈值。
     pub face_threshold: f32,
@@ -176,6 +181,7 @@ impl Default for StylizedInstanceDescriptor {
 /// 语义）。
 #[derive(Clone, Copy, Debug, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct StylizedInstanceGpuRecord {
     /// 内容所声明的 schema 版本（命名空间固定为
     /// [`SCHEMA_ID_INSTANCE_V1`](crate::schema::SCHEMA_ID_INSTANCE_V1)）。
@@ -194,6 +200,10 @@ pub struct StylizedInstanceGpuRecord {
     /// Quality override 位（LOD/quality 语义位，render 侧解释）。
     pub quality_flags: u32,
     /// Lighting override 染色（线性；MeshTag 通道不可表达）。
+    #[cfg_attr(
+        feature = "schema",
+        schemars(with = "crate::schema::LinearColorSchema")
+    )]
     pub light_tint: LinearRgba,
 }
 
@@ -234,6 +244,7 @@ impl From<StylizedInstanceDescriptor> for StylizedInstanceGpuRecord {
 /// View 层质量状态（当前 view 实际运行的 tier 与验证模式快照）。
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct StylizedViewQuality {
     /// 当前 view 解析后的执行档位。
     #[cfg_attr(feature = "serde", serde(default))]
@@ -246,6 +257,7 @@ pub struct StylizedViewQuality {
 /// 相机 NPR 状态（属 View 层，**禁止**写入角色材质）。
 #[derive(Clone, Copy, Debug, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct StylizedCameraNprState {
     /// 是否启用描边。
     pub outline_enabled: bool,
@@ -265,17 +277,34 @@ impl Default for StylizedCameraNprState {
 /// View / Frame 层描述符：NPR Key Light、全局调色板、昼夜、曝光与相机 NPR 状态。
 #[derive(Clone, Debug, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct StylizedViewDescriptor {
     /// 内容所声明的 schema 版本（命名空间固定为
     /// [`SCHEMA_ID_VIEW_V1`]）。
     #[cfg_attr(feature = "serde", serde(default = "default_view_schema_version"))]
     pub schema_version: StylizedSchemaVersion,
     /// NPR Key Light 方向（世界空间，指向光源）。
+    #[cfg_attr(feature = "schema", schemars(with = "[f32; 3]"))]
     pub key_light_direction: Vec3,
     /// NPR Key Light 颜色（线性空间）。
+    #[cfg_attr(
+        feature = "schema",
+        schemars(with = "crate::schema::LinearColorSchema")
+    )]
     pub key_light_color: LinearRgba,
+    /// Explicit authored ambient radiance. None preserves day/night interpolation.
+    #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "schema",
+        schemars(with = "Option<crate::schema::LinearColorSchema>")
+    )]
+    pub ambient_override: Option<LinearRgba>,
     /// 全局调色板（一份全局数据，**禁止**逐材质复制）。
     #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "schema",
+        schemars(with = "Vec<crate::schema::LinearColorSchema>")
+    )]
     pub palette: Vec<LinearRgba>,
     /// 昼夜因子（0 = 夜，1 = 昼）。
     pub day_night_factor: f32,
@@ -302,6 +331,7 @@ impl Default for StylizedViewDescriptor {
     fn default() -> Self {
         Self {
             schema_version: SCHEMA_ID_VIEW_V1.version,
+            ambient_override: None,
             key_light_direction: Vec3::new(0.5, 1.0, 0.5).normalize(),
             key_light_color: LinearRgba::WHITE,
             palette: Vec::new(),

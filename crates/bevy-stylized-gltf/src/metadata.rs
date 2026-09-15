@@ -75,6 +75,7 @@ pub enum StylizedImportError {
 
 /// `.npr.json` sidecar 的顶层结构（骨架，provisional）。
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct StylizedSidecar {
     /// 顶层 schema 标识，必须等于 [`STYLIZED_SIDECAR_SCHEMA`]。
     pub schema: String,

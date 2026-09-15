@@ -77,6 +77,13 @@ const NIGHT_AMBIENT_BRIGHTNESS: f32 = 0.06;
 /// [`NIGHT_AMBIENT_COLOR`]（冷蓝）。
 #[must_use]
 pub fn resolve_ambient_light(descriptor: &StylizedViewDescriptor) -> AmbientLight {
+    if let Some(color) = descriptor.ambient_override {
+        return AmbientLight {
+            color: bevy::prelude::Color::LinearRgba(color),
+            brightness: 1.0,
+            ..AmbientLight::default()
+        };
+    }
     let t = descriptor.day_night_factor.clamp(0.0, 1.0);
     let day_color = descriptor
         .palette
@@ -277,6 +284,24 @@ mod tests {
         descriptor.day_night_factor = 0.5;
         let mid = resolve_ambient_light(&descriptor);
         assert!(mid.brightness > night.brightness && mid.brightness < day.brightness);
+    }
+
+    #[test]
+    fn authored_ambient_is_explicit_and_default_policy_is_unchanged() {
+        let mut descriptor = StylizedViewDescriptor::default();
+        let previous = resolve_ambient_light(&descriptor);
+        let color = LinearRgba::new(0.2, 0.3, 0.4, 1.0);
+        descriptor.ambient_override = Some(color);
+        for time in [0.0, 1.0] {
+            descriptor.day_night_factor = time;
+            let actual = resolve_ambient_light(&descriptor);
+            assert_eq!(actual.color, bevy::prelude::Color::LinearRgba(color));
+            assert_eq!(actual.brightness, 1.0);
+        }
+        descriptor.ambient_override = None;
+        let restored = resolve_ambient_light(&descriptor);
+        assert_eq!(restored.color, previous.color);
+        assert_eq!(restored.brightness, previous.brightness);
     }
 
     #[test]

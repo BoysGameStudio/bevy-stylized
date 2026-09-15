@@ -1,0 +1,22 @@
+[package]
+name = "stylized-integration-tests"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+bevy = { workspace = true, features = ["bevy_animation", "bevy_gltf", "bevy_scene", "png", "reflect_auto_register"] }
+bevy-stylized = { path = "../../crates/bevy-stylized" }
+bevy-stylized-gltf = { path = "../../crates/bevy-stylized-gltf" }
+golden-harness = { path = "../harness" }
+serde_json.workspace = true
+sha2.workspace = true
+serde.workspace = true
+tempfile.workspace = true
+gltf.workspace = true
+bevy-stylized-render = { path = "../../crates/bevy-stylized-render" }
+bevy-stylized-core = { path = "../../crates/bevy-stylized-core" }
+naga = { version = "=29.0.4", features = ["wgsl-in"] }
+
+[lints]
+workspace = true

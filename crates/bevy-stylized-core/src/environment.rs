@@ -19,12 +19,17 @@ use bevy_reflect::Reflect;
 /// 距离雾（线性 start/end；View 层）。
 #[derive(Clone, Copy, Debug, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct StylizedFog {
     /// 是否启用（false = 完全恒等，渲染层不挂 fog 组件）。
     #[cfg_attr(feature = "serde", serde(default))]
     pub enabled: bool,
     /// 雾色（= horizon 大气色；线性空间，alpha 调制整体强度）。
     #[cfg_attr(feature = "serde", serde(default = "default_fog_color"))]
+    #[cfg_attr(
+        feature = "schema",
+        schemars(with = "crate::schema::LinearColorSchema")
+    )]
     pub color: LinearRgba,
     /// 雾起始距离。
     #[cfg_attr(feature = "serde", serde(default = "default_fog_start"))]
@@ -69,9 +74,14 @@ impl StylizedFog {
 /// 风格化阴影染色（乘法 tint 作用于 shadow 侧颜色）。
 #[derive(Clone, Copy, Debug, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct StylizedShadowTint {
     /// 阴影染色（线性空间；冷色偏移是常见风格化选择）。
     #[cfg_attr(feature = "serde", serde(default = "default_shadow_tint_color"))]
+    #[cfg_attr(
+        feature = "schema",
+        schemars(with = "crate::schema::LinearColorSchema")
+    )]
     pub color: LinearRgba,
     /// 染色强度 0..=1（0 = 恒等，默认）。
     #[cfg_attr(feature = "serde", serde(default))]
@@ -96,6 +106,7 @@ impl Default for StylizedShadowTint {
 /// [`StylizedViewDescriptor`](crate::StylizedViewDescriptor)）。
 #[derive(Clone, Copy, Debug, Default, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct StylizedEnvironment {
     /// 距离雾 / horizon 大气色。
     #[cfg_attr(feature = "serde", serde(default))]
@@ -106,6 +117,10 @@ pub struct StylizedEnvironment {
     /// Zenith 天色（渲染层映射为相机清屏色 = 平涂天空；渐变天空球
     /// 超出 V2 first cut）。`None` = 不触碰清屏色。
     #[cfg_attr(feature = "serde", serde(default))]
+    #[cfg_attr(
+        feature = "schema",
+        schemars(with = "Option<crate::schema::LinearColorSchema>")
+    )]
     pub zenith_tint: Option<LinearRgba>,
 }
 

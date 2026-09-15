@@ -3,3 +3,8 @@
 # Local-only golden captures of third-party (HoYoverse-derived) art
 # (ADR-0017 §Partial decision): referenced by path, never committed.
 /fixtures/golden-local/
+
+# Reproducible external assets and Python execution caches
+/assets/local/
+__pycache__/
+*.pyc

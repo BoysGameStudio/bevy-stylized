@@ -33,9 +33,10 @@ pub const SCHEMA_ID_INSTANCE_V1: StylizedSchemaId =
 
 /// View domain v1 的完整 schema 标识。
 ///
+/// minor 1.2 adds optional authored ambient radiance; 1.1 added `environment`.
 /// minor 1.1（additive）：新增可选 `environment` 字段（V2-d 环境模型，
 /// 缺省解析为恒等默认）。
-pub const SCHEMA_ID_VIEW_V1: StylizedSchemaId = StylizedSchemaId::new("bevy_stylized.camera", 1, 1);
+pub const SCHEMA_ID_VIEW_V1: StylizedSchemaId = StylizedSchemaId::new("bevy_stylized.camera", 1, 2);
 
 /// `bevy_stylized.*` namespace 内某一 domain 的版本化 schema 标识。
 ///
@@ -73,6 +74,7 @@ impl fmt::Display for StylizedSchemaId {
 /// `Display` 为 `v<major>.<minor>`；`FromStr` 接受 `v1`、`v1.2`、`1`、`1.2`。
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub struct StylizedSchemaVersion {
     /// 主版本：破坏性变更时递增（见模块文档的演进规则）。
     pub major: u32,
@@ -200,4 +202,14 @@ mod tests {
         let back: StylizedSchemaVersion = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(version, back);
     }
+}
+
+/// JSON representation of Bevy LinearRgba, used only by schema generation.
+#[cfg(feature = "schema")]
+#[derive(schemars::JsonSchema)]
+pub struct LinearColorSchema {
+    pub red: f32,
+    pub green: f32,
+    pub blue: f32,
+    pub alpha: f32,
 }

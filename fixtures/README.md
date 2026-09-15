@@ -1,18 +1,12 @@
-# Fixtures
+# Test fixtures
 
-## `golden-local/` (gitignored, local only)
+- `synthetic/reference-scene/`: first-party fixed camera/body/head/hair/ground scene,
+  its Blender generator outputs and export provenance.
+- `synthetic/character/`: independently generated two-joint, three-material GLB
+  with a face morph and animation; `tools/assets/synthetic.py` rebuilds it.
+- `golden/`: existing first-party accepted baselines relocated byte-for-byte after
+  pre-migration GPU comparison passed. Third-party character captures are excluded.
 
-Golden captures produced by `crates/dev/odette-reference-lab` use the Odette
-character from the sibling Tenacity project. Odette is third-party
-HoYoverse-derived art, so every capture under `fixtures/golden-local/` is
-local-only: the PNGs and provenance sidecars are referenced by path and never
-committed (see `docs/adr/0017-license-and-provenance.md` §Partial decision).
-
-Regenerate or accept a new baseline locally with:
-
-```sh
-GOLDEN_REBASELINE=1 cargo run -p odette-reference-lab
-```
-
-Repo-committed golden baselines (first-party synthetic fixtures) belong under
-`fixtures/golden/` instead; none exist yet.
+Third-party raw/authoring/runtime packs and historical character images live under
+ignored `assets/local`. Diagnostic captures and reports use `target/stylized`.
+Tests never create a missing accepted baseline as an implicit successful comparison.

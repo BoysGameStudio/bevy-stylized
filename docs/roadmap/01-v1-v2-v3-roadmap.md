@@ -6,6 +6,12 @@
 
 ## V1：Reusable Cross-Platform NPR Library
 
+所有版本遵守[渲染职责边界](../architecture/01-goals-scope-and-three-axis-model.md)。
+动画控制、表情生成、重定向、IK 和角色物理不属于本项目路线图。Pose sweep、
+skin/morph fixture 与 Face Debugger 用于验证或检查渲染输入和结果，不承担角色控制。
+后续角色验证优先统一静态参考条件，再验证外部姿态和 morph 输入的渲染一致性；
+完整 rig、动画和表情系统不作为独立化之后的扩展目标。
+
 一句话：
 
 > **把正确的架构建立起来。**

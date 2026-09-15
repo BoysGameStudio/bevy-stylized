@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Bevy Stylized original source pack",
+  "type": "object",
+  "required": [
+    "schema",
+    "id",
+    "files"
+  ],
+  "properties": {
+    "schema": {
+      "const": "bevy_stylized.source/v1"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]*$"
+    },
+    "archive": {
+      "type": "string"
+    },
+    "files": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "bytes",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "url": {
+            "type": "string",
+            "pattern": "https://.+"
+          }
+        }
+      }
+    }
+  },
+  "description": "Additional source metadata is preserved. The source validator also enforces unique normalized relative paths, no escapes/symlinks, sizes and actual content hashes. URLs are required only when downloading rather than restoring a verified mirror."
+}

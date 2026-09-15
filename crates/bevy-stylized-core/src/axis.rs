@@ -20,6 +20,7 @@ use bevy_reflect::Reflect;
     derive(serde::Serialize, serde::Deserialize),
     serde(rename_all = "snake_case")
 )]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum StylizedSurfaceClass {
     /// 基础卡通/赛璐璐表面。
     #[default]
@@ -39,6 +40,7 @@ pub enum StylizedSurfaceClass {
     derive(serde::Serialize, serde::Deserialize),
     serde(rename_all = "snake_case")
 )]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum StylizedExecutionTier {
     /// 最低能力路径；不得依赖任何可选 GPU Feature
     /// （见 [`crate::capability::PORTABLE_FORBIDDEN_REQUIREMENTS`]）。
@@ -78,6 +80,7 @@ impl StylizedExecutionTier {
     derive(serde::Serialize, serde::Deserialize),
     serde(rename_all = "snake_case")
 )]
+#[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 pub enum StylizedValidationMode {
     /// 生产渲染路径。
     #[default]

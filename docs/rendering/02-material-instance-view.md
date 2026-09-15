@@ -191,3 +191,14 @@ Portable baseline 有非-storage-buffer fallback（若 WebGL2/GLES3.0 在支持�
 在该 ADR 通过前，不应把任何具体 storage-buffer 方案写成稳定公共 ABI。
 
 ---
+
+## External face pose input (2026-09-15)
+
+`StylizedFaceInput` is an explicit renderer-side consumer of an application-owned
+head entity's `GlobalTransform`. Its local forward/up vectors are supplied by the
+host. It owns only the instance face threshold and side correction while attached,
+restores previous values when removed, and exposes invalid inputs through
+`StylizedFaceInputStatus`. Materials remain shared. The current adapter requires
+MeshTag transport (threshold step 1/254), rejects storage-table slots and explicit
+material-side overrides, and does not claim full-precision animated-character
+parity. See [the contract and verification](../showcase/04-realtime-validation.md).

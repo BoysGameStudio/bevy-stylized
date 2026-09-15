@@ -1,0 +1,336 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "StylizedViewDescriptor",
+  "description": "View / Frame 层描述符：NPR Key Light、全局调色板、昼夜、曝光与相机 NPR 状态。",
+  "type": "object",
+  "properties": {
+    "ambient_override": {
+      "description": "Explicit authored ambient radiance. None preserves day/night interpolation.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LinearColorSchema"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "camera": {
+      "description": "相机 NPR 状态。",
+      "$ref": "#/$defs/StylizedCameraNprState",
+      "default": {
+        "outline_enabled": true,
+        "post_enabled": true
+      }
+    },
+    "day_night_factor": {
+      "description": "昼夜因子（0 = 夜，1 = 昼）。",
+      "type": "number",
+      "format": "float"
+    },
+    "environment": {
+      "description": "环境模型（V2-d；additive since schema v1.1——缺省解析为恒等默认，\n既有 v1.0 payload 行为不变）。",
+      "$ref": "#/$defs/StylizedEnvironment",
+      "default": {
+        "fog": {
+          "color": {
+            "alpha": 1.0,
+            "blue": 0.8500000238418579,
+            "green": 0.7200000286102295,
+            "red": 0.6200000047683716
+          },
+          "enabled": false,
+          "end": 120.0,
+          "start": 20.0
+        },
+        "shadow_tint": {
+          "color": {
+            "alpha": 1.0,
+            "blue": 0.7799999713897705,
+            "green": 0.5799999833106995,
+            "red": 0.550000011920929
+          },
+          "strength": 0.0
+        },
+        "zenith_tint": null
+      }
+    },
+    "exposure": {
+      "description": "曝光。",
+      "type": "number",
+      "format": "float"
+    },
+    "key_light_color": {
+      "description": "NPR Key Light 颜色（线性空间）。",
+      "$ref": "#/$defs/LinearColorSchema"
+    },
+    "key_light_direction": {
+      "description": "NPR Key Light 方向（世界空间，指向光源）。",
+      "type": "array",
+      "items": {
+        "type": "number",
+        "format": "float"
+      },
+      "maxItems": 3,
+      "minItems": 3
+    },
+    "palette": {
+      "description": "全局调色板（一份全局数据，**禁止**逐材质复制）。",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/LinearColorSchema"
+      }
+    },
+    "quality": {
+      "description": "View 质量状态。",
+      "$ref": "#/$defs/StylizedViewQuality",
+      "default": {
+        "tier": "portable",
+        "validation_mode": "production"
+      }
+    },
+    "schema_version": {
+      "description": "内容所声明的 schema 版本（命名空间固定为\n[`SCHEMA_ID_VIEW_V1`]）。",
+      "$ref": "#/$defs/StylizedSchemaVersion",
+      "default": {
+        "major": 1,
+        "minor": 2
+      }
+    }
+  },
+  "required": [
+    "key_light_direction",
+    "key_light_color",
+    "day_night_factor",
+    "exposure"
+  ],
+  "$defs": {
+    "LinearColorSchema": {
+      "description": "JSON representation of Bevy LinearRgba, used only by schema generation.",
+      "type": "object",
+      "properties": {
+        "alpha": {
+          "type": "number",
+          "format": "float"
+        },
+        "blue": {
+          "type": "number",
+          "format": "float"
+        },
+        "green": {
+          "type": "number",
+          "format": "float"
+        },
+        "red": {
+          "type": "number",
+          "format": "float"
+        }
+      },
+      "required": [
+        "red",
+        "green",
+        "blue",
+        "alpha"
+      ]
+    },
+    "StylizedCameraNprState": {
+      "description": "相机 NPR 状态（属 View 层，**禁止**写入角色材质）。",
+      "type": "object",
+      "properties": {
+        "outline_enabled": {
+          "description": "是否启用描边。",
+          "type": "boolean"
+        },
+        "post_enabled": {
+          "description": "是否启用生产后处理链。",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "outline_enabled",
+        "post_enabled"
+      ]
+    },
+    "StylizedEnvironment": {
+      "description": "环境模型（View 层；附加于\n[`StylizedViewDescriptor`](crate::StylizedViewDescriptor)）。",
+      "type": "object",
+      "properties": {
+        "fog": {
+          "description": "距离雾 / horizon 大气色。",
+          "$ref": "#/$defs/StylizedFog",
+          "default": {
+            "color": {
+              "alpha": 1.0,
+              "blue": 0.8500000238418579,
+              "green": 0.7200000286102295,
+              "red": 0.6200000047683716
+            },
+            "enabled": false,
+            "end": 120.0,
+            "start": 20.0
+          }
+        },
+        "shadow_tint": {
+          "description": "风格化阴影染色。",
+          "$ref": "#/$defs/StylizedShadowTint",
+          "default": {
+            "color": {
+              "alpha": 1.0,
+              "blue": 0.7799999713897705,
+              "green": 0.5799999833106995,
+              "red": 0.550000011920929
+            },
+            "strength": 0.0
+          }
+        },
+        "zenith_tint": {
+          "description": "Zenith 天色（渲染层映射为相机清屏色 = 平涂天空；渐变天空球\n超出 V2 first cut）。`None` = 不触碰清屏色。",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LinearColorSchema"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      }
+    },
+    "StylizedExecutionTier": {
+      "description": "执行档位：当前设备允许消耗的 GPU/内存预算。\n\n顺序即预算顺序：`Portable < Standard < High`，fallback 只允许沿该序向下。",
+      "oneOf": [
+        {
+          "description": "最低能力路径；不得依赖任何可选 GPU Feature\n（见 [`crate::capability::PORTABLE_FORBIDDEN_REQUIREMENTS`]）。",
+          "type": "string",
+          "const": "portable"
+        },
+        {
+          "description": "主流 iOS/Android Vulkan / 普通 PC。",
+          "type": "string",
+          "const": "standard"
+        },
+        {
+          "description": "高端 PC、未来主机级 GPU。",
+          "type": "string",
+          "const": "high"
+        }
+      ]
+    },
+    "StylizedFog": {
+      "description": "距离雾（线性 start/end；View 层）。",
+      "type": "object",
+      "properties": {
+        "color": {
+          "description": "雾色（= horizon 大气色；线性空间，alpha 调制整体强度）。",
+          "$ref": "#/$defs/LinearColorSchema",
+          "default": {
+            "alpha": 1.0,
+            "blue": 0.8500000238418579,
+            "green": 0.7200000286102295,
+            "red": 0.6200000047683716
+          }
+        },
+        "enabled": {
+          "description": "是否启用（false = 完全恒等，渲染层不挂 fog 组件）。",
+          "type": "boolean",
+          "default": false
+        },
+        "end": {
+          "description": "雾终止距离（>= start；非法时 fail-closed 按全透明处理）。",
+          "type": "number",
+          "format": "float",
+          "default": 120.0
+        },
+        "start": {
+          "description": "雾起始距离。",
+          "type": "number",
+          "format": "float",
+          "default": 20.0
+        }
+      }
+    },
+    "StylizedSchemaVersion": {
+      "description": "Schema 版本号（`major.minor`）。\n\n`Display` 为 `v<major>.<minor>`；`FromStr` 接受 `v1`、`v1.2`、`1`、`1.2`。",
+      "type": "object",
+      "properties": {
+        "major": {
+          "description": "主版本：破坏性变更时递增（见模块文档的演进规则）。",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "minor": {
+          "description": "次版本：additive 变更时递增。",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "major",
+        "minor"
+      ]
+    },
+    "StylizedShadowTint": {
+      "description": "风格化阴影染色（乘法 tint 作用于 shadow 侧颜色）。",
+      "type": "object",
+      "properties": {
+        "color": {
+          "description": "阴影染色（线性空间；冷色偏移是常见风格化选择）。",
+          "$ref": "#/$defs/LinearColorSchema",
+          "default": {
+            "alpha": 1.0,
+            "blue": 0.7799999713897705,
+            "green": 0.5799999833106995,
+            "red": 0.550000011920929
+          }
+        },
+        "strength": {
+          "description": "染色强度 0..=1（0 = 恒等，默认）。",
+          "type": "number",
+          "format": "float",
+          "default": 0.0
+        }
+      }
+    },
+    "StylizedValidationMode": {
+      "description": "验证模式：当前渲染路径是在执行生产实现还是在验证参考真值。\n\nReference 不属于 Execution Tier；它是独立的验证后端/模式。",
+      "oneOf": [
+        {
+          "description": "生产渲染路径。",
+          "type": "string",
+          "const": "production"
+        },
+        {
+          "description": "对照上游（Blender / Gacha Setup）真值的验证路径。",
+          "type": "string",
+          "const": "upstream_reference"
+        },
+        {
+          "description": "对照引擎内 Reference 实现的验证路径。",
+          "type": "string",
+          "const": "engine_reference"
+        }
+      ]
+    },
+    "StylizedViewQuality": {
+      "description": "View 层质量状态（当前 view 实际运行的 tier 与验证模式快照）。",
+      "type": "object",
+      "properties": {
+        "tier": {
+          "description": "当前 view 解析后的执行档位。",
+          "$ref": "#/$defs/StylizedExecutionTier",
+          "default": "portable"
+        },
+        "validation_mode": {
+          "description": "当前验证模式。",
+          "$ref": "#/$defs/StylizedValidationMode",
+          "default": "production"
+        }
+      }
+    }
+  }
+}

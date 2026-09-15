@@ -1,53 +1,18 @@
-name: GPU (self-hosted)
-
-# ---------------------------------------------------------------------------
-# GPU 层 CI（It-8）：默认不启用。
-#
-# 维护者操作（平台设置，agent 无法代办）：
-#   1. 在本机（RTX 5090 baseline 机）注册一个 self-hosted runner；
-#   2. 将下方 `if: false` 改为 `true`（或删除该条件）。
-#
-# 政策（过渡期规则）：
-#   - GPU 层失败只阻塞**渲染相关** PR（crates/bevy-stylized-* 的渲染路径、
-#     shaders、golden 设施）；非渲染 PR（docs/core/gltf 等）不被 GPU 层阻塞；
-#   - GPU 层的 golden/benchmark 证据只覆盖本机 NVIDIA baseline（V1 范围，
-#     见 docs/platforms/SUPPORT_MATRIX.md 与迭代计划 §5 风险表）；
-#   - GPU 层测试在无 GPU 时一律 graceful skip，因此本 workflow 即便在 CPU
-#     runner 上误跑也保持绿色（但不应这样用）。
-# ---------------------------------------------------------------------------
-
+name: GPU qualification
+# Explicit trusted-code execution; runner provisioning is a separate platform task.
 on:
-  push:
-  pull_request:
-    paths:
-      - "crates/bevy-stylized*/**"
-      - "crates/dev/**"
-      - "fixtures/reference/**"
-      - ".github/workflows/gpu.yml"
-
+  workflow_dispatch:
 permissions:
   contents: read
-
-env:
-  CARGO_TERM_COLOR: always
-
+concurrency:
+  group: stylized-gpu-qualification
+  cancel-in-progress: false
 jobs:
-  gpu-tests:
-    if: false # 维护者注册 self-hosted runner 后移除此行（见文件头注释）
-    runs-on: self-hosted
+  gpu:
+    runs-on: [self-hosted, linux, stylized-gpu]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
-      - name: Cache cargo
-        uses: Swatinem/rust-cache@v2
-      - name: Golden + budget + spike tests (GPU)
-        run: >-
-          cargo test -p bevy-stylized-render --test golden_cel
-          --test golden_character --test golden_odette --test instance_batching
-          --test interim_budget --test adr_0001_spike --test spike_instance_transport
-      - name: Three-layer golden comparison
-        run: cargo test -p reference-comparison
-      - name: Fixed benchmark scenes (baseline evidence, not gated)
-        run: cargo test -p benchmarks -- --nocapture
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+      - uses: dtolnay/rust-toolchain@master
+      - run: python3 tools/dev.py check --lane gpu --required

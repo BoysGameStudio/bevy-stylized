@@ -38,7 +38,7 @@ The remaining high-priority work is to close technical decisions, not to restruc
 Run:
 
 ```bash
-python3 tools/check_docs.py
+python3 tools/checks/check_docs.py
 ```
 
 for every documentation change and in CI.
