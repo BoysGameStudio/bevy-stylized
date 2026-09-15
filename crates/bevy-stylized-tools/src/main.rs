@@ -315,8 +315,15 @@ pub(crate) fn run_one(path: &Path, validate: bool) -> Result<FileReport, String>
     let bytes = std::fs::read(path).map_err(|e| format!("read: {e}"))?;
     let gltf =
         gltf::Gltf::from_slice_without_validation(&bytes).map_err(|e| format!("parse: {e}"))?;
-    let document = &gltf.document;
+    inspect_document(path, &gltf.document, validate)
+}
 
+/// Shared inspection of an already parsed document; compile reuses its input.
+pub(crate) fn inspect_document(
+    path: &Path,
+    document: &gltf::Document,
+    validate: bool,
+) -> Result<FileReport, String> {
     let mut report = FileReport {
         path: path.display().to_string(),
         command: if validate { "validate" } else { "inspect" },
