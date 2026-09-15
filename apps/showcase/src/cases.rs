@@ -647,34 +647,6 @@ pub fn lod(app: &mut App) {
     case_camera(app, LOD_CAMERA_EYE, Vec3::new(0.0, 0.0, -10.0));
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// 布局确定性：四球落在 near/mid/far/very_far 四带（相机原点）。
-    #[test]
-    fn lod_layout_bands_are_deterministic() {
-        let thresholds = bevy_stylized::stylized_core::StylizedLodThresholds::default();
-        let expected = [0, 1, 2, 3];
-        for (i, (angle_deg, dist, _)) in LOD_LAYOUT.iter().enumerate() {
-            let x = dist * angle_deg.to_radians().tan();
-            let actual = (Vec3::new(x, 0.0, -dist) - LOD_CAMERA_EYE).length();
-            let band = bevy_stylized::stylized_core::resolve_lod_band(actual, &thresholds);
-            assert_eq!(band, expected[i], "layout[{i}] distance {actual}");
-            // 离带边界留 ≥15% 余量（防止布局微调时静默跨带）。
-            let bounds = [
-                0.0,
-                thresholds.mid_start,
-                thresholds.far_start,
-                thresholds.very_far_start,
-                f32::INFINITY,
-            ];
-            let margin = (actual - bounds[band as usize]).min(bounds[band as usize + 1] - actual);
-            assert!(margin > 1.0, "layout[{i}] too close to band edge: {actual}");
-        }
-    }
-}
-
 // ---------------------------------------------------------------------------
 // environment（V2-d）：同一场景 × 三套环境调色板（昼雾 / 黄昏 / 夜）
 // ---------------------------------------------------------------------------
@@ -778,4 +750,32 @@ pub fn environment_night(view: &mut StylizedViewDescriptor) {
         },
         zenith_tint: Some(LinearRgba::new(0.03, 0.05, 0.12, 1.0)),
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 布局确定性：四球落在 near/mid/far/very_far 四带（相机原点）。
+    #[test]
+    fn lod_layout_bands_are_deterministic() {
+        let thresholds = bevy_stylized::stylized_core::StylizedLodThresholds::default();
+        let expected = [0, 1, 2, 3];
+        for (i, (angle_deg, dist, _)) in LOD_LAYOUT.iter().enumerate() {
+            let x = dist * angle_deg.to_radians().tan();
+            let actual = (Vec3::new(x, 0.0, -dist) - LOD_CAMERA_EYE).length();
+            let band = bevy_stylized::stylized_core::resolve_lod_band(actual, &thresholds);
+            assert_eq!(band, expected[i], "layout[{i}] distance {actual}");
+            // 离带边界留 ≥15% 余量（防止布局微调时静默跨带）。
+            let bounds = [
+                0.0,
+                thresholds.mid_start,
+                thresholds.far_start,
+                thresholds.very_far_start,
+                f32::INFINITY,
+            ];
+            let margin = (actual - bounds[band as usize]).min(bounds[band as usize + 1] - actual);
+            assert!(margin > 1.0, "layout[{i}] too close to band edge: {actual}");
+        }
+    }
 }

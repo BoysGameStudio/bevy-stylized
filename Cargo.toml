@@ -38,9 +38,6 @@ repository = "https://github.com/BoysGameStudio/bevy-stylized"
 # params by design (same allowances as bevy itself / the Flock template).
 type_complexity = "allow"
 too_many_arguments = "allow"
-# Legacy reference crates are frozen verbatim copies; their test-module
-# layout is kept as imported.
-items_after_test_module = "allow"
 
 [workspace.dependencies]
 # Bevy baseline is pinned to the architecture baseline (ARCHITECTURE.md).

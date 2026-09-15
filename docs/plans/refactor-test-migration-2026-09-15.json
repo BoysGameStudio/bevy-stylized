@@ -1,0 +1,57 @@
+[
+  {
+    "case": "morph_target_deformation_renders",
+    "from": "morph_skinning",
+    "to": "morph_skinning"
+  },
+  {
+    "case": "skinned_deformation_renders",
+    "from": "morph_skinning",
+    "to": "morph_skinning"
+  },
+  {
+    "case": "live_morph_outline_tracks_surface_and_returns_to_rest",
+    "from": "morph_skinning",
+    "to": "morph_skinning"
+  },
+  {
+    "case": "external_head_pose_drives_face_shading_without_material_clones",
+    "from": "morph_skinning",
+    "to": "morph_skinning"
+  },
+  {
+    "case": "genshin_ilm_zero_ao_preserves_shadow_gate",
+    "from": "morph_skinning",
+    "to": "profile_lighting"
+  },
+  {
+    "case": "genshin_ramp_day_night_uses_image_row_orientation",
+    "from": "morph_skinning",
+    "to": "profile_lighting"
+  },
+  {
+    "case": "genshin_face_factor_uses_projected_light_and_control_map",
+    "from": "morph_skinning",
+    "to": "profile_lighting"
+  },
+  {
+    "case": "genshin_material_bands_follow_authored_nonsequential_order",
+    "from": "morph_skinning",
+    "to": "profile_lighting"
+  },
+  {
+    "case": "genshin_zero_vertex_ramp_width_uses_authored_safe_divide",
+    "from": "morph_skinning",
+    "to": "profile_lighting"
+  },
+  {
+    "case": "authored_cubic_diffuse_reconstructs_texel_neighborhood",
+    "from": "morph_skinning",
+    "to": "sampling_camera"
+  },
+  {
+    "case": "orthographic_specular_uses_constant_camera_basis",
+    "from": "morph_skinning",
+    "to": "sampling_camera"
+  }
+]

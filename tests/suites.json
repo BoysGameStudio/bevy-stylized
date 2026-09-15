@@ -16,14 +16,18 @@
       "morph_target_deformation_renders",
       "skinned_deformation_renders",
       "live_morph_outline_tracks_surface_and_returns_to_rest",
+      "external_head_pose_drives_face_shading_without_material_clones"
+    ],
+    "profile_lighting": [
       "genshin_ilm_zero_ao_preserves_shadow_gate",
       "genshin_ramp_day_night_uses_image_row_orientation",
       "genshin_face_factor_uses_projected_light_and_control_map",
       "genshin_material_bands_follow_authored_nonsequential_order",
-      "genshin_zero_vertex_ramp_width_uses_authored_safe_divide",
+      "genshin_zero_vertex_ramp_width_uses_authored_safe_divide"
+    ],
+    "sampling_camera": [
       "authored_cubic_diffuse_reconstructs_texel_neighborhood",
-      "orthographic_specular_uses_constant_camera_basis",
-      "external_head_pose_drives_face_shading_without_material_clones"
+      "orthographic_specular_uses_constant_camera_basis"
     ],
     "instance_table": [
       "table_golden_full_precision_face_thresholds",
