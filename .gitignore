@@ -8,3 +8,6 @@
 /assets/local/
 __pycache__/
 *.pyc
+
+# Integration test Cargo build output
+/tests/integration/target/

@@ -67,6 +67,16 @@ def validate_gpu_suites(suites):
     return suites
 
 
+def select_gpu_suites(suites, selected):
+    """Select explicit binaries without turning a partial run into full coverage."""
+    suites = validate_gpu_suites(suites)
+    if not selected:
+        return suites
+    if len(selected) != len(set(selected)) or any(name not in suites for name in selected):
+        raise CheckFailed('GPU suite selection must contain unique registered binary identities')
+    return {name: suites[name] for name in selected}
+
+
 def run_tests(project, name, command, expected, env):
     """Check the filtered ignored-test inventory, then execute each exact identity.
 

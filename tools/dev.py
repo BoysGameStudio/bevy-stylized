@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 from project import Project
 
-from task_runner import CheckFailed, ResourceBlocked, run_tests, require_suites, invoke, validate_gpu_suites
+from task_runner import CheckFailed, ResourceBlocked, run_tests, require_suites, invoke, validate_gpu_suites, select_gpu_suites
 
 
 def run(project, command, env=None):
@@ -44,6 +44,7 @@ def main():
     sub=parser.add_subparsers(dest='command',required=True);sub.add_parser('paths')
     check=sub.add_parser('check');check.add_argument('--lane',choices=['docs','architecture','schema','cpu','gpu','asset-integration','reference','character-reference','inspector','realtime','independence','consumers','inspector-cpu'],required=True)
     check.add_argument('--fetch',action='store_true',help='prepare independent consumer dependencies online');check.add_argument('--required',action='store_true');check.add_argument('--asset');check.add_argument('--case');check.add_argument('--pack',default='synthetic');check.add_argument('--out')
+    check.add_argument('--suite', action='append', help='GPU lane only: select an exact registered test binary; reports partial coverage')
     assets=sub.add_parser('assets');asset_sub=assets.add_subparsers(dest='action',required=True)
     for action in ['prepare','build']:
         p=asset_sub.add_parser(action);p.add_argument('--pack',required=True);p.add_argument('--manifest');p.add_argument('--mirror');p.add_argument('--blender',default='blender')
@@ -56,9 +57,13 @@ def main():
     if args.command == 'paths':
         return execute(project, args)
     lane = args.lane if args.command == 'check' else args.command + '-' + args.action
+    if lane == 'gpu' and getattr(args, 'suite', None):
+        lane = 'gpu-selected'
     try:
         project.begin_run(lane, {key: getattr(args, key, None) for key in
                                 ['asset', 'case', 'manifest', 'candidate', 'baseline']}, args.run_id)
+        if getattr(args, 'suite', None):
+            project.identity['options'] = {'gpu_suites': args.suite}
         print(f'RUN {project.run_id}', flush=True)
         execute(project, args)
         project.finish_run('PASS', 'completed')
@@ -83,6 +88,8 @@ def main():
 
 
 def execute(project, args):
+    if getattr(args, 'suite', None) and (args.command != 'check' or args.lane != 'gpu'):
+        raise CheckFailed('--suite is only valid for the GPU lane')
     if args.command == 'check' and args.fetch and args.lane != 'consumers':
         raise CheckFailed('--fetch is only valid for consumers')
     if args.command=='paths':
@@ -147,18 +154,25 @@ def execute(project, args):
         env = dict(os.environ, STYLIZED_REQUIRE_GPU='1')
         suites = json.loads((project.root/'tests/suites.json').read_text())
         states = []
-        for binary, identities in validate_gpu_suites(suites['gpu']).items():
+        selected = select_gpu_suites(suites['gpu'], getattr(args, 'suite', None))
+        partial = bool(getattr(args, 'suite', None))
+        for binary, identities in selected.items():
             states.append(run_tests(project, binary,
                 ['cargo','test','--locked','-p','stylized-integration-tests','--test',binary], identities, env))
         from task_runner import aggregate
         totals = {key: sum(s[key] for s in states) for key in
                   ['expected','executed','passed','failed','blocked','not_executed']}
-        project.report('gpu-required', dict(totals, status=aggregate(states)['status'], suites=states))
-        states.append(run_tests(project,'synthetic-import',
-            ['cargo','test','--locked','-p','stylized-integration-tests','--test','asset_adoption','synthetic_character'],
-            suites['synthetic-import'],env))
+        project.report('gpu-selected-required' if partial else 'gpu-required', dict(totals, status=aggregate(states)['status'], suites=states,
+                                          coverage='selected-suites' if partial else 'full-registry',
+                                          full_gpu_suite=not partial))
+        if not partial:
+            states.append(run_tests(project,'synthetic-import',
+                ['cargo','test','--locked','-p','stylized-integration-tests','--test','asset_adoption','synthetic_character'],
+                suites['synthetic-import'],env))
         require_suites(states)
-        project.report('gpu', {'status':'PASS','binaries':list(suites['gpu']), 'required':True})
+        project.report('gpu-selected' if partial else 'gpu', {'status':'PASS','binaries':list(selected), 'required':True,
+                               'coverage':'selected-suites' if partial else 'full-registry',
+                               'full_gpu_suite':not partial})
     elif lane=='asset-integration':
         if not args.asset:raise ValueError('--asset must identify the explicitly prepared GLB')
         if not project.resolve(args.asset).is_file():raise ResourceBlocked('required compiled asset missing')

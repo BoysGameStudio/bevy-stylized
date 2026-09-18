@@ -23,7 +23,9 @@
       "genshin_ramp_day_night_uses_image_row_orientation",
       "genshin_face_factor_uses_projected_light_and_control_map",
       "genshin_material_bands_follow_authored_nonsequential_order",
-      "genshin_zero_vertex_ramp_width_uses_authored_safe_divide"
+      "genshin_zero_vertex_ramp_width_uses_authored_safe_divide",
+      "prepared_ramp_zero_vertex_width_uses_explicit_denominator_floor",
+      "source_metal_requires_explicit_enable_and_uses_authored_color"
     ],
     "sampling_camera": [
       "authored_cubic_diffuse_reconstructs_texel_neighborhood",
@@ -37,6 +39,23 @@
     "interim_budget": [
       "whole_pipeline_budget_fits_baseline_models",
       "uniform_packing_and_sampler_audit"
+    ],
+    "host_input_abi": [
+      "bounded_host_uniform_records_match_gpu_layout"
+    ],
+    "extended_skin": [
+      "complete_skin_and_morph_match_baked_surface_and_outline",
+      "authored_outline_selects_all_five_alpha_classes_and_disabled_class_falls_back"
+    ],
+    "host_material": [
+      "shared_host_material_updates_instance_data_without_asset_mutation",
+      "hero_blend_uses_diffuse_alpha_while_opaque_keeps_it_as_control_data",
+      "opaque_priorities_are_independent_of_material_allocation_order"
+    ],
+    "physical_material": [
+      "physical_extension_preserves_standard_lighting_and_host_binding",
+      "physical_ramp_remaps_light_without_erasing_emission",
+      "physical_host_resource_layout_is_measured"
     ]
   },
   "asset-integration": [

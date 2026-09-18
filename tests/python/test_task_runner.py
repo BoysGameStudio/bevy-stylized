@@ -203,3 +203,38 @@ class RegistryValidation(unittest.TestCase):
             with self.assertRaises(CheckFailed):validate_gpu_suites(value)
         valid={'one':['a','module::b']}
         self.assertEqual(validate_gpu_suites(valid),valid)
+
+
+class GpuSelection(unittest.TestCase):
+    def test_selection_rejects_unknown_and_duplicate_binaries(self):
+        from task_runner import select_gpu_suites
+        registry = {'first': ['a'], 'second': ['b']}
+        self.assertEqual(select_gpu_suites(registry, None), registry)
+        self.assertEqual(select_gpu_suites(registry, ['second']), {'second': ['b']})
+        for selected in [['missing'], ['first', 'first']]:
+            with self.assertRaises(CheckFailed):
+                select_gpu_suites(registry, selected)
+
+    def test_selected_gpu_run_never_claims_full_coverage(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = make_project(tmp)
+            (project.root / 'tests').mkdir()
+            (project.root / 'tests/suites.json').write_text(json.dumps({
+                'gpu': {'first': ['a'], 'second': ['b']}, 'synthetic-import': ['synthetic']}))
+            state = dict(status='PASS', expected=1, executed=1, passed=1,
+                         failed=0, blocked=0, not_executed=0)
+            complete = project.report('gpu', {'status': 'PASS', 'marker': 'older-full-run'})
+            prior = complete.read_bytes()
+            with patch.object(dev, 'Project', return_value=project), \
+                 patch.object(sys, 'argv', ['dev.py', '--run-id', 'selected', 'check', '--lane', 'gpu', '--suite', 'first']), \
+                 patch.object(dev, 'run_tests', return_value=state) as run, \
+                 contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(dev.main(), 0)
+            self.assertEqual(run.call_count, 1)
+            report = project.read_report('gpu-selected', 'selected')
+            self.assertFalse(report['full_gpu_suite'])
+            self.assertEqual(report['coverage'], 'selected-suites')
+            self.assertEqual(report['binaries'], ['first'])
+            self.assertEqual(report['options']['gpu_suites'], ['first'])
+            self.assertFalse(project.read_report('gpu-selected-required', 'selected')['full_gpu_suite'])
+            self.assertEqual(complete.read_bytes(), prior)

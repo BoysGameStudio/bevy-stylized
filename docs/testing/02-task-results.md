@@ -10,6 +10,15 @@ Automation may pass `--run-id ID` before the subcommand; IDs are 1–80 ASCII le
 digits, underscores or hyphens and cannot reuse an existing directory. The parent
 retains this ID before starting the child. Interactive invocations print `RUN ID`.
 
+For a bounded GPU investigation, `check --lane gpu --suite BINARY --required`
+selects an exact binary from `tests/suites.json`; repeat `--suite` for additional
+binaries. Unknown/duplicate identities are rejected. These runs use the
+`gpu-selected` report lane, set `full_gpu_suite: false`, and do not overwrite the
+full GPU lane's convenience reports or run its synthetic-import tail. They are
+scoped evidence, not full GPU qualification. Omitting `--suite` retains the full
+registry and synthetic-import checks. The requested suite list is recorded in
+the run's `options.gpu_suites` field.
+
 Each run writes `runs/ID/LANE.json`, child reports and logs. A fixed `LANE.json` in
 the output root is only a convenience copy. Never infer a current success solely
 from this copy or from an old log. `Project.read_report` checks the expected run ID,
