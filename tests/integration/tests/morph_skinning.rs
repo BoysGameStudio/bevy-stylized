@@ -195,6 +195,7 @@ fn live_morph_outline_tracks_surface_and_returns_to_rest() {
             params: StylizedOutlineParams::default()
                 .with_color(LinearRgba::RED)
                 .with_width(4.0),
+            ..Default::default()
         });
     let source = app
         .world_mut()

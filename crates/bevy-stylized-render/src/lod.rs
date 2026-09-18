@@ -186,7 +186,7 @@ pub(crate) fn register(app: &mut bevy::app::App) {
     app.init_resource::<StylizedLodPolicyResource>()
         .add_systems(
             PostUpdate,
-            sync_lod.before(crate::instance::sync_instance_tags),
+            sync_lod.before(crate::instance::sync_instance_tags).in_set(crate::presentation::NativePresentationSystems),
         );
 }
 

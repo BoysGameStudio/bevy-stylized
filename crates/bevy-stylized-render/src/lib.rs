@@ -37,13 +37,19 @@ pub mod capability;
 pub mod character;
 pub mod face_input;
 pub mod hero;
+pub mod host_inputs;
+pub mod host_material;
 pub mod instance;
 pub mod instance_table;
 pub mod lod;
 pub mod material;
 pub mod outline;
+pub mod outline_order;
+pub mod physical;
 pub mod post;
+pub mod presentation;
 pub mod screen_outline;
+pub mod skinning;
 pub mod view;
 pub use face_input::{StylizedFaceInput, StylizedFaceInputStatus};
 
@@ -111,10 +117,14 @@ pub struct StylizedRenderPlugin;
 
 impl Plugin for StylizedRenderPlugin {
     fn build(&self, app: &mut App) {
+        app.init_resource::<presentation::PresentationSchedule>()
+            .configure_sets(PostUpdate, presentation::NativePresentationSystems.run_if(presentation::native_schedule));
         embedded_asset!(app, "shaders/cel/portable_forward.wgsl");
         embedded_asset!(app, "shaders/character/character_forward.wgsl");
         embedded_asset!(app, "shaders/outline/portable_outline.wgsl");
         embedded_asset!(app, "shaders/common/npr_common.wgsl");
+        embedded_asset!(app, "shaders/common/host_inputs.wgsl");
+        embedded_asset!(app, "shaders/common/complete_skin_prepass.wgsl");
         embedded_asset!(app, "shaders/hero/hero_forward.wgsl");
         embedded_asset!(app, "shaders/post/stylized_fullscreen.wgsl");
         embedded_asset!(app, "shaders/outline/screen_outline.wgsl");
@@ -127,6 +137,7 @@ impl Plugin for StylizedRenderPlugin {
             MaterialPlugin::<screen_outline::StylizedScreenOutlineMaterial>::default(),
         ));
         post::register(app);
+        outline_order::register(app);
         app.register_type::<StylizedCelMaterial>()
             .register_type::<StylizedOutlineMaterial>()
             .register_type::<StylizedCharacterMaterial>()
@@ -152,23 +163,29 @@ impl Plugin for StylizedRenderPlugin {
             PostUpdate,
             (
                 material::sync_cel_material_flags.after(bevy::asset::AssetEventSystems),
+                skinning::update_complete_skin_bounds
+                    .after(bevy::asset::AssetEventSystems)
+                    .before(bevy::camera::visibility::VisibilitySystems::CalculateBounds),
                 character::sync_character_material_flags.after(bevy::asset::AssetEventSystems),
                 character::sync_character_table_material_flags
                     .after(bevy::asset::AssetEventSystems),
                 hero::sync_hero_material_flags.after(bevy::asset::AssetEventSystems),
                 outline::sync_outline_replicas
+                    .in_set(presentation::NativePresentationSystems)
                     .after(bevy::app::AnimationSystems)
                     .before(bevy::transform::TransformSystems::Propagate)
                     .before(bevy::camera::visibility::VisibilitySystems::CalculateBounds),
                 screen_outline::sync_screen_outline,
                 face_input::sync_face_inputs
+                    .in_set(presentation::NativePresentationSystems)
                     .after(hero::sync_hero_material_flags)
                     .after(bevy::transform::TransformSystems::Propagate)
                     .before(instance::sync_instance_tags),
                 face_input::restore_removed_face_inputs
+                    .in_set(presentation::NativePresentationSystems)
                     .after(face_input::sync_face_inputs)
                     .before(instance::sync_instance_tags),
-                instance::sync_instance_tags,
+                instance::sync_instance_tags.in_set(presentation::NativePresentationSystems),
             ),
         );
     }
@@ -188,6 +205,10 @@ impl Plugin for StylizedRenderPlugin {
             let handle: bevy::prelude::Handle<bevy::shader::Shader> = bevy::asset::load_embedded_asset!(
                 app.world_mut(),
                 "shaders/common/npr_common.wgsl"
+            );
+            core::mem::forget(handle);
+            let handle: bevy::prelude::Handle<bevy::shader::Shader> = bevy::asset::load_embedded_asset!(
+                app.world_mut(), "shaders/common/host_inputs.wgsl"
             );
             core::mem::forget(handle);
         }

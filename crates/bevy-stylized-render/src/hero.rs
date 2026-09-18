@@ -50,6 +50,8 @@ pub const HERO_FLAG_GENSHIN_FACE: u32 = 1 << 6;
 pub const HERO_FLAG_PUPIL_HIGHLIGHT: u32 = 1 << 7;
 /// Reconstruct a raw authored diffuse image using cubic B-splines.
 pub const HERO_FLAG_CUBIC_BASE: u32 = 1 << 8;
+/// Select UV1 for backfacing diffuse without changing face/control-map UVs.
+pub const HERO_FLAG_BACKFACE_UV1: u32 = 1 << 9;
 
 /// Genshin lighting fields, packed as vec4s without extra texture bindings.
 #[derive(Clone, Copy, Debug, PartialEq, Reflect, ShaderType)]
@@ -87,8 +89,36 @@ impl Default for StylizedGenshinLightingParams {
     }
 }
 
+/// Opt-in authored matcap/specular branch; colors precede their gamma nodes.
+#[derive(Clone, Copy, Debug, PartialEq, Reflect, ShaderType)]
+pub struct StylizedMetalParams {
+    /// Enabled, matcap brightness, horizontal tile scale, reserved.
+    pub controls: bevy::math::Vec4,
+    pub dark: bevy::math::Vec4,
+    pub light: bevy::math::Vec4,
+    pub shadow: bevy::math::Vec4,
+    /// Shininess, response scale, attenuation, sharp-layer threshold.
+    pub specular: bevy::math::Vec4,
+    pub specular_color: bevy::math::Vec4,
+    pub sharp_color: bevy::math::Vec4,
+}
+impl Default for StylizedMetalParams {
+    fn default() -> Self {
+        use bevy::math::Vec4;
+        Self {
+            controls: Vec4::new(0., 3., 1., 0.),
+            dark: Vec4::ONE,
+            light: Vec4::ONE,
+            shadow: Vec4::ONE,
+            specular: Vec4::new(4., 1.2, 0.2, 0.95),
+            specular_color: Vec4::ONE,
+            sharp_color: Vec4::ONE,
+        }
+    }
+}
+
 /// Hero 材质 GPU uniform：character 参数 + hero 扩展 2×vec4（packed 单
-/// UBO，496B）。
+/// UBO，512B）。
 #[derive(Clone, Copy, Debug, PartialEq, Reflect, ShaderType)]
 pub struct StylizedHeroParams {
     /// Character 层参数（face/hair/emission/cel 基础 + palette + face up）。
@@ -100,6 +130,12 @@ pub struct StylizedHeroParams {
     pub hero_b: bevy::math::Vec4,
     /// Explicit Genshin body lighting; disabled by default.
     pub genshin: StylizedGenshinLightingParams,
+    /// Opt-in base readability floor, authored-alpha gain, eye floor and highlight preservation.
+    /// Zero preserves the existing profile behavior.
+    pub authored_energy: bevy::math::Vec4,
+    pub metal: StylizedMetalParams,
+    /// Source bump scale (0 disables), sequential prepared ramp, level-zero controls, incoming-light body convention.
+    pub source_conventions: bevy::math::Vec4,
 }
 
 impl Default for StylizedHeroParams {
@@ -109,6 +145,9 @@ impl Default for StylizedHeroParams {
             hero_a: bevy::math::Vec4::new(0.0, 0.0, 0.5, 1.0),
             hero_b: bevy::math::Vec4::new(1.0, 1.0, 1.0, 0.0),
             genshin: StylizedGenshinLightingParams::default(),
+            authored_energy: bevy::math::Vec4::ZERO,
+            metal: StylizedMetalParams::default(),
+            source_conventions: bevy::math::Vec4::ZERO,
         }
     }
 }
@@ -328,6 +367,13 @@ impl StylizedHeroMaterial {
         };
         material.params.character = character.params;
         material.params.set_flag(
+            HERO_FLAG_BACKFACE_UV1,
+            descriptor
+                .static_params
+                .get("backface_uv1")
+                .is_some_and(|v| *v > 0.5),
+        );
+        material.params.set_flag(
             HERO_FLAG_CUBIC_BASE,
             descriptor
                 .static_params
@@ -335,6 +381,14 @@ impl StylizedHeroMaterial {
                 .is_some_and(|v| *v > 0.5),
         );
         for (index, texture) in descriptor.textures.iter().enumerate() {
+            if descriptor
+                .static_params
+                .get("specular_ramp_index")
+                .is_some_and(|v| *v == index as f32)
+            {
+                material.spec_ramp_texture = Some(load_texture(&texture.uri));
+                continue;
+            }
             if descriptor
                 .static_params
                 .get("surface_control_index")
@@ -396,6 +450,27 @@ impl StylizedHeroMaterial {
                 .copied()
                 .unwrap_or(default)
         };
+        let metal_vector = |key: &str, fallback: bevy::math::Vec4| {
+            bevy::math::Vec4::from_array(std::array::from_fn(|i| {
+                get(&format!("{key}_{i}"), fallback[i])
+            }))
+        };
+        material.params.source_conventions =
+            metal_vector("source_conventions", material.params.source_conventions);
+        let m = &mut material.params.metal;
+        m.controls = metal_vector("metal_controls", m.controls);
+        m.dark = metal_vector("metal_dark", m.dark);
+        m.light = metal_vector("metal_light", m.light);
+        m.shadow = metal_vector("metal_shadow", m.shadow);
+        m.specular = metal_vector("metal_specular", m.specular);
+        m.specular_color = metal_vector("metal_specular_color", m.specular_color);
+        m.sharp_color = metal_vector("metal_sharp_color", m.sharp_color);
+        material.params.authored_energy = bevy::math::Vec4::new(
+            get("readability_floor", 0.0).clamp(0.0, 1.0),
+            get("authored_emission_gain", 0.0).max(0.0),
+            get("eye_floor", 0.0).clamp(0.0, 1.0),
+            get("eye_highlight_preservation", 0.0).max(0.0),
+        );
         if get("genshin_ramp", 0.0) != 0.0 {
             material.params = material
                 .params
@@ -579,6 +654,10 @@ impl Material for StylizedHeroMaterial {
     // prepass 参与在类型级开启（默认 prepass shader 即可）；**成本门控在
     // 相机**：只有带 DepthPrepass/NormalPrepass 组件的相机才产生 prepass
     // 开销（StylizedScreenOutline 的 per-camera opt-in），默认相机零成本。
+    fn prepass_vertex_shader() -> ShaderRef {
+        crate::skinning::COMPLETE_SKIN_PREPASS_SHADER.into()
+    }
+
     fn enable_prepass() -> bool {
         true
     }
@@ -590,9 +669,10 @@ impl Material for StylizedHeroMaterial {
     fn specialize(
         _pipeline: &bevy::pbr::MaterialPipeline,
         descriptor: &mut bevy::render::render_resource::RenderPipelineDescriptor,
-        _layout: &bevy::mesh::MeshVertexBufferLayoutRef,
+        layout: &bevy::mesh::MeshVertexBufferLayoutRef,
         key: bevy::pbr::MaterialPipelineKey<Self>,
     ) -> Result<(), bevy::render::render_resource::SpecializedMeshPipelineError> {
+        crate::skinning::specialize_secondary_skin(descriptor, layout)?;
         let debug_define = match key.bind_group_data.debug_view {
             StylizedHeroDebugView::Beauty => None,
             StylizedHeroDebugView::LightingFactors => Some("STYLIZED_LIGHTING_FACTORS"),

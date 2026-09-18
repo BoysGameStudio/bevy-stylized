@@ -295,6 +295,7 @@ fn outline_scene(app: &mut App) {
             params: StylizedOutlineParams::default()
                 .with_color(LinearRgba::new(0.01, 0.01, 0.02, 1.0))
                 .with_width(6.0),
+            ..Default::default()
         });
     app.world_mut().spawn((
         Mesh3d(sphere),

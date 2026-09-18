@@ -8,6 +8,10 @@ use bevy_stylized_core::{
 use bevy_stylized_render::{
     StylizedCelMaterial, StylizedCharacterMaterial, StylizedHeroMaterial, StylizedInstanceData,
 };
+use bevy_stylized_render::{
+    host_inputs::HostInstanceRecord,
+    host_material::{HostAlphaMode, HostInstanceInput, HostMaterial},
+};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Attach to the application-owned scene root before loading its descendants.
@@ -19,6 +23,14 @@ pub struct StylizedMaterialSet {
     pub materials: BTreeMap<String, StylizedMaterialDescriptor>,
     /// Asset-server-relative directory containing descriptor texture paths.
     pub texture_prefix: String,
+}
+
+/// Opt-in bounded host-frame adoption. View and instance state are not part of
+/// the shared static-material cache key. Requires HostMaterialPlugin.
+#[derive(Component, Clone, Debug)]
+pub struct HostMaterialScope {
+    pub view: Entity,
+    pub instance: HostInstanceRecord,
 }
 
 /// Per-entity adoption outcome. Errors are inspectable instead of silent defaults.
@@ -34,6 +46,9 @@ enum CachedMaterial {
     Cel(Handle<StylizedCelMaterial>),
     Character(Handle<StylizedCharacterMaterial>),
     Hero(Handle<StylizedHeroMaterial>),
+    HostCel(Handle<HostMaterial<StylizedCelMaterial>>, Vec4),
+    HostCharacter(Handle<HostMaterial<StylizedCharacterMaterial>>, Vec4),
+    HostHero(Handle<HostMaterial<StylizedHeroMaterial>>, Vec4),
 }
 #[derive(Resource, Default)]
 struct MaterialCache(HashMap<String, CachedMaterial>);
@@ -50,8 +65,8 @@ impl Plugin for StylizedAssetIntegrationPlugin {
 fn owner<'a>(
     mut entity: Entity,
     parents: &Query<&ChildOf>,
-    sets: &'a Query<&StylizedMaterialSet>,
-) -> Option<&'a StylizedMaterialSet> {
+    sets: &'a Query<(&StylizedMaterialSet, Option<&HostMaterialScope>)>,
+) -> Option<(&'a StylizedMaterialSet, Option<&'a HostMaterialScope>)> {
     loop {
         if let Ok(set) = sets.get(entity) {
             return Some(set);
@@ -71,16 +86,19 @@ fn adopt(
         Without<StylizedMaterialAdoption>,
     >,
     parents: Query<&ChildOf>,
-    sets: Query<&StylizedMaterialSet>,
+    sets: Query<(&StylizedMaterialSet, Option<&HostMaterialScope>)>,
     server: Res<AssetServer>,
     standard: Res<Assets<StandardMaterial>>,
     mut cel: ResMut<Assets<StylizedCelMaterial>>,
     mut character: ResMut<Assets<StylizedCharacterMaterial>>,
     mut hero: ResMut<Assets<StylizedHeroMaterial>>,
     mut cache: ResMut<MaterialCache>,
+    mut host_cel: Option<ResMut<Assets<HostMaterial<StylizedCelMaterial>>>>,
+    mut host_character: Option<ResMut<Assets<HostMaterial<StylizedCharacterMaterial>>>>,
+    mut host_hero: Option<ResMut<Assets<HostMaterial<StylizedHeroMaterial>>>>,
 ) {
     for (entity, source, name) in &entities {
-        let Some(set) = owner(entity, &parents, &sets) else {
+        let Some((set, scope)) = owner(entity, &parents, &sets) else {
             continue;
         };
         if standard.get(&source.0).is_none() {
@@ -97,7 +115,17 @@ fn adopt(
         };
         // Built only once at adoption. Identical descriptors share material assets
         // across scene roots; dynamic instance state is kept out of this key.
-        let key = format!("{}:{descriptor:?}", set.texture_prefix);
+        if scope.is_some()
+            && (host_cel.is_none() || host_character.is_none() || host_hero.is_none())
+        {
+            commands.entity(entity).insert(StylizedMaterialAdoption {
+                material_name: name,
+                error: Some("HostMaterialPlugin is required for host material scope".into()),
+                cache_key: String::new(),
+            });
+            continue;
+        }
+        let key = format!("{}:{}:{descriptor:?}", scope.is_some(), set.texture_prefix);
         let material = cache
             .0
             .entry(key.clone())
@@ -139,15 +167,51 @@ fn adopt(
                         .load(path)
                 };
                 match descriptor.surface_class {
-                    StylizedSurfaceClass::Cel => CachedMaterial::Cel(
-                        cel.add(StylizedCelMaterial::from_descriptor(descriptor, load)),
-                    ),
-                    StylizedSurfaceClass::Character => CachedMaterial::Character(
-                        character.add(StylizedCharacterMaterial::from_descriptor(descriptor, load)),
-                    ),
-                    StylizedSurfaceClass::Hero => CachedMaterial::Hero(
-                        hero.add(StylizedHeroMaterial::from_descriptor(descriptor, load)),
-                    ),
+                    StylizedSurfaceClass::Cel => {
+                        let material = StylizedCelMaterial::from_descriptor(descriptor, load);
+                        if scope.is_some() {
+                            let tint = material.params.base_color_factor;
+                            CachedMaterial::HostCel(
+                                host_cel
+                                    .as_mut()
+                                    .unwrap()
+                                    .add(HostMaterial::new(material, HostAlphaMode::Inherit)),
+                                tint,
+                            )
+                        } else {
+                            CachedMaterial::Cel(cel.add(material))
+                        }
+                    }
+                    StylizedSurfaceClass::Character => {
+                        let material = StylizedCharacterMaterial::from_descriptor(descriptor, load);
+                        if scope.is_some() {
+                            let tint = material.params.cel.base_color_factor;
+                            CachedMaterial::HostCharacter(
+                                host_character
+                                    .as_mut()
+                                    .unwrap()
+                                    .add(HostMaterial::new(material, HostAlphaMode::Inherit)),
+                                tint,
+                            )
+                        } else {
+                            CachedMaterial::Character(character.add(material))
+                        }
+                    }
+                    StylizedSurfaceClass::Hero => {
+                        let material = StylizedHeroMaterial::from_descriptor(descriptor, load);
+                        if scope.is_some() {
+                            let tint = material.params.character.cel.base_color_factor;
+                            CachedMaterial::HostHero(
+                                host_hero
+                                    .as_mut()
+                                    .unwrap()
+                                    .add(HostMaterial::new(material, HostAlphaMode::Inherit)),
+                                tint,
+                            )
+                        } else {
+                            CachedMaterial::Hero(hero.add(material))
+                        }
+                    }
                 }
             })
             .clone();
@@ -163,8 +227,46 @@ fn adopt(
             CachedMaterial::Hero(handle) => {
                 target.insert(MeshMaterial3d(handle));
             }
+            CachedMaterial::HostCel(handle, tint) => {
+                let scope = scope.unwrap();
+                let mut record = scope.instance;
+                record.tint *= tint;
+                target.insert((
+                    MeshMaterial3d(handle),
+                    HostInstanceInput {
+                        view: scope.view,
+                        record,
+                    },
+                ));
+            }
+            CachedMaterial::HostCharacter(handle, tint) => {
+                let scope = scope.unwrap();
+                let mut record = scope.instance;
+                record.tint *= tint;
+                target.insert((
+                    MeshMaterial3d(handle),
+                    HostInstanceInput {
+                        view: scope.view,
+                        record,
+                    },
+                ));
+            }
+            CachedMaterial::HostHero(handle, tint) => {
+                let scope = scope.unwrap();
+                let mut record = scope.instance;
+                record.tint *= tint;
+                target.insert((
+                    MeshMaterial3d(handle),
+                    HostInstanceInput {
+                        view: scope.view,
+                        record,
+                    },
+                ));
+            }
         }
-        target.insert_if_new(StylizedInstanceData::default());
+        if scope.is_none() {
+            target.insert_if_new(StylizedInstanceData::default());
+        }
         target.insert(StylizedMaterialAdoption {
             material_name: name,
             error: None,

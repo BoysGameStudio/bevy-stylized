@@ -1,0 +1,15 @@
+{
+  "schema": "bevy-stylized.sidecar/v1",
+  "materials": {
+    "surface": {
+      "name": "surface",
+      "surface_class": "cel",
+      "static_params": {
+        "base_color_r": 0.8,
+        "base_color_g": 0.3,
+        "base_color_b": 0.2,
+        "base_color_a": 1.0
+      }
+    }
+  }
+}

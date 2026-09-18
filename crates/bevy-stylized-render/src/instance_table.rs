@@ -210,7 +210,7 @@ pub(crate) fn register(app: &mut bevy::app::App) {
     use bevy::prelude::IntoScheduleConfigs;
     app.add_systems(
         PostUpdate,
-        sync_instance_table.before(crate::instance::sync_instance_tags),
+        sync_instance_table.before(crate::instance::sync_instance_tags).in_set(crate::presentation::NativePresentationSystems),
     );
 }
 

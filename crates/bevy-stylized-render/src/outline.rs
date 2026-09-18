@@ -6,6 +6,7 @@
 //! **Provisional（ADR-0008 草案）**：生命周期契约（bounds / LOD / despawn
 //! 的完整语义）随 ADR-0008 关闭而定；当前实现为最小可用副本同步。
 
+use bevy::prelude::{Or, With, error};
 use bevy::{
     mesh::{
         Mesh3d, MeshVertexBufferLayoutRef,
@@ -30,10 +31,43 @@ pub const OUTLINE_PORTABLE_SHADER_PATH: &str =
 pub struct StylizedOutlineParams {
     /// 线性 rgb + 宽度（物理像素，0 = 关闭）。
     pub color_width: bevy::math::Vec4,
+    /// Optional authored class colors, converted by `source_params.y` gamma.
+    pub source_colors: [bevy::math::Vec4; 5],
+    /// Local extrusion width, color exponent, suppression, reserved.
+    pub source_params: bevy::math::Vec4,
+    /// Local-space mode, enabled classes 2–5 mask, force first class, use map.
+    pub source_state: bevy::math::UVec4,
 }
 
 #[cfg(test)]
 mod lifecycle_tests {
+    #[test]
+    fn outline_mirrors_render_layers_and_removal() {
+        use bevy::camera::visibility::RenderLayers;
+        let mut app = App::new();
+        app.add_systems(Update, sync_outline_replicas);
+        let source = app
+            .world_mut()
+            .spawn((
+                Mesh3d(Handle::default()),
+                StylizedOutline::new(Handle::default()),
+                RenderLayers::layer(3),
+            ))
+            .id();
+        app.update();
+        let replica = app
+            .world_mut()
+            .query_filtered::<Entity, With<StylizedOutlineReplica>>()
+            .single(app.world())
+            .unwrap();
+        assert_eq!(
+            app.world().get::<RenderLayers>(replica),
+            Some(&RenderLayers::layer(3))
+        );
+        app.world_mut().entity_mut(source).remove::<RenderLayers>();
+        app.update();
+        assert!(app.world().get::<RenderLayers>(replica).is_none());
+    }
     use super::*;
     use bevy::prelude::*;
 
@@ -145,6 +179,9 @@ impl Default for StylizedOutlineParams {
     fn default() -> Self {
         Self {
             color_width: bevy::math::Vec4::new(0.02, 0.02, 0.03, Self::DEFAULT_WIDTH),
+            source_colors: [bevy::math::Vec4::ONE; 5],
+            source_params: bevy::math::Vec4::new(0.0, 1.0, 0.0, 0.0),
+            source_state: bevy::math::UVec4::ZERO,
         }
     }
 }
@@ -154,6 +191,33 @@ impl StylizedOutlineParams {
     pub const DEFAULT_WIDTH: f32 = 2.0;
     /// 轮廓宽度上限（物理像素）。
     pub const MAX_WIDTH: f32 = 24.0;
+
+    /// Select source-unit extrusion and five alpha-band-selected colors.
+    /// The caller owns the source color encoding; `color_exponent=1` is linear.
+    #[must_use]
+    pub fn with_source_palette(
+        mut self,
+        local_width: f32,
+        colors: [bevy::color::LinearRgba; 5],
+        enabled_mask: u32,
+        force_first: bool,
+        color_exponent: f32,
+    ) -> Self {
+        self.source_colors = colors
+            .map(|c| bevy::math::Vec4::new(c.red.max(0.0), c.green.max(0.0), c.blue.max(0.0), 1.0));
+        self.source_params.x = if local_width.is_finite() {
+            local_width.max(0.0)
+        } else {
+            0.0
+        };
+        self.source_params.y = if color_exponent.is_finite() {
+            color_exponent.max(0.0)
+        } else {
+            1.0
+        };
+        self.source_state = bevy::math::UVec4::new(1, enabled_mask & 15, u32::from(force_first), 0);
+        self
+    }
 
     /// 设置线性颜色。
     #[must_use]
@@ -182,8 +246,10 @@ pub struct StylizedOutlineMaterial {
     /// 轮廓 uniform。
     #[uniform(0)]
     pub params: StylizedOutlineParams,
-    // 预留：lightmap 多色轮廓属于 Character/Hero 语义，不进 Portable
-    // Cel 切片；加入时会以独立字段扩展而不是塞进本 uniform。
+    /// Optional authored class map (alpha bands); absent for plain pixel hulls.
+    #[texture(1)]
+    #[sampler(2)]
+    pub class_texture: Option<Handle<bevy::prelude::Image>>,
 }
 
 impl Material for StylizedOutlineMaterial {
@@ -210,11 +276,13 @@ impl Material for StylizedOutlineMaterial {
     fn specialize(
         _pipeline: &MaterialPipeline,
         descriptor: &mut bevy::render::render_resource::RenderPipelineDescriptor,
-        _layout: &MeshVertexBufferLayoutRef,
+        layout: &MeshVertexBufferLayoutRef,
         _key: MaterialPipelineKey<Self>,
     ) -> Result<(), SpecializedMeshPipelineError> {
+        crate::skinning::specialize_secondary_skin(descriptor, layout)?;
         // Inverted hull：剔除正面。
         descriptor.primitive.cull_mode = Some(Face::Front);
+        descriptor.label = Some("stylized opaque hull".into());
         Ok(())
     }
 }
@@ -262,13 +330,23 @@ pub fn sync_outline_replicas(
         (
             Entity,
             Ref<Mesh3d>,
-            Ref<StylizedOutline>,
+            Option<Ref<StylizedOutline>>,
+            Option<Ref<crate::host_material::HostOutline>>,
+            Option<Ref<crate::host_material::HostInstanceInput>>,
             Option<Ref<SkinnedMesh>>,
             Option<Ref<MorphWeights>>,
             Option<Ref<MeshMorphWeights>>,
             Option<Ref<bevy::camera::primitives::Aabb>>,
+            Option<Ref<bevy::camera::visibility::RenderLayers>>,
+            Option<Ref<GlobalTransform>>,
         ),
-        Without<StylizedOutlineReplica>,
+        (
+            Without<StylizedOutlineReplica>,
+            Or<(
+                With<StylizedOutline>,
+                With<crate::host_material::HostOutline>,
+            )>,
+        ),
     >,
     replicas: Query<(
         Entity,
@@ -284,7 +362,24 @@ pub fn sync_outline_replicas(
             existing.insert(replica.source, (entity, bounds.is_some()));
         }
     }
-    for (entity, mesh, outline, skin, morph, morph_reference, bounds) in &sources {
+    for (
+        entity,
+        mesh,
+        outline,
+        host_outline,
+        host_input,
+        skin,
+        morph,
+        morph_reference,
+        bounds,
+        layers,
+        global,
+    ) in &sources
+    {
+        if outline.is_some() && host_outline.is_some() {
+            error!("A surface cannot have both static and host outline owners");
+            continue;
+        }
         let current = existing.get(&entity).copied();
         let new = current.is_none();
         let mut target = if let Some((replica, _)) = current {
@@ -298,6 +393,21 @@ pub fn sync_outline_replicas(
                 bevy::prelude::ChildOf(entity),
             ))
         };
+        // The generated child has an identity local transform. An external
+        // host has already finalized source globals; do not re-propagate its
+        // hierarchy just to initialize renderer-owned replicas.
+        if let Some(global) = global
+            && (new || global.is_changed())
+        {
+            target.insert(*global);
+        }
+        if let Some(layers) = layers {
+            if new || layers.is_changed() {
+                target.insert((*layers).clone());
+            }
+        } else {
+            target.remove::<bevy::camera::visibility::RenderLayers>();
+        }
         if new || mesh.is_changed() {
             target.insert(Mesh3d(mesh.0.clone()));
             // Mesh replacement invalidates the old mesh's automatically computed bounds.
@@ -310,8 +420,24 @@ pub fn sync_outline_replicas(
         } else if current.is_some_and(|(_, mirrored)| mirrored) {
             target.remove::<(bevy::camera::primitives::Aabb, StylizedOutlineSourceBounds)>();
         }
-        if new || outline.is_changed() {
+        if let Some(outline) = outline
+            && (new || outline.is_changed())
+        {
+            target.remove::<MeshMaterial3d<crate::host_material::HostMaterial<StylizedOutlineMaterial>>>();
             target.insert(MeshMaterial3d(outline.material.clone()));
+        }
+        if let Some(outline) = host_outline {
+            if new || outline.is_changed() {
+                target.remove::<MeshMaterial3d<StylizedOutlineMaterial>>();
+                target.insert(MeshMaterial3d(outline.0.clone()));
+            }
+            if let Some(input) = host_input {
+                if new || input.is_changed() {
+                    target.insert((*input).clone());
+                }
+            } else {
+                target.remove::<crate::host_material::HostInstanceInput>();
+            }
         }
         if let Some(skin) = skin {
             if new || skin.is_changed() {

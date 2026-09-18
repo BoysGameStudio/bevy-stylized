@@ -243,9 +243,9 @@ pub fn sync_stylized_view(
 
 /// 注册 View 同步系统。
 pub(crate) fn register(app: &mut bevy::prelude::App) {
-    use bevy::prelude::PostUpdate;
+    use bevy::prelude::{PostUpdate, IntoScheduleConfigs};
     app.init_resource::<StylizedViewSettings>();
-    app.add_systems(PostUpdate, sync_stylized_view);
+    app.add_systems(PostUpdate, sync_stylized_view.in_set(crate::presentation::NativePresentationSystems));
 }
 
 #[cfg(test)]

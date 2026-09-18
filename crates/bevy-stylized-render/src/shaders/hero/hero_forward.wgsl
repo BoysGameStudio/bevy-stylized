@@ -1,3 +1,4 @@
+#import bevy_stylized_render::common::npr_common::deformed_world_normal
 #define_import_path bevy_stylized_render::hero::hero_forward
 
 // Hero@Portable 前向（It-5，provisional pending ADR-0001/0005/0006）。
@@ -19,6 +20,7 @@
     deform_vertex, analytic_ramp, face_light_dots, face_threshold_from_dots,
     environment_fog_apply, environment_shadow_tint,
 }
+#import bevy_stylized_render::common::npr_common::add_secondary_skin
 #import bevy_pbr::{
     forward_io::{Vertex, VertexOutput, FragmentOutput},
     mesh_functions,
@@ -57,6 +59,10 @@ struct GenshinLightingParams {
     highlight_primary: vec4<f32>,
     highlight_secondary: vec4<f32>,
 }
+struct StylizedMetalParams {
+    controls:vec4<f32>,dark:vec4<f32>,light:vec4<f32>,shadow:vec4<f32>,
+    specular:vec4<f32>,specular_color:vec4<f32>,sharp_color:vec4<f32>,
+}
 struct HeroParams {
     character: HeroCharacterParams,
     // x: matcap 强度, y: spec ramp 强度, z: shadow position（ramp 公式
@@ -65,6 +71,9 @@ struct HeroParams {
     // rgb: matcap 染色, w: 位标志（bitcast u32）
     hero_b: vec4<f32>,
     genshin: GenshinLightingParams,
+    authored_energy: vec4<f32>,
+    metal: StylizedMetalParams,
+    source_conventions:vec4<f32>,
 }
 
 const CEL_FLAG_ALPHA_MASK: u32 = 8u;
@@ -89,8 +98,16 @@ const INSTANCE_FLAG_DROP_HERO_EXTRAS: u32 = 1u;  // matcap / spec ramp / packed 
 const INSTANCE_FLAG_FACE_HARD_STEP: u32 = 2u;
 const INSTANCE_FLAG_HAIR_SPECULAR_OFF: u32 = 4u;
 
-@group(#{MATERIAL_BIND_GROUP}) @binding(0)
-var<uniform> params: HeroParams;
+#ifdef NPR_HOST_INPUTS
+#import bevy_stylized_render::common::host_inputs::{HostInstance, HostView}
+struct HostUniform { material: HeroParams, instances: array<HostInstance,128>, views: array<HostView,16>, }
+@group(#{MATERIAL_BIND_GROUP}) @binding(0) var<uniform> host_uniform: HostUniform;
+fn material_params() -> HeroParams { return host_uniform.material; }
+fn host_instance(index:u32) -> HostInstance { return host_uniform.instances[mesh_functions::get_tag(index) & 0xFFFFFFu]; }
+#else
+@group(#{MATERIAL_BIND_GROUP}) @binding(0) var<uniform> params: HeroParams;
+fn material_params() -> HeroParams { return params; }
+#endif
 @group(#{MATERIAL_BIND_GROUP}) @binding(1)
 var base_color_texture: texture_2d<f32>;
 @group(#{MATERIAL_BIND_GROUP}) @binding(2)
@@ -127,6 +144,11 @@ var surface_control_sampler: sampler;
 const HERO_FLAG_GENSHIN_FACE: u32 = 64u;
 const HERO_FLAG_PUPIL_HIGHLIGHT: u32 = 128u;
 
+fn source_safe_normal(v:vec3<f32>,fallback:vec3<f32>)->vec3<f32> {
+    if dot(v,v)>0.00001 {return v*inverseSqrt(dot(v,v));}
+    if dot(fallback,fallback)>0.00001 {return fallback*inverseSqrt(dot(fallback,fallback));}
+    return vec3<f32>(1.0,0.0,0.0);
+}
 fn hero_view_direction(position: vec3<f32>) -> vec3<f32> {
     if view.clip_from_view[3].w == 1.0 {
         // Camera-local +Z points towards the viewer. Projection depth rows
@@ -137,20 +159,19 @@ fn hero_view_direction(position: vec3<f32>) -> vec3<f32> {
 }
 
 @vertex
-fn vertex(vertex_in: Vertex) -> VertexOutput {
-    let deformed = deform_vertex(vertex_in);
+fn vertex(vertex_in: Vertex,
+#ifdef NPR_SKIN_EXTENDED
+    @location(8) extra_joint_indices: vec4<u32>,
+    @location(9) extra_joint_weights: vec4<f32>,
+#endif
+) -> VertexOutput {
+    var deformed = deform_vertex(vertex_in);
+#ifdef NPR_SKIN_EXTENDED
+    deformed = add_secondary_skin(deformed, extra_joint_indices, extra_joint_weights);
+#endif
     var out: VertexOutput;
 #ifdef VERTEX_NORMALS
-#ifdef SKINNED
-    out.world_normal = normalize(
-        (deformed.world_from_local * vec4<f32>(deformed.local_normal, 0.0)).xyz
-    );
-#else
-    out.world_normal = mesh_functions::mesh_normal_local_to_world(
-        deformed.local_normal,
-        deformed.instance_index,
-    );
-#endif
+    out.world_normal = deformed_world_normal(deformed);
 #endif
 #ifdef VERTEX_POSITIONS
     out.world_position = mesh_functions::mesh_position_local_to_world(
@@ -212,34 +233,58 @@ fn sample_cubic(tex: texture_2d<f32>, smp: sampler, uv: vec2<f32>) -> vec4<f32> 
 
 @fragment
 fn fragment(vertex: VertexOutput, @builtin(front_facing) front_facing: bool) -> FragmentOutput {
+    var material=material_params();
+#ifdef NPR_HOST_INPUTS
+    let host=host_instance(vertex.instance_index);
+    let host_view=host_uniform.views[host.indices.y];
+    material.character.cel.base_color_factor=host.tint;
+    material.character.cel.rim_color=vec4<f32>(host.rim.rgb,1.0);
+    material.character.cel.rim.y=host.rim.w;
+#endif
+
+#ifdef NPR_HOST_INPUTS
+    material.character.palette_soft_lit=host_view.soft_lit;
+    material.character.palette_soft_shadow=host_view.soft_shadow;
+    material.character.palette_sharp_lit=host_view.sharp_lit;
+    material.character.palette_sharp_shadow=host_view.sharp_shadow;
+    material.character.face_misc.w=1.0-host_view.controls.x;
+#endif
+
     var in=vertex;
 #ifdef VERTEX_UVS_A
 #ifdef VERTEX_UVS_B
-    if !front_facing && params.genshin.controls.z>0.5 {in.uv=in.uv_b;}
+    if !front_facing && material.genshin.controls.z>0.5 {in.uv=in.uv_b;}
 #endif
 #endif
 
-    let cel_flags = bitcast<u32>(params.character.cel.shading.w);
-    let char_flags = bitcast<u32>(params.character.face_misc.y);
-    let hero_flags = bitcast<u32>(params.hero_b.w);
+    let cel_flags = bitcast<u32>(material.character.cel.shading.w);
+    let char_flags = bitcast<u32>(material.character.face_misc.y);
+    let hero_flags = bitcast<u32>(material.hero_b.w);
 
     // Per-instance LOD（V2-b）：MeshTag flags 逐实例削减，材质资产不动。
     var tag: u32 = 0u;
 #ifdef VERTEX_OUTPUT_INSTANCE_INDEX
     tag = mesh_functions::get_tag(in.instance_index);
+#ifdef NPR_HOST_INPUTS
+    tag = (host.indices.x & 255u) | ((host.indices.w & 255u) << 24u);
+#endif
 #endif
     let instance_flags = (tag >> TAG_FLAGS_SHIFT) & 0xFFu;
     let drop_hero_extras = (instance_flags & INSTANCE_FLAG_DROP_HERO_EXTRAS) != 0u;
     let instance_face_hard_step = (instance_flags & INSTANCE_FLAG_FACE_HARD_STEP) != 0u;
     let hair_specular_off = (instance_flags & INSTANCE_FLAG_HAIR_SPECULAR_OFF) != 0u;
 
-    var base = params.character.cel.base_color_factor;
+    var base = material.character.cel.base_color_factor;
 #ifdef VERTEX_UVS_A
-    if (hero_flags & 256u)!=0u {base*=sample_cubic(base_color_texture,base_color_sampler,in.uv);}
-    else {base *= textureSample(base_color_texture, base_color_sampler, in.uv);}
+    var base_uv=in.uv;
+#ifdef VERTEX_UVS_B
+    if !front_facing && (hero_flags & 512u)!=0u {base_uv=vertex.uv_b;}
+#endif
+    if (hero_flags & 256u)!=0u {base*=sample_cubic(base_color_texture,base_color_sampler,base_uv);}
+    else {base *= textureSample(base_color_texture, base_color_sampler, base_uv);}
 #endif
     if (cel_flags & CEL_FLAG_ALPHA_MASK) != 0u {
-        if base.a < params.character.cel.rim.w {
+        if base.a < material.character.cel.rim.w {
             discard;
         }
     }
@@ -250,6 +295,8 @@ fn fragment(vertex: VertexOutput, @builtin(front_facing) front_facing: bool) -> 
     return base_output;
 #endif
 
+    let authored_base = base;
+
     // View 层 key light。
     var light_direction = vec3<f32>(0.0, 1.0, 0.0);
     var light_color = vec3<f32>(1.0);
@@ -257,6 +304,11 @@ fn fragment(vertex: VertexOutput, @builtin(front_facing) front_facing: bool) -> 
         light_direction = lights.directional_lights[0].direction_to_light;
         light_color = lights.directional_lights[0].color.rgb;
     }
+#ifdef NPR_HOST_INPUTS
+    light_direction=normalize(host_view.direction.xyz);
+    if material.source_conventions.y>0.5 {light_direction=source_safe_normal(host_view.direction.xyz,vec3<f32>(0.0,1.0,0.0));}
+    light_color=host_view.key_color.rgb;
+#endif
 
     // Packed normal（xy 存储，z 重建；通用解码，未锁定上游的非常规
     // 重建式——profile 特化属 profile crate）。
@@ -269,6 +321,21 @@ fn fragment(vertex: VertexOutput, @builtin(front_facing) front_facing: bool) -> 
         // 无切线基时的保守近似：把解码法线视作物体空间扰动叠加到几何法线。
         let perturb = vec3<f32>(tangent_xy.x, tangent_xy.y, tangent_z);
         normal = normalize(normal + (perturb - vec3<f32>(0.0, 0.0, 1.0)) * 0.5);
+        if material.source_conventions.x>0.0 {
+            var tangent=vec3<f32>(tangent_xy,sqrt(max(1.0-tangent_xy.x*tangent_xy.x+tangent_xy.y*tangent_xy.y,0.0)));
+            if !front_facing {tangent=-tangent;}
+            let dx=dpdx(in.world_position.xyz);
+            let dy=dpdy(in.world_position.xyz);
+            let r1=cross(dy,in.world_normal);
+            let r2=cross(in.world_normal,dx);
+            let determinant=dot(dx,r1);
+            let sign=select(-1.0,1.0,determinant>=0.0);
+            let n=abs(determinant)*in.world_normal;
+            let scale=max(material.source_conventions.x,1.0)*sign;
+            let du=scale*(dpdx(in.uv.x)*r1+dpdy(in.uv.x)*r2);
+            let dv=scale*(dpdx(in.uv.y)*r1+dpdy(in.uv.y)*r2);
+            normal=tangent.x*source_safe_normal(n+du,in.world_normal)+tangent.y*source_safe_normal(n+dv*1000.0,in.world_normal)+tangent.z*in.world_normal;
+        }
     }
 #endif
 
@@ -279,15 +346,17 @@ fn fragment(vertex: VertexOutput, @builtin(front_facing) front_facing: bool) -> 
     return half_output;
 #endif
 
-    let half_lambert = clamp(dot(normal, light_direction) * 0.5 + 0.5, 0.0, 1.0);
+    let body_light=select(light_direction,-light_direction,material.source_conventions.w>0.5);
+    let half_lambert = clamp(dot(normal, body_light) * 0.5 + 0.5, 0.0, 1.0);
 
     // ILM decode once（docs/reference/07 §3.2 已核实布局）：
     // R=metal mask(>0.9) / G=AO / B=高光抑制(1.03−B) / A=材质分带 ID。
-    let genshin_lighting = params.genshin.controls.z > 0.5;
+    let genshin_lighting = material.genshin.controls.z > 0.5;
     var packed = vec4<f32>(0.0,1.0,0.0,0.0);
-    if genshin_lighting {packed=params.genshin.lightmap_constant;}
+    if genshin_lighting {packed=material.genshin.lightmap_constant;}
 #ifdef VERTEX_UVS_A
-    if (char_flags & CHAR_FLAG_ILM_TEXTURE) != 0u {packed=textureSample(ilm_texture,ilm_sampler,in.uv);if genshin_lighting {packed=sample_cubic(ilm_texture,ilm_sampler,in.uv);}}
+    if (char_flags & CHAR_FLAG_ILM_TEXTURE) != 0u {packed=textureSample(ilm_texture,ilm_sampler,in.uv);if genshin_lighting {packed=sample_cubic(ilm_texture,ilm_sampler,in.uv);}
+        if material.source_conventions.z>0.5 {packed=textureSampleLevel(ilm_texture,ilm_sampler,in.uv,0.0);}}
 #endif
     var metal_mask = select(0.0,1.0,packed.r>0.9);
     var ao=1.0;
@@ -295,23 +364,25 @@ fn fragment(vertex: VertexOutput, @builtin(front_facing) front_facing: bool) -> 
         ao=mix(0.5,1.0,packed.g);
         if (hero_flags & HERO_FLAG_GENSHIN_RAMP) != 0u || genshin_lighting {ao=packed.g;}
     }
-    if genshin_lighting {ao=mix(1.0,packed.g,params.genshin.controls.x);}
+    if genshin_lighting {ao=mix(1.0,packed.g,material.genshin.controls.x);}
 #ifdef VERTEX_COLORS
-    if genshin_lighting {ao*=mix(1.0,pow(max(in.color.r,0.0),0.4545),params.genshin.controls.w);}
+    if genshin_lighting {ao*=mix(1.0,pow(select(max(in.color.r,0.0),clamp(in.color.r,0.0,1.0),material.source_conventions.y>0.5),0.4545),material.genshin.controls.w);}
 #endif
     let spec_suppress=1.03-packed.b;
     var band=1.0+f32(packed.a>0.2)+f32(packed.a>0.4)+f32(packed.a>0.6)+f32(packed.a>0.8);
-    if genshin_lighting || (hero_flags & HERO_FLAG_GENSHIN_RAMP)!=0u {
+    if (genshin_lighting || (hero_flags & HERO_FLAG_GENSHIN_RAMP)!=0u) && material.source_conventions.y<0.5 {
         let material_order=array<f32,5>(1.0,4.0,3.0,5.0,2.0);
         band=material_order[u32(band)-1u];
     }
-    if genshin_lighting && params.genshin.specular_rows[u32(band)-1u].z<0.5 {band=1.0;}
+    if genshin_lighting && material.genshin.specular_rows[u32(band)-1u].z<0.5 {band=1.0;}
 
     // LitFactor：half-lambert 经 AO 门控（docs/reference/07 §3.1 已核实）。
     var lit_factor = half_lambert * smoothstep(0.01, 0.4, ao);
 
     // 阴影色：authored ramp 优先。
-    var shadow_color = params.character.palette_soft_shadow.rgb;
+    var shadow_color = material.character.palette_soft_shadow.rgb;
+    var sampled_ramp=vec3<f32>(1.0);
+    var debug_coordinate=0.0;
     if (hero_flags & HERO_FLAG_RAMP_TEXTURE) != 0u {
         if (hero_flags & HERO_FLAG_GENSHIN_RAMP) != 0u {
             // 已核实 ramp 寻址（docs/reference/07 §3.1）：
@@ -321,39 +392,53 @@ fn fragment(vertex: VertexOutput, @builtin(front_facing) front_facing: bool) -> 
             // 我方 day_night 约定 1=昼（face_misc.w，材质静态）。
             var vcol_g = 1.0;
 #ifdef VERTEX_COLORS
-            vcol_g=pow(max(in.color.g,0.0),0.4545);
+            vcol_g=pow(select(max(in.color.g,0.0),clamp(in.color.g,0.0,1.0),material.source_conventions.y>0.5),0.4545);
 #endif
-            let shadow_position = params.hero_a.z;
-            let ramp_width = params.hero_a.w;
+            let shadow_position = material.hero_a.z;
+            let ramp_width = material.hero_a.w;
             // Blender Math Divide returns zero for a zero denominator.
             // Zero vertex-width controls are authored data, not missing values.
             var position_term=0.0;
             if shadow_position!=0.0 {position_term=(shadow_position-lit_factor)/shadow_position;}
             var width_term=0.0;
             if vcol_g*2.0*ramp_width!=0.0 {width_term=position_term/(vcol_g*2.0*ramp_width);}
-            let ramp_x=1.0-width_term;
-            let day_row = 0.05 + 0.1 * (band - 1.0);
-            let day_night = clamp(params.character.face_misc.w, 0.0, 1.0);
+            var ramp_x=1.0-width_term;
+            if material.source_conventions.y>0.5 {
+                ramp_x=1.0-(shadow_position-lit_factor)/max(shadow_position*2.0*vcol_g*ramp_width,0.0001);
+            }
+            debug_coordinate=clamp(ramp_x,0.0,1.0);
+            let day_row = select(0.05,0.025,material.source_conventions.y>0.5) + 0.1 * (band - 1.0);
+            let day_night = clamp(material.character.face_misc.w, 0.0, 1.0);
             // PNG rows are top-down, opposite the authored Blender UV axis.
             let ramp_v = day_row + 0.5 * (1.0-day_night);
             let ramp_size=vec2<i32>(textureDimensions(ramp_texture));
             let ramp_pixel=clamp(vec2<i32>(vec2<f32>(clamp(ramp_x,0.0,1.0),ramp_v)*vec2<f32>(ramp_size)),vec2<i32>(0),ramp_size-vec2<i32>(1));
             shadow_color=textureLoad(ramp_texture,ramp_pixel,0).rgb;
+            if material.source_conventions.y>0.5 {
+                let day_pixel=clamp(vec2<i32>(vec2<f32>(clamp(ramp_x,0.0,1.0),day_row)*vec2<f32>(ramp_size)),vec2<i32>(0),ramp_size-vec2<i32>(1));
+                let night_pixel=clamp(vec2<i32>(vec2<f32>(clamp(ramp_x,0.0,1.0),day_row+0.5)*vec2<f32>(ramp_size)),vec2<i32>(0),ramp_size-vec2<i32>(1));
+                shadow_color=mix(textureLoad(ramp_texture,day_pixel,0).rgb,textureLoad(ramp_texture,night_pixel,0).rgb,1.0-day_night);
+            }
+            sampled_ramp=shadow_color;
             // The authored ramp first modulates diffuse, then its coordinate
             // drives the separate soft/sharp palette factors. It is not a
             // substitute palette shadow color.
-            let force_lit = select(0.0,1.0,ao > 0.95);
+            let gate_ao=select(ao,packed.g,material.source_conventions.y>0.5);
+            let force_lit = select(0.0,1.0,gate_ao > 0.95);
             let ramp_gate = clamp(select(0.0,1.0,lit_factor < shadow_position)-force_lit,0.0,1.0);
             base = vec4<f32>(base.rgb * mix(vec3<f32>(1.0),shadow_color,ramp_gate),base.a);
             lit_factor = clamp(max(ramp_x,force_lit),0.0,1.0);
-            shadow_color = params.character.palette_soft_shadow.rgb;
+            shadow_color = material.character.palette_soft_shadow.rgb;
         } else {
             // 通用 ramp 路径（保留）：MeshTag 行寻址。
             var row = 0.0;
 #ifdef VERTEX_OUTPUT_INSTANCE_INDEX
             row = f32(mesh_functions::get_tag(in.instance_index) & 0xFFu);
+#ifdef NPR_HOST_INPUTS
+        row = f32(host.indices.x);
 #endif
-            let ramp_v = (row + 0.5) / max(params.character.cel.rim.z, 1.0);
+#endif
+            let ramp_v = (row + 0.5) / max(material.character.cel.rim.z, 1.0);
             shadow_color = textureSample(
                 ramp_texture, ramp_sampler,
                 vec2<f32>(half_lambert, ramp_v),
@@ -365,9 +450,9 @@ fn fragment(vertex: VertexOutput, @builtin(front_facing) front_facing: bool) -> 
         var mixed=(ao+half_lambert)*0.5;
         if ao>0.95 {mixed=1.0;}
         if ao<0.05 {mixed=0.0;}
-        let transition=params.genshin.shadow_rows[u32(band)-1u];
+        let transition=material.genshin.shadow_rows[u32(band)-1u];
         var shadow=0.0;
-        if mixed<params.hero_a.z {shadow=min(pow((params.hero_a.z-mixed)/max(transition.x,0.0001)+0.01,max(transition.y,0.0001)),1.0);}
+        if mixed<material.hero_a.z {shadow=min(pow((material.hero_a.z-mixed)/max(transition.x,0.0001)+0.01,max(transition.y,0.0001)),1.0);}
         lit_factor=1.0-shadow;
     }
     var sharp_factor = select(0.0, 1.0, lit_factor > 0.5);
@@ -378,31 +463,41 @@ fn fragment(vertex: VertexOutput, @builtin(front_facing) front_facing: bool) -> 
     // Face SDF（与 character 一致；共享材质 + MeshTag 实例数据）。
 #ifdef VERTEX_UVS_A
     if (char_flags & CHAR_FLAG_FACE_SDF_TEXTURE) != 0u {
-        let face_forward_world = normalize(
+        var face_forward_world = normalize(
             (mesh_functions::get_world_from_local(in.instance_index)
-                * vec4<f32>(params.character.face_forward_softness.xyz, 0.0)).xyz
+                * vec4<f32>(material.character.face_forward_softness.xyz, 0.0)).xyz
         );
-        let face_up_world = normalize(
+        var face_up_world = normalize(
             (mesh_functions::get_world_from_local(in.instance_index)
-                * vec4<f32>(params.character.face_up.xyz, 0.0)).xyz
+                * vec4<f32>(material.character.face_up.xyz, 0.0)).xyz
         );
+#ifdef NPR_HOST_INPUTS
+        if host.face_forward.w>0.5 {
+            face_forward_world=normalize(host.face_forward.xyz);
+            face_up_world=normalize(host.face_up.xyz);
+        }
+#endif
         var face_light = light_direction;
         if (hero_flags & HERO_FLAG_GENSHIN_FACE) != 0u {
             face_light -= face_up_world * dot(face_light,face_up_world);
         }
-        let dots = face_light_dots(face_light, face_forward_world, face_up_world);
+        var dots = face_light_dots(face_light, face_forward_world, face_up_world);
+        if material.source_conventions.y>0.5 && dot(light_direction.xz,light_direction.xz)>0.00000001 {
+            let l=normalize(light_direction.xz);
+            dots=vec2<f32>(dot(normalize(face_forward_world.xz),l),dot(normalize(cross(face_forward_world,face_up_world).xz),l));
+        }
         var threshold = face_threshold_from_dots(dots.x);
         if (hero_flags & HERO_FLAG_GENSHIN_FACE) != 0u {
-            threshold = pow(min((1.0-dots.x)*0.5,0.999), pow(1.5-params.hero_a.z,3.0));
+            threshold = pow(clamp((1.0-select(dots.x,-dots.x,material.source_conventions.y>0.5))*0.5,0.0,0.999), pow(1.5-material.hero_a.z,3.0));
         }
         let tag_threshold = (tag >> TAG_FACE_THRESHOLD_SHIFT) & 0xFFu;
         if tag_threshold != 0u {
             threshold = f32(tag_threshold - 1u) / 254.0;
         }
         var flip = dots.y < 0.0;
-        if (hero_flags & HERO_FLAG_GENSHIN_FACE)!=0u {flip=dots.y>=0.0;}
+        if (hero_flags & HERO_FLAG_GENSHIN_FACE)!=0u {flip=select(dots.y>=0.0,dots.y<=0.0,material.source_conventions.y>0.5);}
         let force_flip = ((tag >> TAG_FACE_SIDE_SHIFT) & 1u) != 0u
-            || params.character.face_misc.z > 0.5;
+            || material.character.face_misc.z > 0.5;
         if force_flip {
             flip = !flip;
         }
@@ -412,19 +507,29 @@ fn fragment(vertex: VertexOutput, @builtin(front_facing) front_facing: bool) -> 
         }
         var sdf = textureSample(face_sdf_texture, face_sdf_sampler, vec2<f32>(uv_x, in.uv.y)).r;
         if (hero_flags & HERO_FLAG_GENSHIN_FACE)!=0u {sdf=sample_cubic(face_sdf_texture,face_sdf_sampler,vec2<f32>(uv_x,in.uv.y)).r;}
-        let softness = params.character.face_forward_softness.w;
+        if material.source_conventions.z>0.5 {sdf=textureSampleLevel(face_sdf_texture,face_sdf_sampler,vec2<f32>(uv_x,in.uv.y),0.0).r;}
+        let softness = material.character.face_forward_softness.w;
         if (hero_flags & HERO_FLAG_GENSHIN_FACE) != 0u {
-            let control=sample_cubic(surface_control_texture,surface_control_sampler,in.uv);
+            // The face ramp modulates diffuse separately; it does not replace
+            // the view's soft-shadow palette when lighting is evaluated.
+            shadow_color=material.character.palette_soft_shadow.rgb;
+            var control=sample_cubic(surface_control_texture,surface_control_sampler,in.uv);
+            if material.source_conventions.z>0.5 {control=textureSampleLevel(surface_control_texture,surface_control_sampler,in.uv,0.0);}
             let fixed_band=(control.a-select(0.0,1.0,control.a>0.55))*5.0;
             let fixed_shadow=clamp((1.0-threshold-0.71)/0.09,0.0,1.0)*fixed_band;
             sharp_factor=clamp(smoothstep(threshold-softness,threshold+softness,sdf)*control.g+fixed_shadow,0.0,1.0);
             lit_factor=clamp(smoothstep(threshold-softness-0.05,threshold+softness+0.05,sdf+0.05)*control.g+fixed_shadow,0.0,1.0);
-            if params.genshin.controls.w>0.5 {
+            if material.genshin.controls.w>0.5 {
                 let order=array<u32,5>(0u,3u,2u,4u,1u);
                 var color_band=order[u32(control.a>0.2)+u32(control.a>0.4)+u32(control.a>0.6)+u32(control.a>0.8)];
+                if material.source_conventions.y>0.5 {color_band=u32(control.a>0.2)+u32(control.a>0.4)+u32(control.a>0.6)+u32(control.a>0.8);}
                 if color_band>2u {color_band=0u;}
-                let tint=pow(mix(params.genshin.shadow_rows[color_band].rgb,params.genshin.specular_rows[color_band].rgb,params.character.face_misc.w),vec3<f32>(2.2));
-                base=vec4<f32>(base.rgb*mix(tint,vec3<f32>(1.0),sharp_factor),base.a);
+                var tint=pow(mix(material.genshin.shadow_rows[color_band].rgb,material.genshin.specular_rows[color_band].rgb,material.character.face_misc.w),vec3<f32>(2.2));
+                if material.source_conventions.y>0.5 {
+                    tint=mix(pow(material.genshin.specular_rows[color_band].rgb,vec3<f32>(2.2)),pow(material.genshin.shadow_rows[color_band].rgb,vec3<f32>(2.2)),1.0-material.character.face_misc.w);
+                }
+                sampled_ramp=mix(tint,vec3<f32>(1.0),sharp_factor);
+                base=vec4<f32>(base.rgb*sampled_ramp,base.a);
             }
         } else {
 
@@ -447,14 +552,31 @@ fn fragment(vertex: VertexOutput, @builtin(front_facing) front_facing: bool) -> 
     // 双档光照（docs/reference/07 §3.7 已核实：sharp/soft 串联相乘 +
     // ambient，全 MULTIPLY；ramp 阴影色替代 softShadow）。
     // 阴影色经环境阴影染色（V2-d；强度 0 时逐位恒等）。
-    let soft_mix = mix(environment_shadow_tint(shadow_color), params.character.palette_soft_lit.rgb, lit_factor);
-    let sharp_mix = mix(environment_shadow_tint(params.character.palette_sharp_shadow.rgb), params.character.palette_sharp_lit.rgb, sharp_factor);
+    let soft_mix = mix(environment_shadow_tint(shadow_color), material.character.palette_soft_lit.rgb, lit_factor);
+    let sharp_mix = mix(environment_shadow_tint(material.character.palette_sharp_shadow.rgb), material.character.palette_sharp_lit.rgb, sharp_factor);
     var shaded_base=base.rgb;
-    if genshin_lighting {
-        let row=params.genshin.specular_rows[u32(band)-1u];
-        let half_vector=normalize(light_direction+hero_view_direction(in.world_position.xyz));
+    let source_metal=genshin_lighting && material.metal.controls.x>0.5 && packed.r>0.9 && !drop_hero_extras;
+    if source_metal {
+        let m=material.metal;
+        let v=hero_view_direction(in.world_position.xyz);
+        let camera_up=source_safe_normal(view.world_from_view[1].xyz,vec3<f32>(0.0,1.0,0.0));
+        let axis_x=cross(v,-camera_up);
+        let axis_y=-cross(v,axis_x);
+        let uv=vec2<f32>(dot(normal,axis_x)*m.controls.z,dot(normal,axis_y))*0.5+vec2<f32>(0.5);
+        let sampled=textureSampleLevel(matcap_texture,matcap_sampler,uv,0.0).rgb;
+        let tint=mix(pow(m.dark.rgb,vec3<f32>(2.2)),pow(m.light.rgb,vec3<f32>(2.2)),clamp(sampled*m.controls.y,vec3<f32>(0.0),vec3<f32>(1.0)));
+        let shadow=mix(vec3<f32>(1.0),pow(m.shadow.rgb,vec3<f32>(2.2)),1.0-lit_factor);
+        let half_vector=source_safe_normal(v-light_direction,normal);
+        let response=m.specular.y*pow(max(dot(normal,half_vector),0.001),max(m.specular.x,0.001));
+        let ramp=textureSampleLevel(spec_ramp_texture,spec_ramp_sampler,vec2<f32>(response,0.5),0.0).rgb;
+        let spec=select(ramp*pow(m.specular_color.rgb,vec3<f32>(2.2))*response,pow(m.sharp_color.rgb,vec3<f32>(2.2)),response>m.specular.w);
+        shaded_base=authored_base.rgb*tint*shadow+spec*(m.specular.z+(1.0-m.specular.z)*lit_factor);
+    } else if genshin_lighting {
+        let row=material.genshin.specular_rows[u32(band)-1u];
+        var half_vector=normalize(light_direction+hero_view_direction(in.world_position.xyz));
+        if material.source_conventions.y>0.5 {half_vector=source_safe_normal(hero_view_direction(in.world_position.xyz)+light_direction,normal);}
         let ndoth=max(dot(normal,half_vector),0.001);
-        let nonmetal=params.genshin.specular_color.rgb*row.y*packed.r*select(0.0,1.0,pow(ndoth,max(row.x,0.001))>1.03-packed.b);
+        let nonmetal=material.genshin.specular_color.rgb*row.y*packed.r*select(0.0,1.0,pow(ndoth,max(row.x,0.001))>1.03-packed.b);
         // The qualified source recipe disables metallics for both the
         // matcap and specular branches. Do not infer metal from ILM.R alone.
         shaded_base+=nonmetal;
@@ -464,68 +586,101 @@ fn fragment(vertex: VertexOutput, @builtin(front_facing) front_facing: bool) -> 
     palette_input.color=vec4<f32>(shaded_base,1.0);
     return palette_input;
 #endif
-    let ambient = lights.ambient_color.rgb;
+    var ambient = lights.ambient_color.rgb;
+#ifdef NPR_HOST_INPUTS
+    ambient=host_view.ambient.rgb;
+#endif
     var color = shaded_base * soft_mix * sharp_mix * max(ambient, vec3<f32>(0.05));
 
     // Hair 高光（cheap Blinn × ILM.B 高光抑制）。
     if (char_flags & CHAR_FLAG_HAIR_SPECULAR) != 0u && !hair_specular_off {
         let view_direction = hero_view_direction(in.world_position.xyz);
         let half_vector = normalize(light_direction + view_direction);
-        let specular = pow(clamp(dot(normal, half_vector), 0.0, 1.0), params.character.hair.x);
-        color += specular * params.character.hair.y * spec_suppress * light_color;
+        let specular = pow(clamp(dot(normal, half_vector), 0.0, 1.0), material.character.hair.x);
+        color += specular * material.character.hair.y * spec_suppress * light_color;
     }
 
     // Spec ramp（半角高光 × ILM.B 抑制；material fallback 或 per-instance
     // LOD（drop_hero_extras）下关闭）。
-    if (hero_flags & HERO_FLAG_SPEC_RAMP) != 0u && !drop_hero_extras {
+    if (hero_flags & HERO_FLAG_SPEC_RAMP) != 0u && !drop_hero_extras && !source_metal {
         let view_direction = hero_view_direction(in.world_position.xyz);
         let half_vector = normalize(light_direction + view_direction);
         let spec_coord = clamp(dot(normal, half_vector), 0.0, 1.0);
         let spec = textureSample(spec_ramp_texture, spec_ramp_sampler, vec2<f32>(spec_coord, 0.5)).rgb;
-        color += spec * params.hero_a.y * spec_suppress * light_color;
+        color += spec * material.hero_a.y * spec_suppress * light_color;
     }
 
     // Metal matcap（view-space normal 查找 × ILM.R metal mask（>0.9）；
     // material fallback 或 per-instance LOD 关闭）。
-    if (hero_flags & HERO_FLAG_MATCAP) != 0u && !drop_hero_extras {
+    if (hero_flags & HERO_FLAG_MATCAP) != 0u && !drop_hero_extras && !source_metal {
         let view_normal = normalize(
             (view.view_from_world * vec4<f32>(normal, 0.0)).xyz
         );
         let matcap_uv = view_normal.xy * 0.5 + vec2<f32>(0.5);
         let matcap = textureSample(matcap_texture, matcap_sampler, matcap_uv).rgb;
-        color = mix(color, color * params.hero_b.rgb + matcap * params.hero_a.x, metal_mask);
+        color = mix(color, color * material.hero_b.rgb + matcap * material.hero_a.x, metal_mask);
     }
 
     // Rim。
     if (cel_flags & 4u) != 0u {
         let view_direction = hero_view_direction(in.world_position.xyz);
-        let fresnel = pow(clamp(1.0 - dot(normal, view_direction), 0.0, 1.0), params.character.cel.rim.x);
-        color += fresnel * params.character.cel.rim.y * params.character.cel.rim_color.rgb;
+        let fresnel = pow(clamp(1.0 - dot(normal, view_direction), 0.0, 1.0), material.character.cel.rim.x);
+        color += fresnel * material.character.cel.rim.y * material.character.cel.rim_color.rgb;
     }
 
     // Emission（mask = base color alpha；上游 alpha switch 语义，
     // provisional pending ADR-0023）。
     if (char_flags & CHAR_FLAG_EMISSION) != 0u {
-        color += params.character.emission.rgb * params.character.emission.w * base.a;
+        color += material.character.emission.rgb * material.character.emission.w * base.a;
     }
 
     var output_alpha=1.0;
+
 #ifdef VERTEX_UVS_A
     if (hero_flags & HERO_FLAG_PUPIL_HIGHLIGHT)!=0u {
         let red=textureSample(surface_control_texture,surface_control_sampler,in.uv).r;
-        let a=clamp(red/max(params.genshin.highlight_curve.y,0.0001),0.0,1.0);
-        let first=clamp(red/max(params.genshin.highlight_primary.w,0.0001),0.0,1.0);
-        let second=clamp((red-params.genshin.highlight_secondary.w)/max(params.genshin.highlight_curve.x-params.genshin.highlight_secondary.w,0.0001),0.0,1.0);
-        let emission=params.genshin.highlight_primary.rgb*first+params.genshin.highlight_secondary.rgb*second;
+        let a=clamp(red/max(material.genshin.highlight_curve.y,0.0001),0.0,1.0);
+        let first=clamp(red/max(material.genshin.highlight_primary.w,0.0001),0.0,1.0);
+        let second=clamp((red-material.genshin.highlight_secondary.w)/max(material.genshin.highlight_curve.x-material.genshin.highlight_secondary.w,0.0001),0.0,1.0);
+        let emission=material.genshin.highlight_primary.rgb*first+material.genshin.highlight_secondary.rgb*second;
         output_alpha=1.0-a+a*a;
         color=(color*(1.0-a)+emission*a*a)/output_alpha;
     }
 #endif
 
+    // Explicit authored-energy policy; no effect on existing profiles by default.
+    if material.authored_energy.x > 0.0 {
+        color=max(color,authored_base.rgb*material.authored_energy.x);
+        color/=max(max(max(color.r,color.g),color.b),1.0);
+    }
+    if material.authored_energy.y > 0.0 {
+        let emission_mask=clamp(authored_base.a-0.03,0.0,1.0);
+        color=mix(color,authored_base.rgb*material.authored_energy.y*emission_mask,emission_mask);
+    }
+    if material.authored_energy.z > 0.0 {
+        let highlight=max(color-base.rgb,vec3<f32>(0.0));
+        color=max(color,base.rgb*material.authored_energy.z)+highlight*material.authored_energy.w;
+    }
+#ifdef NPR_HOST_BLEND
+    if (hero_flags & HERO_FLAG_PUPIL_HIGHLIGHT)!=0u {output_alpha*=host.tint.a;}
+    else {output_alpha=authored_base.a;}
+#endif
+
     // 环境 NPR（V2-d）：距离雾（无 DistanceFog 组件时逐位恒等）。
     color = environment_fog_apply(color, in.world_position.xyz, view.world_position);
 
+#ifdef NPR_HOST_INPUTS
+    color += host.emission.rgb * host.emission.w;
+    color *= host_view.controls.y;
+    if host_view.controls.z==1.0 {color=vec3<f32>(lit_factor);}
+    if host_view.controls.z==2.0 {color=vec3<f32>(debug_coordinate);}
+    if host_view.controls.z==3.0 {color=sampled_ramp;}
+    if host_view.controls.z==4.0 {color=vec3<f32>(select(0.0,sharp_factor,(char_flags & CHAR_FLAG_FACE_SDF_TEXTURE)!=0u));}
+    if host_view.controls.z==5.0 {color=soft_mix*sharp_mix*max(ambient,vec3<f32>(0.05));}
+    if host_view.controls.z==6.0 {color=normal*0.5+vec3<f32>(0.5);}
+#else
     color *= view.exposure;
+#endif
 
     var out: FragmentOutput;
     out.color = vec4<f32>(color, output_alpha);

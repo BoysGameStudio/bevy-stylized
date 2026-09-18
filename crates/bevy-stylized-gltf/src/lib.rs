@@ -13,6 +13,8 @@
 
 #[cfg(feature = "bevy-integration")]
 pub mod attributes;
+#[cfg(feature = "bevy-integration")]
+pub mod skin_attributes;
 pub mod contract;
 pub mod metadata;
 #[cfg(feature = "bevy-integration")]

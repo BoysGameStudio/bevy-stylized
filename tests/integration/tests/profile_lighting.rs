@@ -109,7 +109,7 @@ fn genshin_ramp_day_night_uses_image_row_orientation() {
         bevy::asset::RenderAssetUsages::default(),
     );
     let ilm = app.world_mut().resource_mut::<Assets<Image>>().add(ilm);
-    for (x, day) in [(-0.9, 1.0), (0.9, 0.0)] {
+    for (x, day, prepared) in [(-0.9, 1.0, false), (0.9, 0.0, false), (0.0, 0.7, true)] {
         let mesh = app
             .world_mut()
             .resource_mut::<Assets<Mesh>>()
@@ -117,6 +117,7 @@ fn genshin_ramp_day_night_uses_image_row_orientation() {
         let mut material = StylizedHeroMaterial::default();
         material.params = material.params.with_genshin_ramp(0.55, 1.0);
         material.params.character = material.params.character.with_day_night(day);
+        material.params.source_conventions.y = f32::from(prepared);
         material.ramp_texture = Some(ramp.clone());
         material.ilm_texture = Some(ilm.clone());
         let material = app
@@ -141,6 +142,11 @@ fn genshin_ramp_day_night_uses_image_row_orientation() {
     assert!(
         night[2] > 100 && night[0] < 10,
         "night must sample the authored PNG bottom half: {night:?}"
+    );
+    let mixed = at(128);
+    assert!(
+        mixed[0] > 100 && mixed[2] > 50 && mixed[0] < day[0] && mixed[2] < night[2],
+        "prepared partial page blend must interpolate both page colors: {mixed:?}"
     );
 }
 
@@ -343,5 +349,158 @@ fn genshin_zero_vertex_ramp_width_uses_authored_safe_divide() {
     assert!(
         pixel.iter().all(|v| *v > 250),
         "zero width divides to zero upstream, producing ramp coordinate 1: {pixel:?}"
+    );
+}
+
+#[test]
+#[ignore = "requires GPU; run the explicit GPU lane"]
+fn prepared_ramp_zero_vertex_width_uses_explicit_denominator_floor() {
+    use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+    let mut app =
+        headless_app(capture::probe_render_resources().expect("required GPU unavailable"));
+    {
+        let mut settings = app.world_mut().resource_mut::<StylizedViewSettings>();
+        settings.0.key_light_direction = Vec3::NEG_Z;
+        settings.0.ambient_override = Some(LinearRgba::WHITE);
+    }
+    let texture = |width, height, data| {
+        Image::new(
+            Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            TextureDimension::D2,
+            data,
+            TextureFormat::Rgba8Unorm,
+            bevy::asset::RenderAssetUsages::default(),
+        )
+    };
+    let ramp = app.world_mut().resource_mut::<Assets<Image>>().add(texture(
+        2,
+        1,
+        vec![0, 0, 255, 255, 255, 0, 0, 255],
+    ));
+    let ilm =
+        app.world_mut()
+            .resource_mut::<Assets<Image>>()
+            .add(texture(1, 1, vec![0, 128, 0, 0]));
+    for (x, prepared) in [(-0.9, false), (0.9, true)] {
+        let mut mesh = quad_mesh();
+        mesh.insert_attribute(
+            Mesh::ATTRIBUTE_COLOR,
+            vec![[1., 0., 1., 1.]; mesh.count_vertices()],
+        );
+        let mesh = app.world_mut().resource_mut::<Assets<Mesh>>().add(mesh);
+        let mut material = StylizedHeroMaterial::default();
+        material.params = material.params.with_genshin_ramp(0.55, 1.0);
+        material.params.source_conventions.y = f32::from(prepared);
+        material.params.character.palette_soft_lit = Vec4::ONE;
+        material.params.character.palette_soft_shadow = Vec4::ONE;
+        material.params.character.palette_sharp_lit = Vec4::ONE;
+        material.params.character.palette_sharp_shadow = Vec4::ONE;
+        material.ilm_texture = Some(ilm.clone());
+        material.ramp_texture = Some(ramp.clone());
+        let handle = app
+            .world_mut()
+            .resource_mut::<Assets<StylizedHeroMaterial>>()
+            .add(material);
+        app.world_mut().spawn((
+            Mesh3d(mesh),
+            MeshMaterial3d(handle),
+            Transform::from_xyz(x, 0., 0.),
+        ));
+    }
+    let image = capture_frame(&mut app);
+    let at = |x: usize| &image.data[(128 * SIZE as usize + x) * 4..][..3];
+    assert!(
+        at(80)[0] > 240 && at(80)[2] < 5,
+        "raw Divide-zero convention must remain red: {:?}",
+        at(80)
+    );
+    assert!(
+        at(176)[2] > 240 && at(176)[0] < 5,
+        "prepared denominator-floor convention must select blue: {:?}",
+        at(176)
+    );
+}
+
+#[test]
+#[ignore = "requires GPU; run the explicit GPU lane"]
+fn source_metal_requires_explicit_enable_and_uses_authored_color() {
+    use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+    let mut app =
+        headless_app(capture::probe_render_resources().expect("required GPU unavailable"));
+    {
+        let mut v = app.world_mut().resource_mut::<StylizedViewSettings>();
+        v.0.key_light_direction = Vec3::Z;
+        v.0.ambient_override = Some(LinearRgba::WHITE);
+    }
+    let tex = |rgba: &[u8]| {
+        Image::new_fill(
+            Extent3d {
+                width: 1,
+                height: 1,
+                depth_or_array_layers: 1,
+            },
+            TextureDimension::D2,
+            rgba,
+            TextureFormat::Rgba8Unorm,
+            bevy::asset::RenderAssetUsages::default(),
+        )
+    };
+    let ilm = app
+        .world_mut()
+        .resource_mut::<Assets<Image>>()
+        .add(tex(&[255, 255, 0, 0]));
+    let matcap = app
+        .world_mut()
+        .resource_mut::<Assets<Image>>()
+        .add(tex(&[255, 255, 255, 255]));
+    let spec = app
+        .world_mut()
+        .resource_mut::<Assets<Image>>()
+        .add(tex(&[0, 0, 0, 255]));
+    for (x, enabled) in [(-0.9, false), (0.9, true)] {
+        let mesh = app
+            .world_mut()
+            .resource_mut::<Assets<Mesh>>()
+            .add(quad_mesh());
+        let mut m = StylizedHeroMaterial::default();
+        m.ilm_texture = Some(ilm.clone());
+        m.matcap_texture = Some(matcap.clone());
+        m.spec_ramp_texture = Some(spec.clone());
+        m.params.genshin.controls = Vec4::new(1., 1., 1., 0.);
+        for row in &mut m.params.genshin.specular_rows {
+            row.y = 0.;
+        }
+        m.params.character.palette_soft_lit = Vec4::ONE;
+        m.params.character.palette_soft_shadow = Vec4::ONE;
+        m.params.character.palette_sharp_lit = Vec4::ONE;
+        m.params.character.palette_sharp_shadow = Vec4::ONE;
+        m.params.metal.controls.x = f32::from(enabled);
+        m.params.metal.light = Vec4::new(1., 0., 0., 1.);
+        m.params.metal.specular.w = 2.;
+        let material = app
+            .world_mut()
+            .resource_mut::<Assets<StylizedHeroMaterial>>()
+            .add(m);
+        app.world_mut().spawn((
+            Mesh3d(mesh),
+            MeshMaterial3d(material),
+            Transform::from_xyz(x, 0., 0.),
+        ));
+    }
+    let image = capture_frame(&mut app);
+    let at = |x: usize| &image.data[(128 * SIZE as usize + x) * 4..][..3];
+    assert!(
+        at(80).iter().all(|v| *v > 240),
+        "disabled source branch must remain neutral: {:?}",
+        at(80)
+    );
+    assert!(
+        at(176)[0] > 240 && at(176)[1] < 5 && at(176)[2] < 5,
+        "authored matcap tint missing: {:?}",
+        at(176)
     );
 }

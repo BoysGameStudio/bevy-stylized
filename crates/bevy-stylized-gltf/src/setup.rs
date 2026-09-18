@@ -22,7 +22,9 @@ use crate::attributes::StylizedGltfPluginExt;
 /// ```
 #[must_use]
 pub fn npr_gltf_plugin() -> GltfPlugin {
-    GltfPlugin::default().add_npr_vertex_attributes()
+    crate::skin_attributes::add_secondary_skin_attributes(
+        GltfPlugin::default().add_npr_vertex_attributes(),
+    )
 }
 
 /// glTF 初始化顺序错误。

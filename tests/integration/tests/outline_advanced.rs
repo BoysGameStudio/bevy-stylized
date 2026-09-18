@@ -91,6 +91,7 @@ fn build_scene(app: &mut App, hull: bool, screen: bool) {
             params: StylizedOutlineParams::default()
                 .with_color(LinearRgba::new(0.02, 0.02, 0.04, 1.0))
                 .with_width(3.0),
+            ..Default::default()
         });
     let big_box = app
         .world_mut()

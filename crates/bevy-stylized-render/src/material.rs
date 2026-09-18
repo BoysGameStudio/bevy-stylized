@@ -264,6 +264,10 @@ impl Material for StylizedCelMaterial {
     // prepass 参与在类型级开启（默认 prepass shader 即可）；**成本门控在
     // 相机**：只有带 DepthPrepass/NormalPrepass 组件的相机才产生 prepass
     // 开销（StylizedScreenOutline 的 per-camera opt-in），默认相机零成本。
+    fn prepass_vertex_shader() -> ShaderRef {
+        crate::skinning::COMPLETE_SKIN_PREPASS_SHADER.into()
+    }
+
     fn enable_prepass() -> bool {
         true
     }
@@ -275,9 +279,10 @@ impl Material for StylizedCelMaterial {
     fn specialize(
         _pipeline: &bevy::pbr::MaterialPipeline,
         descriptor: &mut bevy::render::render_resource::RenderPipelineDescriptor,
-        _layout: &bevy::mesh::MeshVertexBufferLayoutRef,
+        layout: &bevy::mesh::MeshVertexBufferLayoutRef,
         key: bevy::pbr::MaterialPipelineKey<Self>,
     ) -> Result<(), bevy::render::render_resource::SpecializedMeshPipelineError> {
+        crate::skinning::specialize_secondary_skin(descriptor, layout)?;
         // 双面渲染经 bind_group_data 特化（cull 继承 = 默认背面剔除）。
         if key.bind_group_data.double_sided {
             descriptor.primitive.cull_mode = None;

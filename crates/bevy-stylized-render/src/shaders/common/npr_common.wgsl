@@ -160,3 +160,22 @@ fn environment_shadow_tint(shadow_color: vec3<f32>) -> vec3<f32> {
 #endif
     return shadow_color;
 }
+
+// Apply the same second influence set to every surface/outline vertex path.
+fn add_secondary_skin(value: NprDeformedVertex, joints: vec4<u32>, weights: vec4<f32>) -> NprDeformedVertex {
+    var result = value;
+#ifdef SKINNED
+    result.world_from_local += skinning::skin_model(joints, weights, value.instance_index);
+#endif
+    return result;
+}
+
+// Weighted skin matrices need an inverse transpose even when individual bones
+// contain only rotations: their blend is generally not orthogonal.
+fn deformed_world_normal(vertex:NprDeformedVertex)->vec3<f32> {
+#ifdef SKINNED
+    return skinning::skin_normals(vertex.world_from_local,vertex.local_normal);
+#else
+    return mesh_functions::mesh_normal_local_to_world(vertex.local_normal,vertex.instance_index);
+#endif
+}

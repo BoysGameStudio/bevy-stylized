@@ -1,0 +1,60 @@
+{
+  "schema": "bevy_stylized.extended-skin-fixture/v1",
+  "source": "first-party procedural triangle",
+  "glb_sha256": "f05bb1a8ec8850b0c3ad6be998b34fea6bd47fe334704a022d454afd7a16872b",
+  "rest_positions": [
+    [
+      -0.5,
+      -0.5,
+      0.0
+    ],
+    [
+      0.5,
+      -0.5,
+      0.0
+    ],
+    [
+      0.0,
+      0.5,
+      0.0
+    ]
+  ],
+  "cases": [
+    {
+      "id": "rest",
+      "time": 0.0,
+      "morph_weight": 0.0,
+      "translation": [
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "id": "second-influence",
+      "time": 1.0,
+      "morph_weight": 0.0,
+      "translation": [
+        3.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "id": "morph-before-skin",
+      "time": 1.0,
+      "morph_weight": 1.0,
+      "translation": [
+        3.0,
+        0.0,
+        0.5
+      ]
+    }
+  ],
+  "negative_cases": [
+    "missing-secondary-weights",
+    "missing-secondary-joints",
+    "secondary-joint-out-of-range"
+  ],
+  "qualification": "input fixture only; GPU deformation checks must execute these cases"
+}

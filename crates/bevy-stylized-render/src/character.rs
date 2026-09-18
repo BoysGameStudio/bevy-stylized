@@ -379,6 +379,11 @@ impl StylizedCharacterMaterial {
                 get("face_softness").unwrap_or(0.02),
             );
         }
+        // Softness is independent of the optional static basis. External hosts
+        // provide their basis per frame and must still receive this setting.
+        if let Some(softness) = get("face_softness") {
+            material.params.face_forward_softness.w = softness.max(0.0001);
+        }
         if let (Some(x), Some(y), Some(z)) = (get("face_up_x"), get("face_up_y"), get("face_up_z"))
         {
             material.params.face_up = bevy::math::Vec4::new(x, y, z, 0.0);
@@ -428,6 +433,10 @@ impl Material for StylizedCharacterMaterial {
     // prepass 参与在类型级开启（默认 prepass shader 即可）；**成本门控在
     // 相机**：只有带 DepthPrepass/NormalPrepass 组件的相机才产生 prepass
     // 开销（StylizedScreenOutline 的 per-camera opt-in），默认相机零成本。
+    fn prepass_vertex_shader() -> ShaderRef {
+        crate::skinning::COMPLETE_SKIN_PREPASS_SHADER.into()
+    }
+
     fn enable_prepass() -> bool {
         true
     }
@@ -439,9 +448,10 @@ impl Material for StylizedCharacterMaterial {
     fn specialize(
         _pipeline: &bevy::pbr::MaterialPipeline,
         descriptor: &mut bevy::render::render_resource::RenderPipelineDescriptor,
-        _layout: &bevy::mesh::MeshVertexBufferLayoutRef,
+        layout: &bevy::mesh::MeshVertexBufferLayoutRef,
         key: bevy::pbr::MaterialPipelineKey<Self>,
     ) -> Result<(), bevy::render::render_resource::SpecializedMeshPipelineError> {
+        crate::skinning::specialize_secondary_skin(descriptor, layout)?;
         if key.bind_group_data.double_sided {
             descriptor.primitive.cull_mode = None;
         }
@@ -656,6 +666,10 @@ impl Material for StylizedCharacterTableMaterial {
         }
     }
 
+    fn prepass_vertex_shader() -> ShaderRef {
+        crate::skinning::COMPLETE_SKIN_PREPASS_SHADER.into()
+    }
+
     fn enable_prepass() -> bool {
         true
     }
@@ -667,9 +681,10 @@ impl Material for StylizedCharacterTableMaterial {
     fn specialize(
         _pipeline: &bevy::pbr::MaterialPipeline,
         descriptor: &mut bevy::render::render_resource::RenderPipelineDescriptor,
-        _layout: &bevy::mesh::MeshVertexBufferLayoutRef,
+        layout: &bevy::mesh::MeshVertexBufferLayoutRef,
         key: bevy::pbr::MaterialPipelineKey<Self>,
     ) -> Result<(), bevy::render::render_resource::SpecializedMeshPipelineError> {
+        crate::skinning::specialize_secondary_skin(descriptor, layout)?;
         // 表通道 shader 变体（同一 WGSL 编译单元，def 分支）。
         let def = bevy::shader::ShaderDefVal::from("INSTANCE_STORAGE_TABLE");
         descriptor.vertex.shader_defs.push(def.clone());
@@ -705,5 +720,24 @@ pub fn sync_character_table_material_flags(
         if let Some(mut material) = materials.get_mut(id) {
             material.sync_flags();
         }
+    }
+}
+
+#[cfg(test)]
+mod host_face_descriptor_tests {
+    #[test]
+    fn face_softness_is_honored_without_static_basis_fields() {
+        let mut descriptor = bevy_stylized_core::StylizedMaterialDescriptor::default();
+        descriptor
+            .static_params
+            .insert("face_softness".into(), 0.0001);
+        let material = super::StylizedCharacterMaterial::from_descriptor(&descriptor, |_| {
+            panic!("fixture has no textures")
+        });
+        assert_eq!(material.params.face_forward_softness.w, 0.0001);
+        assert_eq!(
+            material.params.face_forward_softness.truncate(),
+            bevy::math::Vec3::Z
+        );
     }
 }

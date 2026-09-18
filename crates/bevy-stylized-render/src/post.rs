@@ -139,6 +139,12 @@ fn sync_post_process_enabled(
 
 /// 注册后处理（由 `StylizedRenderPlugin` 调用）。
 pub(crate) fn register(app: &mut App) {
+    if app
+        .world()
+        .contains_resource::<crate::presentation::ExternalPostProcess>()
+    {
+        return;
+    }
     use bevy::prelude::PostUpdate;
     app.add_plugins(FullscreenMaterialPlugin::<StylizedFullscreenEffect>::default())
         .add_systems(PostUpdate, sync_post_process_enabled);
@@ -146,6 +152,13 @@ pub(crate) fn register(app: &mut App) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn external_owner_does_not_register_a_competing_fullscreen_pipeline() {
+        let mut app = bevy::prelude::App::new();
+        app.insert_resource(crate::presentation::ExternalPostProcess);
+        super::register(&mut app);
+        assert!(!app.is_plugin_added::<bevy::core_pipeline::fullscreen_material::FullscreenMaterialPlugin<super::StylizedFullscreenEffect>>());
+    }
     use super::*;
     use bevy::prelude::PostUpdate;
     use bevy_stylized_core::StylizedViewDescriptor;
