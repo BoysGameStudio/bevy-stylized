@@ -239,6 +239,123 @@ pub fn evaluate_tier2(
     Ok(report)
 }
 
+/// Region-restricted report (Tenacity migration critical regions). The mask
+/// comes from renderer-produced isolation captures; metrics reuse the same
+/// per-pixel delta and edge exclusion as [`evaluate_tier2`], restricted to
+/// in-region pixels. Shadow/silhouette IoU stay global-only checks.
+#[derive(Clone, Debug, Serialize)]
+pub struct Tier2RegionReport {
+    /// `case@region` identity.
+    pub case: String,
+    /// In-region pixel count.
+    pub pixels: usize,
+    /// 非边缘区域像素的最大通道差（0..=1）。
+    pub max_abs_delta_nonedge: f32,
+    /// 区域 mean abs delta（0..=1）。
+    pub mean_abs_delta: f32,
+    /// 区域 PSNR（dB）。
+    pub psnr_db: f32,
+    /// 使用的阈值。
+    #[serde(skip)]
+    pub thresholds: Tier2Thresholds,
+    /// 是否通过全部区域判据。
+    pub passed: bool,
+    /// 未通过的判据描述。
+    pub violations: Vec<String>,
+}
+
+/// Region-restricted Tier-2 metrics. `mask` is one byte per pixel (nonzero =
+/// in region); its length must match `width * height`.
+pub fn evaluate_tier2_region(
+    case: &str,
+    region: &str,
+    a: &CapturedImage,
+    b: &CapturedImage,
+    mask: &[bool],
+    thresholds: Tier2Thresholds,
+) -> Result<Tier2RegionReport, crate::diff::DiffError> {
+    if a.width != b.width || a.height != b.height {
+        return Err(crate::diff::DiffError::DimensionsMismatch {
+            baseline: [a.width, a.height],
+            candidate: [b.width, b.height],
+        });
+    }
+    let (width, height) = (a.width as usize, a.height as usize);
+    if mask.len() != width * height {
+        return Err(crate::diff::DiffError::SizeMismatch {
+            baseline: width * height,
+            candidate: mask.len(),
+        });
+    }
+    let mut pixels = 0_usize;
+    let mut max_nonedge = 0.0_f32;
+    let mut sum = 0.0_f64;
+    let mut squared = 0.0_f64;
+    for y in 0..height {
+        for x in 0..width {
+            if !mask[y * width + x] {
+                continue;
+            }
+            pixels += 1;
+            let pa = pixel(&a.data, width, x, y);
+            let pb = pixel(&b.data, width, x, y);
+            let delta = (0..3)
+                .map(|c| (f32::from(pa[c]) - f32::from(pb[c])).abs() / 255.0)
+                .fold(0.0_f32, f32::max);
+            sum += f64::from(delta);
+            squared += f64::from(delta * delta);
+            if !(is_edge(&a.data, width, height, x, y, thresholds.edge_gradient)
+                || is_edge(&b.data, width, height, x, y, thresholds.edge_gradient))
+            {
+                max_nonedge = max_nonedge.max(delta);
+            }
+        }
+    }
+    if pixels == 0 {
+        return Err(crate::diff::DiffError::SizeMismatch {
+            baseline: 1,
+            candidate: 0,
+        });
+    }
+    let mean = (sum / pixels as f64) as f32;
+    let mse = squared / pixels as f64;
+    let psnr = if mse > 0.0 {
+        (10.0 * (1.0 / mse).log10()) as f32
+    } else {
+        f32::INFINITY
+    };
+    let mut report = Tier2RegionReport {
+        case: format!("{case}@{region}"),
+        pixels,
+        max_abs_delta_nonedge: max_nonedge,
+        mean_abs_delta: mean,
+        psnr_db: psnr,
+        thresholds,
+        passed: true,
+        violations: Vec::new(),
+    };
+    if report.max_abs_delta_nonedge > thresholds.max_abs_delta_nonedge {
+        report.violations.push(format!(
+            "non-edge max delta {:.4} exceeds {:.4}",
+            report.max_abs_delta_nonedge, thresholds.max_abs_delta_nonedge
+        ));
+    }
+    if report.mean_abs_delta > thresholds.mean_abs_delta {
+        report.violations.push(format!(
+            "mean abs delta {:.4} exceeds {:.4}",
+            report.mean_abs_delta, thresholds.mean_abs_delta
+        ));
+    }
+    if report.psnr_db < thresholds.min_psnr_db {
+        report.violations.push(format!(
+            "PSNR {:.2}dB below {:.2}dB",
+            report.psnr_db, thresholds.min_psnr_db
+        ));
+    }
+    report.passed = report.violations.is_empty();
+    Ok(report)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -275,6 +392,35 @@ mod tests {
             evaluate_tier2("shifted", &a, &b, [0, 0, 0], Tier2Thresholds::default()).expect("diff");
         assert!(!report.passed);
         assert!(!report.violations.is_empty());
+    }
+
+    #[test]
+    fn region_metrics_cover_only_masked_pixels() {
+        let a = gradient_image(0);
+        let mut b = gradient_image(0);
+        // Flip the red channel outside the masked top-left quadrant.
+        for (index, chunk) in b.data.as_chunks_mut::<4>().0.iter_mut().enumerate() {
+            let (x, y) = (index % 64, index / 64);
+            if x >= 32 || y >= 32 {
+                chunk[0] = 255 - chunk[0];
+            }
+        }
+        let global = evaluate_tier2("global", &a, &b, [0, 0, 0], Tier2Thresholds::default())
+            .expect("diff");
+        assert!(!global.passed);
+        let mask: Vec<bool> = (0..64 * 64).map(|i| i % 64 < 32 && i / 64 < 32).collect();
+        let region = evaluate_tier2_region(
+            "global",
+            "quadrant",
+            &a,
+            &b,
+            &mask,
+            Tier2Thresholds::default(),
+        )
+        .expect("region");
+        assert!(region.passed, "{:?}", region.violations);
+        assert_eq!(region.pixels, 32 * 32);
+        assert!(evaluate_tier2_region("global", "empty", &a, &b, &vec![false; 64 * 64], Tier2Thresholds::default()).is_err());
     }
 }
 
