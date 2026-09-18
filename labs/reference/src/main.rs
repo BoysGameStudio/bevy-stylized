@@ -1,6 +1,30 @@
-//! Diagnostic capture and an optional strict parity gate.
+mod image_pairs;
+// Diagnostic capture and an optional strict parity gate.
 fn main() {
     let args: Vec<_> = std::env::args().collect();
+    if let Some(i) = args.iter().position(|a| a == "--image-pairs") {
+        let result = (|| {
+            let path = args.get(i + 1).ok_or("--image-pairs requires a manifest")?;
+            let out = args
+                .iter()
+                .position(|a| a == "--out")
+                .and_then(|i| args.get(i + 1))
+                .ok_or("--out required")?;
+            image_pairs::run(std::path::Path::new(path), std::path::Path::new(out))
+        })();
+        match result {
+            Ok(passed) => {
+                if !passed && args.iter().any(|a| a == "--required") {
+                    std::process::exit(1);
+                }
+            }
+            Err(error) => {
+                eprintln!("BLOCKED: {error}");
+                std::process::exit(2);
+            }
+        }
+        return;
+    }
     if let Some(i) = args.iter().position(|a| a == "--character-case") {
         let Some(path) = args.get(i + 1) else {
             eprintln!("case path required");

@@ -15,6 +15,7 @@ fn main() {
             eprintln!("inspect requires --features inspector");
             std::process::exit(2);
         }
+        #[cfg(feature = "inspector")]
         return;
     }
     let capture_mode = args.iter().any(|a| a == "--capture");

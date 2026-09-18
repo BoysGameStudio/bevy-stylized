@@ -341,6 +341,7 @@ pub fn outline(app: &mut App) {
                 params: StylizedOutlineParams::default()
                     .with_color(LinearRgba::new(0.02, 0.02, 0.04, 1.0))
                     .with_width(width),
+                class_texture: None,
             });
         let mut entity = app.world_mut().spawn((
             Mesh3d(mesh.clone()),
@@ -514,6 +515,7 @@ pub fn outline_advanced(app: &mut App) {
             params: StylizedOutlineParams::default()
                 .with_color(LinearRgba::new(0.02, 0.02, 0.04, 1.0))
                 .with_width(2.5),
+            ..Default::default()
         });
     let big_box = app.world_mut().resource_mut::<Assets<Mesh>>().add(
         bevy::math::primitives::Cuboid::from_size(Vec3::new(2.0, 0.8, 1.6)),
