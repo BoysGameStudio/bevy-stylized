@@ -31,3 +31,9 @@ naga = { version = "=29.0.4", features = ["wgsl-in"] }
 
 [lints]
 workspace = true
+
+[features]
+# Opt-in: stylized surfaces cast into shadow maps (Tenacity's game scene keeps
+# shadow-mapped ground contact readable). Receiving is unchanged: the stylized
+# shaders never sample shadow maps, so the authored ramp shading is unaffected.
+shadow-casting = []

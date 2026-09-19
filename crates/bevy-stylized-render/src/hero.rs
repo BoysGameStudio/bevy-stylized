@@ -663,7 +663,11 @@ impl Material for StylizedHeroMaterial {
     }
 
     fn enable_shadows() -> bool {
-        false
+        // Casting is opt-in for hosts whose scenes keep shadow-mapped ground
+        // contact readable (`shadow-casting` feature). Receiving is unchanged:
+        // the shader never samples shadow maps, so the authored ramp shading
+        // is unaffected either way.
+        cfg!(feature = "shadow-casting")
     }
 
     fn specialize(

@@ -23,6 +23,8 @@ gltf = ["dep:bevy-stylized-gltf", "bevy/bevy_gltf"]
 render = ["dep:bevy-stylized-render"]
 # ADR-0019：V1 唯一锁定的 reference family；默认关闭（ADR-0024 additive）。
 profile-genshin = ["dep:bevy-stylized-profile-genshin"]
+# 转投 Host 的场景若保留 shadow map 接地区，可显式打开投影（仅投射，不受阴影影响）。
+shadow-casting = ["bevy-stylized-render/shadow-casting"]
 
 [dev-dependencies]
 bevy = { workspace = true, features = [
