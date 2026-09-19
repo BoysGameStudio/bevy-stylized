@@ -21,7 +21,7 @@ must not override current project paths or contracts. Every task remains executa
 through documented tools without an AI client, Blender MCP or a personal skill.
 
 Validation is local-only. Do not enable GitHub Actions or launch remote CI.
-Historical workflow definitions live under docs/history and are not active tasks.
+Historical workflow definitions were removed; Git history retains their provenance.
 
 Use `tools/dev.py` for standard tasks. Serialize Cargo builds and GPU/performance
 runs. Required GPU/asset/baseline absence is BLOCKED, not PASS. Keep engineering

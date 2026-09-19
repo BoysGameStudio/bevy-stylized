@@ -1,9 +1,5 @@
-# Retired remote CI workflows
+# Retired remote CI history
 
-These are the exact workflow definitions retired on 2026-09-15 when validation
-became local-only at the project owner's request. GitHub Actions is disabled at
-repository level; these files are historical evidence and must not be treated as
-active workflows or required validation steps.
-
-Use the commands in CONTRIBUTING.md and tools/dev.py for local checks. Earlier
-refactoring reports retain the remote CI state that was true when recorded.
+Remote workflows were retired on 2026-09-15. Their archived YAML definitions were
+removed on 2026-09-19 at the user’s request; Git history retains their provenance.
+Use `tools/dev.py` and the current contributing guide for local validation.

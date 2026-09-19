@@ -1,15 +1,10 @@
-# Continuous integration
+# Local validation only
 
-The hosted CPU workflow checks formatting, Clippy, document/schema/dependency
-contracts, Python tool tests and workspace CPU tests. GPU tests are explicitly
-ignored there, not reported as GPU passes. The feature matrix includes pure glTF,
-pure asset tooling and optional profile/schema configurations.
+Remote workflows and their archived YAML definitions have been removed.
+Do not recreate hosted or self-hosted remote jobs, dispatch workflows or make
+remote checks a prerequisite. Use `python3 tools/dev.py` and the contributing
+guide for local CPU, consumer, document, asset and GPU lanes.
 
-The GPU workflow is a manual dispatch against the repository default branch on a
-trusted `self-hosted, linux, stylized-gpu` runner. It executes the same strict GPU
-command as local development. No runner has been provisioned by this change;
-local qualification must not be described as active hosted GPU coverage.
-
-Missing GPU, source assets or accepted baselines fail a required task. External
-Genshin preparation/qualification is explicit and its art is not uploaded as a
-public CI artifact. Refer to CONTRIBUTING.md for the isolated engineering gate.
+Missing GPU, source assets or accepted baselines block a required task.
+Retain engineering, image regression, upstream parity and performance results
+as distinct outcomes; local checks do not claim coverage on untested platforms.
