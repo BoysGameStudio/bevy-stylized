@@ -1,7 +1,6 @@
 # Showcase、Examples 与 Fixtures
 
 > **Status:** Normative architecture specification
-> **Authority:** This document is authoritative for its domain; the archived Master Plan is historical only.
 
 
 ## 三者职责必须分开

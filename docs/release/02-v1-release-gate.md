@@ -1,7 +1,6 @@
 # V1 Release Gate 与 Definition of Done
 
 > **Status:** Normative architecture specification
-> **Authority:** This document is authoritative for its domain; the archived Master Plan is historical only.
 
 
 ## API

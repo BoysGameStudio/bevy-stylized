@@ -1,159 +1,80 @@
-# Blender Export Contract
+# Blender export contract
 
-> **Status:** Normative architecture specification
-> **Authority:** This document is authoritative for its domain; the archived Master Plan is historical only.
+This document owns the Blender-to-runtime boundary. The
+[export bridge](../authoring/02-blender-reference-export-bridge.md) owns build stages;
+the [reference workflow](01-reference-authoring-workflow.md) owns reproduction.
+ADR-0012 and ADR-0020 remain unresolved; describing current mechanisms does not
+freeze a broader interchange API.
 
+## Current static character export
 
-必须建立：
+The active recipe is `assets/recipes/genshin-static-v4.json`. The producer is
+`tools/blender/export_character.py`, called by `tools/assets/build.py` with explicit
+prepared inputs. The recipe number is not the Gacha release; source identities
+come from `assets/sources/gacha-authoring.json` and the source pack manifests.
 
-```text
-docs/reference/03-blender-export-contract.md
-```
+The exporter verifies the authoring blend identity and requires a fresh output
+candidate. It evaluates selected recipe meshes, removes upstream GN outline
+modifiers, transforms evaluated geometry into world coordinates and maps declared
+body/face material roles. Production outlines are reconstructed by the renderer.
+This is the declared static scope, not an animated character export promise.
 
-它是 Blender → glTF → bevy-stylized 的稳定边界。
+| Surface | Current producer behavior |
+| --- | --- |
+| Container and axes | GLB, glTF Y-Up |
+| Selection | Current runtime scene and its selected evaluated objects |
+| Geometry | Meshes evaluated before export; `export_apply=false` on the resulting objects |
+| Animation / skin / morph | All disabled for this recipe; separate first-party fixtures cover runtime deformation compatibility |
+| Attributes / extras | Enabled; active vertex color mode is checked against exporter RNA |
+| Cameras / lights | Excluded from runtime GLB; reference capture owns its camera and lighting |
+| Material interpretation | Explicit static recipe mapping; unsupported source sampling or semantics fail rather than silently approximate |
+| Output lifecycle | Staged into a new candidate; existing outputs are rejected |
 
-至少冻结：
+The script owns exact exporter arguments; no second JSON settings table overrides
+it. UVs, normals, tangents and texture semantics must satisfy the selected profile
+and strict compiler. Supporting another authoring shape needs its own explicit
+recipe and qualification.
 
-### Scene / Transform
+## Artifact ownership
 
-- glTF Y-Up；
-- Object/Armature scale policy；
-- Apply Modifier policy；
-- negative/non-uniform scale policy；
-- coordinate conversion policy。
+| Artifact | Producer / consumer responsibility |
+| --- | --- |
+| `authoring/character.blend`, audit and reference captures | Preserve the scoped upstream scene and independent visual evidence; not shipping runtime dependencies |
+| `runtime/character.glb` | Static runtime geometry and standard glTF material inputs |
+| `runtime/character.genshin.json` | `bevy_stylized.genshin-input/v2`: explicit material inputs, recipe variant, palette and day/night value consumed by strict profile compilation |
+| `runtime/runtime-manifest.json` | `bevy_stylized.runtime-export/v1`: authoring/script/GLB identities, recipe, texture evidence and limitations for this export stage |
+| `compiled/` | Strict compiler's GLB and material descriptor output |
+| `build-manifest.json` | `bevy_stylized.build/v1`: input identities and hashes after every required build stage succeeds; owned by the build runner |
 
-### Mesh
+A runtime-export manifest is not the complete-build acceptance marker. A complete
+build is not proof of image parity, gameplay acceptance or platform qualification.
+Preserve input, tool/script, recipe and output identities so drift can be attributed
+to the owning stage; preserve camera/color/backend identity with reference captures.
 
-必须明确是否导出：
+## Generic NPR attributes and metadata
 
-```text
-UVs
-Normals
-Tangents
-Vertex Colors
-Custom Attributes
-Morph Targets
-Skinning
-```
+[Authoring schema and packing](../authoring/03-authoring-schema-runtime-packing.md)
+owns semantic fields; [glTF registration](../authoring/04-bevy-gltf-import-contract.md)
+owns registration before loader creation. The current attribute inventory is
+`schemas/authoring/npr-attributes.v1.json`; runtime requiredness belongs to the
+selected profile. A generic inventory does not imply that every source asset
+provides every attribute. Do not silently invent absent semantic data.
 
-对于 NPR 依赖的数据，不允许使用“Blender 默认值碰巧正确”。
+Extras and generic sidecars are distinct input channels. The importer exposes
+conflicts rather than silently choosing a winner; ADR-0020 retains precedence
+policy ownership. `bevy_stylized.compile/v1` is a compiler directive namespace,
+not the character profile handoff or either completion manifest. ILM channel
+meaning is defined by the [Gacha behavior contract](07-gacha-setup-behavior-contract-v1.md)
+and compiler implementation, not copied into an export-settings checklist.
 
-### NPR Mesh Attributes
+## Unresolved generalization and retained schema files
 
-Blender 5.2 glTF Exporter 支持导出名称以下划线开头的 Mesh Attribute。
+Attribute quantization, shader-location policy, generalized unit/negative-scale
+validation and broad exporter support remain bounded by ADR-0012 and the actual
+profile implementation. Current static qualification does not settle those choices.
 
-因此 V1 应正式定义：
-
-```text
-_NPR_CONTROL0
-_NPR_HAIR_TANGENT
-...
-```
-
-的：
-
-- Blender Attribute Domain；
-- Blender Data Type；
-- glTF Semantic；
-- Bevy VertexFormat；
-- Shader Location / Runtime Packing；
-- Quantization Rules；
-- Default Value；
-- Missing Attribute Fallback。
-
-不得仅依赖“名称约定”而缺乏 Schema。
-
-### Custom Properties
-
-Blender glTF Export 可将 Custom Properties 写入 glTF `extras`。
-
-因此：
-
-```text
-Material/Rig/Profile metadata
-```
-
-可以有两种规范化输出方式：
-
-1. glTF `extras`；
-2. Versioned sidecar。
-
-选择规则必须记录在 Authoring Contract 中。
-
-### Reference Artifact 与 Runtime Export Artifact 必须分离
-
-完整工作流必须产生两类不同证据：
-
-#### A. Reference Artifact
-
-```text
-source.blend
-reference-render/
-reference-manifest.json
-```
-
-它保存：
-
-- Gacha Setup 实际 Node Graph；
-- Blender-only setup；
-- Reference Camera；
-- Reference Lighting；
-- Compositor/Post；
-- Reference Render；
-- 上游版本信息。
-
-这是视觉行为的 Source of Truth。
-
-注意：若 `source.blend` 包含无法公开再分发的第三方资产，它只能存在于合法的本地/私有 Reference Suite；公开仓库只提交可再分发的 synthetic/self-owned Reference Fixture、manifest、允许公开的 Golden 与行为 Contract。
-
-#### B. Runtime Export Artifact
-
-```text
-export.glb
-export-manifest.json
-sidecar.json（若存在）
-runtime-textures/
-```
-
-它保存：
-
-- Runtime Geometry；
-- UV/Normal/Tangent；
-- `_NPR_*` Attributes；
-- Skin/Morph/Animation；
-- 可导出的标准 Material 输入；
-- Texture；
-- Namespaced Metadata。
-
-Runtime Artifact 不需要、也不应该尝试保存完整 Blender/Gacha Shader Node Graph。
-
-### Export Artifact Manifest
-
-`export-manifest.json` 至少记录：
-
-```text
-Blender Version
-Gacha Setup Version
-Gacha Setup Commit
-Gacha Setup Release Asset Digest
-Blender glTF Exporter Version
-Export Contract Version
-Export Settings Hash
-Reference Node-Graph Signature/Revision
-Reference Render Engine / Color Management
-Canonical Reference Environment ID
-Source Fixture Hash
-Output Hash
-```
-
-这样才能判断一次 Golden 变化来自：
-
-- Blender；
-- Gacha Setup；
-- Exporter；
-- Source Asset；
-- bevy-stylized；
-
-中的哪一层。
-
----
+`schemas/authoring/export-settings.v1.json` and `manifest.schema.json` describe the
+retired generic exporter draft. They do not configure this static producer, and
+`export-manifest-v1` is not its completion format. They are excluded from the
+current reproduction path. Removing these data files requires a separate consumer
+check; this documentation change does not migrate any stored asset schema.

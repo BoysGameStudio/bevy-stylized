@@ -1,20 +1,12 @@
 # ADR-0004: NPR Instance Data Transport
 
 - **Status:** V1 Blocker
-- **Decision owner:** Pending assignment
-- **Date:** Pending decision
 
 ## Context
 
 Prototype MeshTag, GpuArrayBuffer, LUT/texture indirection and portable fallback without breaking batching.
 
-## Options
 
-Pending: enumerate and evaluate options during the owning spike/review.
-
-## Decision
-
-Pending: this ADR is intentionally unresolved until its evidence gate is satisfied.
 
 ## Evidence required
 
@@ -23,9 +15,6 @@ Pending: this ADR is intentionally unresolved until its evidence gate is satisfi
 - affected Golden / pipeline tests;
 - effect on Portable baseline and fallback behavior.
 
-## Consequences
-
-Pending until the decision is made and evidence is recorded.
 
 ## Revisit trigger
 

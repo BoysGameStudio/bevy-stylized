@@ -1,20 +1,12 @@
 # ADR-0028: glTF Plugin Initialization Ordering
 
 - **Status:** V1 Blocker
-- **Decision owner:** Pending assignment
-- **Date:** Pending decision
 
 ## Context
 
 Register custom `_NPR_*` attributes before GltfLoader creation; facade must expose a correct setup path.
 
-## Options
 
-Pending: enumerate and evaluate options during the owning spike/review.
-
-## Decision
-
-Pending: this ADR is intentionally unresolved until its evidence gate is satisfied.
 
 ## Evidence required
 
@@ -23,9 +15,6 @@ Pending: this ADR is intentionally unresolved until its evidence gate is satisfi
 - affected Golden / pipeline tests;
 - effect on Portable baseline and fallback behavior.
 
-## Consequences
-
-Pending until the decision is made and evidence is recorded.
 
 ## Revisit trigger
 

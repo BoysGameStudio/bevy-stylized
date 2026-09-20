@@ -1,7 +1,6 @@
 # Material / Instance / View 数据模型
 
 > **Status:** Normative architecture specification
-> **Authority:** This document is authoritative for its domain; the archived Master Plan is historical only.
 
 
 这是 V1 必须完成的核心重构。

@@ -1,5 +1,10 @@
 # V1 Release Checklist
 
+This checklist organizes release review; checked items retain their existing scope,
+not a fresh run on every documentation revision. Detailed criteria live in
+[release gates](02-v1-release-gate.md), and current gaps in
+[the provisional inventory](03-provisional-inventory.md).
+
 ## Architecture decisions
 - [ ] No ADR remains in `V1 Blocker` status.
 - [ ] Every `Accepted` ADR contains completed Decision, Evidence and Consequences.
@@ -16,8 +21,8 @@
 ## Reference
 
 Gacha Setup gates apply only to the current latest-stable target pinned in
-`assets/sources/gacha-authoring.json`. Historical v3.6.2 failures are not release
-blockers. Broader current-version feature scope remains explicitly qualified.
+`assets/sources/gacha-authoring.json`. No historical release lane is required. Broader current-version feature scope
+remains explicitly qualified.
 
 - [x] Blender upstream Golden produced before runtime export.
 - [x] Reference toolchain locked (Blender / Gacha Setup / digests).
@@ -57,7 +62,7 @@ blockers. Broader current-version feature scope remains explicitly qualified.
 - [x] ADR-0016 Package Naming closed: `bevy-stylized`.
 - [ ] License/provenance ADR closed.
 - [x] Bevy compatibility matrix published.
-- [ ] Feature matrix CI passes.
+- [ ] Selected local feature matrix passes for the release candidate.
 - [x] Showcase suite complete.
 - [x] CLI validate/inspect shipped.
 - [x] Migration notes / changelog complete.

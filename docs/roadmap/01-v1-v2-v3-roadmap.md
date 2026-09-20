@@ -1,7 +1,6 @@
 # V1 / V2 / V3 路线图
 
 > **Status:** Normative architecture specification
-> **Authority:** This document is authoritative for its domain; the archived Master Plan is historical only.
 
 
 ## V1：Reusable Cross-Platform NPR Library

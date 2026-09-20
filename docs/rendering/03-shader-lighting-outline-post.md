@@ -1,7 +1,6 @@
 # Shader、Lighting、Face、Outline 与 PostProcess
 
 > **Status:** Normative architecture specification
-> **Authority:** This document is authoritative for its domain; the archived Master Plan is historical only.
 
 
 ## Shader Entry Point

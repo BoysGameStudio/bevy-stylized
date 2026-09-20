@@ -1,7 +1,6 @@
 # Authoring Schema
 
 > **Status:** Normative architecture specification
-> **Authority:** This document is authoritative for its domain; the archived Master Plan is historical only.
 
 
 Schema namespace 是长期数据契约，采用项目稳定品牌 namespace `bevy_stylized.*`。它的版本独立于 Cargo package 版本：未来 crate 升级不能隐式改变既有 schema 语义。

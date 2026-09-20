@@ -1,7 +1,6 @@
 # Bevy 0.19.1 glTF Import Contract
 
 > **Status:** Normative architecture specification
-> **Authority:** This document is authoritative for its domain; the archived Master Plan is historical only.
 
 
 这条工作流已经能落到 Bevy 官方 API，但必须显式配置。

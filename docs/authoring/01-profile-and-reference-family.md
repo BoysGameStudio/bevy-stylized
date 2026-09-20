@@ -1,7 +1,6 @@
 # Renderer ≠ Art Style
 
 > **Status:** Normative architecture specification
-> **Authority:** This document is authoritative for its domain; the archived Master Plan is historical only.
 
 
 Core 提供：

@@ -14,7 +14,7 @@
 - Rust crate identifier: **`bevy_stylized`**
 - Public license: **Pending ADR-0017 / provenance review**
 
-Current evidence is linked from [README](README.md#current-evidence-and-open-decisions).
+Current evidence is linked from [README](README.md#current-qualification-scope).
 Use the [current provisional inventory](docs/release/03-provisional-inventory.md)
 for implementation locations, and individual ADRs for decision status. Dated
 history does not define current acceptance requirements.
@@ -56,20 +56,11 @@ Upstream Blender Reference  ↔  Production Renderer
 Independent semantic fixtures validate data and rendering contracts.
 ```
 
-## Non-negotiable invariants
+## Invariants
 
-1. Renderer ≠ Art Style.
-2. Authoring Data ≠ Runtime GPU Representation.
-3. Material ≠ Instance ≠ View.
-4. Surface Class ≠ Execution Tier ≠ Validation Mode.
-5. Reference Renderer ≠ Production Renderer.
-6. Portable execution path may not require optional GPU features.
-7. Whole-pipeline per-stage GPU budgets are architectural contracts.
-8. Capability requests happen before RenderDevice creation; runtime selection only uses actually enabled features/limits.
-9. Upstream `latest` is never a stable Golden contract.
-10. glTF is a runtime data transport, not a serialization format for Blender shader graphs.
-11. Any `Supported` platform claim requires real runtime evidence.
-12. Optimization claims require both visual evidence and measured performance evidence.
+[Governance](docs/governance/01-invariants-risks-and-adrs.md) owns cross-cutting
+invariants and decision rules. Domain contracts below own their specific data and
+runtime behavior; this index does not define a second set of requirements.
 
 ## Document map
 
@@ -88,7 +79,7 @@ Independent semantic fixtures validate data and rendering contracts.
 | Upstream upgrade / Golden provenance | `docs/reference/04-upstream-contract-upgrade-and-golden.md` |
 | Reference source register | `docs/reference/source-register.md` |
 | License / provenance boundary | `docs/reference/05-license-and-provenance-boundary.md` |
-| Export contract v1（草案，pending ADR-0012） | `docs/reference/06-export-contract-blender-gltf-npr-v1.md` |
+| Export contract v1（草案，pending ADR-0012） | `docs/reference/03-blender-export-contract.md` |
 | Gacha Setup behavior contract v1（草案，pending ADR-0012） | `docs/reference/07-gacha-setup-behavior-contract-v1.md` |
 | Blender export bridge | `docs/authoring/02-blender-reference-export-bridge.md` |
 | Authoring schema / runtime packing | `docs/authoring/03-authoring-schema-runtime-packing.md` |

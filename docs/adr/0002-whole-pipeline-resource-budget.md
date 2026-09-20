@@ -1,20 +1,12 @@
 # ADR-0002: Whole-Pipeline Resource Budget
 
 - **Status:** Proposed
-- **Decision owner:** Pending assignment
-- **Date:** Pending decision
 
 ## Context
 
 Define per-stage budgets across view, mesh, instance, material and profile resources with safety margin.
 
-## Options
 
-Pending: enumerate and evaluate options during the owning spike/review.
-
-## Decision
-
-Pending: this ADR is intentionally unresolved until its evidence gate is satisfied.
 
 ## Evidence required
 
@@ -23,9 +15,6 @@ Pending: this ADR is intentionally unresolved until its evidence gate is satisfi
 - affected Golden / pipeline tests;
 - effect on Portable baseline and fallback behavior.
 
-## Consequences
-
-Pending until the decision is made and evidence is recorded.
 
 ## Revisit trigger
 

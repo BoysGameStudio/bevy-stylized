@@ -63,7 +63,7 @@ use its pure metadata layer. The optional core `schema` feature adds Schemars fo
 generation only. Check an isolated consumer before claiming minimal features.
 
 Directory moves update Cargo paths, embedded resources, includes, script imports,
-workflow filters and documentation together. Never duplicate render shaders into
+tool task selectors and documentation together. Never duplicate render shaders into
 a second source tree. Keep historical source attribution even after retiring code.
 
 ## Isolation
@@ -119,3 +119,15 @@ An enclosing workspace validates its reviewed local overrides independently.
 lane performs the strict graph checks within the isolated source environment.
 Missing raw inputs, toolchains or GPU resources remain BLOCKED. Architecture PASS
 does not imply the full independence/visual/parity lanes ran.
+
+## Work sequence
+
+Identify the affected contract, profile/capability scope and source lock. Change
+its owner and actual consumers together. Select affected local checks; rendering
+or authoring changes additionally need the corresponding GPU/asset/character scope.
+Report results against [release criteria](docs/release/02-v1-release-gate.md) and
+existing ADRs. Implementation and engineering independence do not accept open
+visual, platform or publication decisions.
+
+For documentation only, run `python3 tools/checks/check_docs.py` and verify moved
+anchors, command entrypoints, generated inputs and source/schema references.

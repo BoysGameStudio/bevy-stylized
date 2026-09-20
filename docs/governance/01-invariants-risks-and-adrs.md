@@ -1,7 +1,6 @@
 # 架构不变量、风险与 ADR
 
 > **Status:** Normative architecture specification
-> **Authority:** This document is authoritative for its domain; the archived Master Plan is historical only.
 
 
 ## Architecture Invariants
@@ -122,62 +121,13 @@ ADR 编号不得在治理文档中手工维护第二份列表。
 
 ---
 
-## 当前 Reference Upstream Snapshot（非永久 Contract）
+## Current reference source
 
-截至本文本次修订（2026-09-11）：
-
-```text
-Gacha Setup latest stable release:
-v3.6.2
-
-Published:
-2026-09-09
-
-Tag commit:
-069e51f3fd89cdc66b4c2741798ede11a5fb16b5
-
-Release asset:
-Gacha_Setup-v3.6.2.zip
-
-Release asset SHA-256:
-f5ab8206464130962234a7ccab19c7d212a048c848ce3e69518f84fc41a39999
-
-Gacha Setup stated Blender target:
-Blender 5.2+
-
-Current Blender LTS candidate at document review time:
-Blender 5.2.1 LTS (2026-08-25)
-Formal baseline remains **Pending Reference Validation**.
-Canonical Blender render environment (OS/GPU backend/device/driver where relevant): **Pending baseline qualification** and must be locked with the baseline.
-
-V1 Genshin Reference Family artifacts at the locked commit:
-Main: setup_wizard/shaders/gi/HoYoverse - Genshin Impact v3.4.blend
-Git blob: 7637f1d18a63188ca08870fb554d949dafefaecf
-
-Outline: setup_wizard/shaders/gi/HoYoverse - Genshin Impact Outlines v3.blend
-Git blob: 532e0860065acea1e427f1d4033f69626793036b
-
-Post: setup_wizard/shaders/gi/HoYoverse - Genshin Impact Post-Processing.blend
-Git blob: 7cafd3d5fcb77e5e7efa8037531e085887f57d5e
-
-Lineage:
-Festivity / Blender-miHoYo-Shaders (GPL-3.0)
-
-Accuracy scope:
-Upstream Reference-Parity; upstream shader author explicitly does not claim 100% in-game accuracy.
-```
-
-官方/上游入口：
-
-- Gacha Setup Repository: https://github.com/PaoloESAN/gacha-setup
-- Gacha Setup Releases: https://github.com/PaoloESAN/gacha-setup/releases
-- Blender 5.2 LTS glTF Manual: https://docs.blender.org/manual/zh-hans/5.2/addons/scene_gltf2.html
-
-注意：
-
-> 这只是文档修订时的 upstream snapshot。只有通过 Reference Validation 后，某个具体版本组合才能成为项目的正式 Golden Baseline。
-
-
+The [source lock](../../assets/sources/gacha-authoring.json) owns the current
+qualified release and digest. The active recipe and
+[capture contract](../reference/09-static-character-capture.md) bound qualification.
+Do not maintain another version/hash snapshot here. Reference lineage and
+redistribution boundaries belong to [third-party notices](../../THIRD_PARTY_NOTICES.md).
 
 ## 本次深度检视的权威依据
 

@@ -1,7 +1,6 @@
 # 总体目标架构
 
 > **Status:** Normative architecture specification
-> **Authority:** This document is authoritative for its domain; the archived Master Plan is historical only.
 
 
 最终架构：

@@ -1,7 +1,6 @@
 # 跨平台 Capability 与支持策略
 
 > **Status:** Normative architecture specification
-> **Authority:** This document is authoritative for its domain; the archived Master Plan is historical only.
 
 
 ## Portable Baseline 必须分开定义

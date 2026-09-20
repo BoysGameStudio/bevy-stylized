@@ -1,7 +1,6 @@
 # 工具链、版本、发布与公共仓库规则
 
 > **Status:** Normative architecture specification
-> **Authority:** This document is authoritative for its domain; the archived Master Plan is historical only.
 
 
 ## Package Naming 与 License/Provenance Gate
@@ -164,7 +163,7 @@ Resolved Variant
 
 ---
 
-## Feature Matrix CI
+## Local feature matrix
 
 必须测试：
 
@@ -220,7 +219,7 @@ MSRV / Rust toolchain policy
 - 跟随 Bevy MSRV；
 - 或锁定 workspace toolchain。
 
-CI 至少测试官方声明的最低 Rust 版本和当前 stable。
+验证在本地执行，覆盖实际声明的工具链范围；以 `rust-toolchain.toml` 和 Cargo 声明为准。
 
 ---
 
@@ -229,8 +228,8 @@ CI 至少测试官方声明的最低 Rust 版本和当前 stable。
 `0.x`：
 
 - 可 breaking；
-- 必须 CHANGELOG；
-- 必须 Migration Note。
+- 当前 API/schema 变化必须更新对应规范与明确的发布说明；
+- 不保留已删除版本的迁移副本或兼容层。
 
 `1.0` 后稳定：
 
@@ -265,7 +264,7 @@ Public Synthetic Suite
 Optional Private/Local Reference Suite
 ```
 
-公共 CI 不能依赖无法合法分发的文件。
+可公开复现的本地检查不能依赖无法合法分发的文件。
 
 必须维护：
 

@@ -40,7 +40,7 @@ Static character follow-up evidence (2026-09-14):
 [shared capture contract](docs/reference/09-static-character-capture.md),
 `tests/integration/tests/morph_skinning.rs` (Genshin AO regression), and
 `crates/bevy-stylized-render/src/hero.rs` (inherited texture flags).
-ADR-0007/ADR-0019 remain unresolved; diagnostics do not accept parity.
+ADR-0007 remains unresolved; ADR-0019 accepts family scope only; diagnostics do not accept parity.
 
 Real-time validation and external rendering inputs (2026-09-15):
 [scan/performance and input contracts](docs/showcase/04-realtime-validation.md).

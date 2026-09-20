@@ -2,116 +2,54 @@
 
 An independent Bevy rendering framework for Cel, Character and Hero surfaces,
 explicit NPR material data, authored lighting, outlines, LOD and capability-based
-fallback. The six product crates are separate from development applications,
-experiments, asset preparation and GPU verification.
+fallback. Six product crates are separate from development apps, experiments,
+asset preparation and GPU verification.
 
-The framework owns stylized rendering. Animation playback, expression control,
-retargeting, IK and character physics belong to the application, engine or DCC.
-Skinning and morph fixtures validate rendering compatibility with externally
-supplied deformation; they do not establish a character animation system.
-See the [scope contract](docs/architecture/01-goals-scope-and-three-axis-model.md).
+The framework owns rendering. Animation playback, expressions, retargeting, IK
+and character physics belong to the host or DCC. Skin/morph fixtures verify
+rendering compatibility, not a character animation system. See the
+[scope contract](docs/architecture/01-goals-scope-and-three-axis-model.md).
 
-This is a development release. Public API/profile decisions remain provisional;
-upstream visual parity and publication qualification are not implied by passing
-build or asset-integration tests. See [support](docs/platforms/SUPPORT_MATRIX.md)
-and [release gates](docs/release/V1_RELEASE_CHECKLIST.md).
+## Start here
 
-## Build and test
-
-Validation runs locally; GitHub Actions is disabled and pushes do not launch CI.
-Use `tools/dev.py` for checks, including inspector, consumer and GPU lanes.
-
-Use the Rust toolchain in `rust-toolchain.toml` and Python 3.11+. Ordinary builds
-and CPU tests need neither Blender nor third-party character assets.
+Use the checked-in Rust toolchain and Python 3.11+. From this directory:
 
 ```sh
-cargo fetch --locked # initial Rust dependency preparation; no character assets
-cargo check --locked
-python3 tools/dev.py check --lane cpu
-python3 tools/dev.py check --lane gpu --required
-```
-
-The GPU command requires an actual adapter and accepted first-party baselines.
-CPU-only runs explicitly leave GPU tests ignored; they do not claim GPU coverage.
-The qualified local backend is currently Linux/Vulkan. Other targets retain their
-stated support level until measured.
-
-To open the showcase or capture a procedural scene:
-
-```sh
+cargo fetch --locked
+CARGO_INCREMENTAL=0 cargo check --locked
 cargo run -p showcase --features interactive -- overview
-cargo run -p showcase -- overview --capture
 ```
 
-## Independent character workflow
+Ordinary builds and the procedural showcase need no Blender or third-party art.
+Use [contributing](CONTRIBUTING.md) to select local CPU, consumer and GPU checks;
+remote CI is not used.
 
-Prepare original files from versioned, hash-verified sources, then build with the
-Blender version declared by the recipe:
-
-```sh
-python3 tools/dev.py assets prepare --pack synthetic
-python3 tools/dev.py assets prepare --pack genshin-odette
-python3 tools/dev.py assets prepare --pack gacha-authoring
-python3 tools/dev.py assets build --pack genshin-odette --blender blender
-```
-
-`build` prints a content-addressed build directory. Use its `compiled/character.glb`
-for integration and its authoring audit/reference metadata to inspect scope:
-
-```sh
-python3 tools/dev.py check --lane asset-integration --required --asset BUILD/compiled/character.glb
-python3 tools/dev.py golden capture --asset BUILD/compiled/character.glb --out target/stylized/character.png
-```
-
-Gacha Setup support targets only the latest stable release (currently qualified
-v3.6.4), pinned in `assets/sources/gacha-authoring.json`. Retired versions are not supported.
-
-The current external recipe is an explicitly restricted static body/face variant,
-not full rig/effect compatibility. Third-party raw and derived art lives only under
-ignored `assets/local`. No sibling game project, processed game GLB or personal
-agent configuration is required. See [authoring](docs/authoring/05-integration-guide.md).
-
-## Interactive character inspection
-
-```sh
-cargo run -p showcase --features inspector -- inspect --asset BUILD/compiled/character.glb
-```
-
-The [character inspector](docs/showcase/03-character-inspector.md) provides linked
-live A/B views, orbit/focus controls, shared lighting, material diagnostics and
-versioned screenshot recipes. It uses normal MSAA rendering, independently of the
-fixed Blender parity captures.
+For an application, begin with the [integration guide](docs/authoring/05-integration-guide.md).
+For authored characters, follow the [reference workflow](docs/reference/01-reference-authoring-workflow.md)
+and [export bridge](docs/authoring/02-blender-reference-export-bridge.md), then use
+its compiled asset with the [character inspector](docs/showcase/03-character-inspector.md).
+No sibling game checkout or personal agent setup is required.
 
 ## Current qualification scope
 
-The [authoring source lock](assets/sources/gacha-authoring.json) owns the one
-supported release/hash. Current structural, rendering and asset qualification
-procedures are in [contributing](CONTRIBUTING.md), the [support matrix](docs/platforms/SUPPORT_MATRIX.md)
-and the [release checklist](docs/release/V1_RELEASE_CHECKLIST.md). Passing local
-checks does not establish every platform, upstream effect or publication gate.
-Use the current `character-reference` lane for declared character cases. There
-is no retired synthetic-reference renderer or old authoring-version lane.
+Gacha Setup support uses one source-locked release (currently qualified v3.6.4),
+recorded in [the source lock](assets/sources/gacha-authoring.json). The external
+recipe covers an explicitly restricted static body/face variant. Raw and derived
+third-party art stays under ignored `assets/local`.
 
-## Layout and contracts
+This is a development release. Public API/profile decisions, broader upstream
+parity and publication gates remain open. Current checks do not qualify every
+platform or upstream effect. See the [support matrix](docs/platforms/SUPPORT_MATRIX.md),
+[provisional inventory](docs/release/03-provisional-inventory.md) and
+[release checklist](docs/release/V1_RELEASE_CHECKLIST.md).
 
-- `crates/`: six product crates; shaders belong to the render crate.
-- `apps/`: runnable showcase.
-- `labs/`: independent reference comparisons, benchmarks and experiments.
-- `tests/`: shared capture harness and cross-crate integration tests.
-- `tools/`, `schemas/`, `assets/recipes/`: reproducible authoring and validation.
-- `fixtures/`: first-party test inputs and accepted first-party image baselines.
-- `.agents/skills/`: optional repository-owned workflow skills.
+## Documentation
 
-Start with [architecture](ARCHITECTURE.md), [contributing](CONTRIBUTING.md),
-[reference validation](docs/reference/01-reference-authoring-workflow.md), and
-[traceability](TRACEABILITY.md). Current provenance is in
-[third-party notices](THIRD_PARTY_NOTICES.md).
+- [Architecture](ARCHITECTURE.md): subsystem contracts and source layout.
+- [Contributing](CONTRIBUTING.md): local tools, check selection and evidence.
+- [Agent instructions](AGENTS.md).
+- [Traceability](TRACEABILITY.md) and [decisions](docs/adr/ADR_INDEX.md).
+- [Asset build recovery](docs/authoring/06-build-attempts.md).
+- [Third-party notices](THIRD_PARTY_NOTICES.md).
 
-A public rendering-contract change must update its specification, ADR/traceability
-and relevant validation. Publication remains disabled pending the existing
-license/provenance and release decisions; no registry publication is performed by
-asset preparation or developer tasks.
-
-Build retries use a new immutable attempt under the same content key and preserve
-failed work. See [asset recovery](docs/authoring/06-build-attempts.md) for stage logs,
-completion markers and verified cache reuse.
+Publication remains disabled pending license/provenance and release decisions.

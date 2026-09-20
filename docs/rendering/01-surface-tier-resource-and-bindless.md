@@ -1,7 +1,6 @@
 # Surface Class、Execution Tier、GPU 资源预算与 Bindless
 
 > **Status:** Normative architecture specification
-> **Authority:** This document is authoritative for its domain; the archived Master Plan is historical only.
 
 
 ## Production Surface Classes

@@ -1,7 +1,6 @@
 # 测试、Golden、性能与质量验证
 
 > **Status:** Normative architecture specification
-> **Authority:** This document is authoritative for its domain; the archived Master Plan is historical only.
 
 
 ## 测试层级

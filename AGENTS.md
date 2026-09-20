@@ -21,16 +21,13 @@ must not override current project paths or contracts. Every task remains executa
 through documented tools without an AI client, Blender MCP or a personal skill.
 
 Validation is local-only. Do not enable GitHub Actions or launch remote CI.
-Historical workflow definitions were removed; Git history retains their provenance.
 
 Use `tools/dev.py` for standard tasks. Serialize Cargo builds and GPU/performance
 runs. Required GPU/asset/baseline absence is BLOCKED, not PASS. Keep engineering
 independence, image regression and upstream parity as distinct reported outcomes.
 
-Gacha Setup acceptance targets only the latest stable release, pinned by exact
-version/hash in `assets/sources/gacha-authoring.json` after qualification. As of
-2026-09-15 this is v3.6.4. Older release compatibility is not a project requirement.
-The v3.6.2 reference lane and its recorded failures are historical, opt-in evidence,
-not current blockers or mandatory isolation inputs. Do not restore old-version
-support obligations without a user request. Preserve dated evidence without
-rewriting its historical outcomes.
+Authoring acceptance uses the qualified version/hash in
+`assets/sources/gacha-authoring.json` and the scope of the active recipe. There
+is no supported old-version lane. Do not restore compatibility code or rewrite
+dated measurement outcomes. Keep proposed ADRs distinct from accepted decisions.
+Documentation-only changes use document/reference checks without Cargo/GPU runs.
