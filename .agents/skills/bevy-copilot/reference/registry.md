@@ -4,10 +4,10 @@
 
 ## brp registry schema
 
-Fetch the Bevy type-registry schema (optionally crate-filtered)
+Fetch the Bevy type-registry schema (optionally filtered by crate or reflection traits such as Component and Resource)
 
 ```text
-Fetch the Bevy type-registry schema (optionally crate-filtered)
+Fetch the Bevy type-registry schema (optionally filtered by crate or reflection traits such as Component and Resource)
 
 Usage: bevy_copilot brp registry schema [OPTIONS]
 
@@ -22,8 +22,10 @@ Options:
           Exclude types from these crates
       --compact <COMPACT>
           Compact (single-line) JSON output instead of pretty: true|false [possible values: true, false]
-      --type-limit <TYPE_LIMIT>
-          Maximum number of types to return
+      --with-types <WITH_TYPES>
+          Include types with any of these reflection traits (e.g. Component,Resource)
+      --without-types <WITHOUT_TYPES>
+          Exclude types with any of these reflection traits (e.g. Serialize)
   -h, --help
           Print help
 ```

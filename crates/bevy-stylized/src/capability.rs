@@ -95,18 +95,21 @@ pub fn requested_wgpu_features(features: &BTreeSet<StylizedGpuFeature>) -> WgpuF
         out |= match feature {
             StylizedGpuFeature::Float16 => WgpuFeatures::SHADER_F16,
             StylizedGpuFeature::Subgroup => WgpuFeatures::SUBGROUP,
-            StylizedGpuFeature::Bindless => {
-                WgpuFeatures::TEXTURE_BINDING_ARRAY
-                    | WgpuFeatures::STORAGE_RESOURCE_BINDING_ARRAY
-                    | WgpuFeatures::BUFFER_BINDING_ARRAY
-                    | WgpuFeatures::PARTIALLY_BOUND_BINDING_ARRAY
-            }
+            StylizedGpuFeature::Bindless => bindless_wgpu_features(),
             StylizedGpuFeature::Compute
             | StylizedGpuFeature::HdrOutput
             | StylizedGpuFeature::StorageBufferInVertexStage => WgpuFeatures::empty(),
         };
     }
     out
+}
+
+// Request policy and actual-device admission use the same complete feature set.
+fn bindless_wgpu_features() -> WgpuFeatures {
+    WgpuFeatures::TEXTURE_BINDING_ARRAY
+        | WgpuFeatures::STORAGE_RESOURCE_BINDING_ARRAY
+        | WgpuFeatures::BUFFER_BINDING_ARRAY
+        | WgpuFeatures::PARTIALLY_BOUND_BINDING_ARRAY
 }
 
 /// wgpu 设备能力 → backend-neutral 能力集合（Stage B 映射）。
@@ -126,9 +129,7 @@ pub fn stylized_capabilities_from_wgpu(
     if features.contains(WgpuFeatures::SUBGROUP) {
         out_features.insert(StylizedGpuFeature::Subgroup);
     }
-    if features.contains(WgpuFeatures::TEXTURE_BINDING_ARRAY)
-        && features.contains(WgpuFeatures::STORAGE_RESOURCE_BINDING_ARRAY)
-    {
+    if features.contains(bindless_wgpu_features()) {
         out_features.insert(StylizedGpuFeature::Bindless);
     }
     if limits.max_compute_workgroup_size_x > 0 {
@@ -173,6 +174,29 @@ mod tests {
         config.apply_to_wgpu_settings(&mut settings);
         assert!(settings.features.contains(WgpuFeatures::SHADER_F16));
         assert!(!settings.features.contains(WgpuFeatures::SUBGROUP));
+    }
+
+    #[test]
+    fn bindless_requires_every_requested_binding_array_feature() {
+        let required = WgpuFeatures::TEXTURE_BINDING_ARRAY
+            | WgpuFeatures::STORAGE_RESOURCE_BINDING_ARRAY
+            | WgpuFeatures::BUFFER_BINDING_ARRAY
+            | WgpuFeatures::PARTIALLY_BOUND_BINDING_ARRAY;
+        let limits = bevy::render::render_resource::WgpuLimits::default();
+        assert!(
+            stylized_capabilities_from_wgpu(required, &limits)
+                .features
+                .contains(&StylizedGpuFeature::Bindless)
+        );
+        for missing in required.iter() {
+            let partial = (required - missing) | WgpuFeatures::SHADER_F16;
+            assert!(
+                !stylized_capabilities_from_wgpu(partial, &limits)
+                    .features
+                    .contains(&StylizedGpuFeature::Bindless),
+                "Bindless admitted without {missing:?}"
+            );
+        }
     }
 
     #[test]

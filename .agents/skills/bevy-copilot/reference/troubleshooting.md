@@ -83,7 +83,7 @@ Any result over 64 KiB is written to `<state dir>/brp_spill_*.json` and
 stdout gets `{"spilled": true, "path", "bytes", "preview"}` instead of the
 payload. Read the spill file for the full document. Typical triggers:
 `brp registry schema` and wide `world.query` calls — narrow them
-(`--with-crates`, `--type-limit`, tighter `--data`).
+(`--with-crates`, `--with-types` / `--without-types`, tighter `--data`).
 
 ## Watches that never end
 

@@ -29,11 +29,12 @@ Read only the relevant detail:
 1. Inspect inputs and choose the exact operation. Distinguish a new Gacha import,
    a re-export of an existing game blend and a runtime material integration.
    Preserve authored sources and accepted baselines; use isolated candidate outputs.
-2. Read the actual export bridge, signature and lock. Validate version, scene scope,
+2. Read the actual export runner, current recipe and source locks. Validate version, scene scope,
    outline modifiers, texture paths, units, rig and vertex attributes before export.
    An old signature must not stamp a new import with old provenance.
-3. Establish the runtime mapping. `export-sidecar.json`, `<asset>.npr.json`,
-   `bevy_stylized.material/v1` and `bevy_stylized.compile/v1` are different contracts.
+3. Establish the runtime mapping. The current `.genshin.json` handoff, export/build
+   completion records, `<asset>.npr.json`, `bevy_stylized.material/v1` and
+   `bevy_stylized.compile/v1` are different contracts.
    Never rename one JSON file and assume conversion. Unmapped material semantics
    are explicit adaptation work, not an invitation to fabricate values.
 4. Run the repository's validate/inspect/compile commands as applicable. Review

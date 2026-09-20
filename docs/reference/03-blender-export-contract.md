@@ -67,14 +67,18 @@ not the character profile handoff or either completion manifest. ILM channel
 meaning is defined by the [Gacha behavior contract](07-gacha-setup-behavior-contract-v1.md)
 and compiler implementation, not copied into an export-settings checklist.
 
-## Unresolved generalization and retained schema files
+## Unresolved generalization and schema ownership
 
 Attribute quantization, shader-location policy, generalized unit/negative-scale
 validation and broad exporter support remain bounded by ADR-0012 and the actual
 profile implementation. Current static qualification does not settle those choices.
 
-`schemas/authoring/export-settings.v1.json` and `manifest.schema.json` describe the
-retired generic exporter draft. They do not configure this static producer, and
-`export-manifest-v1` is not its completion format. They are excluded from the
-current reproduction path. Removing these data files requires a separate consumer
-check; this documentation change does not migrate any stored asset schema.
+The current authoring schemas cover source manifests, static recipes, capture
+contracts and the NPR attribute inventory. The inventory generates the loader's
+attribute contract; it remains an active source. Fixture/golden provenance may
+name `blender-gltf-npr-v1` as its export contract identity, which is separate from
+runtime-export and complete-build record schemas.
+
+The build runner hashes all current authoring schemas into its content key.
+Removing obsolete schema inputs changes the next build identity; existing cached
+artifacts keep their original provenance and are not relabelled as a new build.

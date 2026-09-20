@@ -1,98 +1,79 @@
 # Export and handoff contracts
 
-## Establish input quality
+## Establish inputs and scope
 
-Obtain the source/version manifest, candidate blend and dependencies, import log,
-audit, reference views/settings, intended object/material selection and unresolved
-findings. These are workflow evidence files, not a runtime schema. If starting
-from an existing GLB, inspect that exact file and its provenance instead.
+Locate the actual project root. Read the current source locks, recipe, authoring
+audit and producer before selecting an export path. Source version, installed
+add-on version and an accepted reference capture are distinct facts. For an
+existing GLB, inspect that exact file and its provenance.
 
-Locate the project's actual paths; the inspected workspace uses:
+The maintained workspace uses:
 
-- `assets/sources/gacha-authoring.json`: current qualified authoring release/hash.
-- `tools/blender/export_character.py`: current scoped character export.
-- `schemas/authoring/`: signatures, exporter settings,
-  `_NPR_*` definitions, manifest schema.
-- `crates/bevy-stylized-gltf/src/metadata.rs`: typed runtime sidecar/extras.
-- `crates/bevy-stylized-tools/src/compile.rs`: compiler behavior.
+- `assets/sources/gacha-authoring.json` and the character source manifest for qualified identities;
+- `assets/recipes/genshin-static-v4.json` for the current restricted static scope;
+- `tools/assets/build.py` for the full pipeline and completion marker;
+- `tools/blender/export_character.py` for the runtime export stage;
+- `schemas/authoring/npr-attributes.v1.json` for the generated attribute contract;
+- `crates/bevy-stylized-gltf/src/metadata.rs` and the tools compiler for typed runtime inputs.
 
-## Do not collapse these four formats
+## Keep artifact responsibilities distinct
 
-| Format | Owner / purpose |
-|---|---|
-| `export-manifest.json` (`export-manifest-v1`) | Bridge provenance, hashes, settings and outputs |
-| `export-sidecar.json` (`bevy_stylized.schema_version = export-sidecar-v1.1`) | Reference metadata, namespaced Genshin values and ground truth |
-| `<asset>.npr.json` (`schema = bevy-stylized.sidecar/v1`) | Runtime descriptor map keyed by glTF material name |
-| Material extras `bevy_stylized.material/v1` | Typed `StylizedMaterialDescriptor` for one material |
+| Artifact / schema | Role |
+| --- | --- |
+| Authoring blend, audit and reference captures | Scoped upstream source and independent visual evidence |
+| `character.genshin.json`, `bevy_stylized.genshin-input/v2` | Material/recipe/palette handoff to strict Genshin compilation |
+| `runtime-manifest.json`, `bevy_stylized.runtime-export/v1` | Export-stage identities, texture evidence and limitations |
+| `build-manifest.json`, `bevy_stylized.build/v1` | Complete-build input identities and generated artifact hashes |
+| `<asset>.npr.json`, `bevy-stylized.sidecar/v1` | Runtime descriptor map keyed by material name |
+| Material extras `bevy_stylized.material/v1` | One typed material descriptor |
 
-The compiler additionally reads `bevy_stylized.compile/v1` material extras or a
-sidecar `compile` map for packing instructions. Read the actual payload types;
-this is not the Blender ground-truth structure. Extras/sidecar disagreements
-produce a conflict rather than an arbitrary winner.
+`bevy_stylized.compile/v1` is a compiler directive namespace. Fixture/reference
+sidecars and provenance tags are not interchangeable with these current handoffs.
+Read the payload types; renaming a JSON file cannot convert its meaning.
+Extras/sidecar disagreements require an explicit diagnostic and resolution.
 
-Reference metadata extraction is not a general shader compiler. Establish an
-explicit mapping from authored node/rig values to descriptors, renderer parameters,
-instance data and view settings. Unknown values remain unsupported/unmapped until
-verified. A renamed sidecar cannot provide this conversion.
+## Build the current character candidate
 
-## Export branch
-
-Use a fresh candidate output directory. Normal command shape:
+From the verified project root, with its declared tools and qualified sources:
 
 ```sh
-blender --background SOURCE.blend --python-exit-code 1 \
-  --python tools/blender/export_character.py -- --authoring BUILD/authoring/authoring.json --out CANDIDATE_DIR
+python3 tools/dev.py assets prepare --pack genshin-odette
+python3 tools/dev.py assets prepare --pack gacha-authoring
+python3 tools/dev.py assets build --pack genshin-odette --blender blender
 ```
 
-Select `--role` and `--signature` only when the source genuinely matches that
-contract. Never use fixture mode or weaken a signature to make a real character
-pass. The installed add-on version is not necessarily the source blend's version;
-record the latter independently. The current bridge cross-checks signature and
-lock metadata but must not be assumed to detect every mismatch with the installed
-plugin or the actual scene lineage.
+Use the runner's returned build directory and `compiled/character.glb`. It supplies
+stage paths and options, creates a new immutable attempt and preserves failures.
+A runtime-export record alone is not the full build's success marker.
 
-Before calling the bridge, inspect export scope. The 2026-09-14 settings use
-`export_apply=true`, `use_selection=false`, `use_visible=false`,
-`use_renderable=false`, `use_active_scene=false`. Therefore merely hiding helpers
-or selecting the character is insufficient. Prepare a runtime-only transient
-scene/file, remove upstream outline geometry modifiers from that export copy,
-exclude authoring widgets and verify how morphs/skin survive modifier application.
-The declared character pipeline owns this preparation.
+The current exporter evaluates recipe-selected meshes into a separate runtime
+scene, removes upstream outline geometry, applies the evaluated world transforms,
+and exports the selected runtime objects. It uses `export_apply=false` because
+geometry was evaluated before export. Animation, skin and morph export are disabled
+for this static recipe. Cameras/lights stay with the reference captures. This
+workflow does not qualify arbitrary rigs, effects or another authoring scope.
 
-Gacha Shader-to-RGB graphs are not directly glTF PBR graphs. A suitable exporter
-must expose supported base material inputs and preserve NPR maps separately.
-The independent `tools/blender/export_character.py` is a scoped static exporter.
-Its input/recipe and material restrictions are explicit; it does not promise
-arbitrary rigs or effects. Do not use historical game exporters as a fallback.
+Preserve authored UVs, control colors, texture semantics and intended material
+coverage. Runtime profile requirements decide whether an absent attribute is
+acceptable; generic schema defaults cannot manufacture missing art semantics.
+Measure units and forward axes instead of copying another game's calibration.
+Never substitute a production screenshot for an independent upstream reference.
 
-Read the current `_NPR_*` domain/type contract. The inspected bridge treats missing
-attributes as warnings for upstream fixtures; profile requirements determine
-whether a character can actually render correctly. Preserve the original `Col`
-control data rather than synthesizing all-white colors. Avoid blindly copying
-Blender scale or a game's root calibration; measure units and forward after export.
-
-## Validate, inspect and compile
-
-From the verified workspace root:
+## Validate and compile
 
 ```sh
-cargo run -p bevy-stylized-tools -- validate --json CANDIDATE.glb
-cargo run -p bevy-stylized-tools -- inspect --json CANDIDATE.glb
-cargo run -p bevy-stylized-tools -- compile --json --out COMPILED_DIR CANDIDATE.glb
+CARGO_INCREMENTAL=0 cargo run -p bevy-stylized-tools -- validate --json CANDIDATE.glb
+CARGO_INCREMENTAL=0 cargo run -p bevy-stylized-tools -- inspect --json CANDIDATE.glb
+CARGO_INCREMENTAL=0 cargo run -p bevy-stylized-tools --features profile-genshin -- compile --profile genshin --strict --out COMPILED_DIR CANDIDATE.glb
 ```
 
-The built binary is `bevy-stylized`; exit codes are 0 success, 1 contract violation,
-2 usage/IO. Validate emitted material counts, semantic mappings, hashes and texture
-references. The compiler can create default Cel descriptors from unmapped PBR
-materials, with extracted color textures. That is a structural success, not full
-Genshin shading conversion. No typed metadata is legitimate only when the consuming
-application supplies and verifies explicit material adoption itself.
+Strict Genshin compilation needs the matching `.genshin.json` and complete
+material coverage. Generic Cel compilation is a separate supported asset path;
+its default descriptors do not establish a Genshin conversion. Explicit host-side
+material adoption can legitimately consume assets without runtime descriptors,
+but that host mapping must be validated.
 
-## Current strict pipeline
-
-The maintained path is assets prepare/build, followed by
-`compile --profile genshin --strict` with the optional profile-genshin feature.
-It consumes the typed .genshin.json handoff, matches every GLB material, preserves
-errors and writes an atomic new GLB/sidecar/texture package. Normal default Cel
-compilation remains a separate compatibility path. Runtime schemas are generated
-from the Rust types, not manually duplicated in authoring JSON.
+Inspect emitted materials, textures, schema identities and limitations as well
+as exit status. Build success, runtime integration, GPU correctness, visual parity
+and performance are separate qualifications. Runtime schemas come from Rust types;
+do not maintain another handwritten copy or relax signatures/goldens to pass.

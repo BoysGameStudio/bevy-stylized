@@ -1,6 +1,6 @@
 //! Typed extras / sidecar 导入（`bevy_stylized.*` namespace）。
 //!
-//! 两条元数据通道（docs/reference/06 §5）：
+//! 两条元数据通道（docs/reference/03-blender-export-contract.md）：
 //!
 //! - **extras**：glTF 文档内 `extras` 字段中 `bevy_stylized.material/v1`
 //!   键下的 payload；

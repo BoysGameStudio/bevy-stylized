@@ -30,7 +30,7 @@ walkthroughs live in `reference/recipes.md`.
     (`--entity <ID>` scopes to one entity);
   - `brp world list-resources` — every resource type path;
   - `brp registry schema` — the full type registry with field shapes
-    (large; narrow it with `--with-crates my_game` or `--type-limit <N>`).
+    (large; narrow it with `--with-crates my_game` or `--with-types Component`).
 
 ## Query payloads (`brp world query`)
 

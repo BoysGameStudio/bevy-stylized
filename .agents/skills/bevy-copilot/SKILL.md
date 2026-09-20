@@ -91,7 +91,7 @@ Step-by-step versions with example outputs: `reference/recipes.md`.
 
 ### Registry — `reference/registry.md`
 
-- `brp registry schema` — Fetch the Bevy type-registry schema (optionally crate-filtered)
+- `brp registry schema` — Fetch the Bevy type-registry schema (optionally filtered by crate or reflection traits such as Component and Resource)
 
 ### Schedule — `reference/schedule.md`
 

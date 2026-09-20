@@ -3,8 +3,7 @@
 //! 职责（docs/architecture/03，依赖方向 `gltf → core`）：
 //!
 //! - [`attributes`]：把 `npr-attributes.v1.json` 契约的 10 个 `_NPR_*`
-//!   顶点属性注册为 Bevy 自定义顶点属性；`_CEL_*` 别名表仅以数据形式
-//!   提供，默认不注册；
+//!   顶点属性注册为 Bevy 自定义顶点属性；
 //! - [`metadata`]：`bevy_stylized.*` namespaced extras 与 `.npr.json`
 //!   sidecar 的 typed 导入；extras/sidecar 冲突显式暴露（ADR-0020
 //!   Proposed，绝不静默取舍）；
