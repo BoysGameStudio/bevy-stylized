@@ -21,9 +21,9 @@ Current executable evidence:
   disabled networking and absence of sibling projects, including rebuilding the
   external source case. This is engineering independence, not parity acceptance.
 
-Inspect docs/plans/independent-project-execution.md and current task reports for the
+Inspect current task reports and docs/release/V1_RELEASE_CHECKLIST.md for the
 latest completed checks. Do not treat dated measurements as current-device results.
-The optional GPU workflow requires a separately provisioned trusted runner.
+GPU verification requires a locally available device and the declared inputs.
 
 Primary sources inside the discovered checkout:
 
@@ -36,4 +36,4 @@ Primary sources inside the discovered checkout:
 - crates/bevy-stylized-tools/src/compile.rs
 - schemas/authoring and generated schemas/runtime
 
-Historical research belongs under docs/history and is not an operational fallback.
+Obsolete research and migration copies are not operational inputs.

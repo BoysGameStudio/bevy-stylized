@@ -202,3 +202,55 @@ restores previous values when removed, and exposes invalid inputs through
 MeshTag transport (threshold step 1/254), rejects storage-table slots and explicit
 material-side overrides, and does not claim full-precision animated-character
 parity. See [the contract and verification](../showcase/04-realtime-validation.md).
+
+## Provisional StorageTable lifecycle (2026-09-20)
+
+StorageTable remains experimental under ADR-0004. An idle native app keeps only an
+unallocated table placeholder; a storage asset is created only for explicit entries.
+Slots are dense indices in one
+published table snapshot, not persistent handles. Entries are ordered by Entity
+bits; removing an entry or despawning an entity compacts the next snapshot. Hosts
+must not cache or assign these slot numbers. `next_slot` now reports live records.
+
+`InstanceTableBudget.max_bytes` defaults to 16 MiB. Admission also obeys the actual
+RenderDevice buffer/binding limits and the 24-bit MeshTag index range. Capacity
+rounds upward within those limits and contracts with the live set. Excess entries
+receive `InstanceTableCapacityExceeded`; their table material binding and slot are
+suspended. Re-admission restores the saved material. Removing the entry likewise
+revokes its slot and table draw binding and clears any admission failure, including
+when no slot was ever allocated; adding it again may restore that binding.
+
+Membership or capacity changes publish a fresh ShaderBuffer asset and rebind all
+materials using the prior table before asset events/extraction. New tags therefore
+cannot address an old prepared table if upload is delayed: the new material must
+wait for its new dependency. Submitted draws retain their previous buffer through
+Bevy/wgpu ownership. Numeric-only updates reuse the buffer because index ownership
+is unchanged; delayed upload may retain prior values, never another entity's slot.
+A render scheduling barrier places buffer preparation before table material
+preparation. Unchanged records do not upload or recreate bindings.
+
+The native schedule owns this synchronization. Hosts that take over presentation
+must invoke the same system before instance tag synchronization and asset events.
+The host still chooses StorageTable only on a supported tier; Portable materials
+keep their independent zero-storage layouts. This lifecycle improvement does not
+close ADR-0004 or claim a faster transport than MeshTag.
+
+## Native camera ownership and timing provenance (2026-09-20)
+
+`StylizedViewScope::AllNativeCameras` preserves the original global native mode.
+Embedded hosts can insert `StylizedViewScope::MarkedCameras` and attach
+`StylizedViewCamera` only to cameras whose Exposure, AmbientLight, DistanceFog and
+clear color the framework may write. Removing the marker stops subsequent writes;
+it does not restore prior camera components. Newly created cameras require their
+own marker. Native lighting still uses the scene's shared StylizedKeyLight and a
+single StylizedViewSettings resource. Marking cameras does not create independent
+light worlds. Use the existing HostView/HostMaterial records and externally owned
+presentation schedule for independently authored views or host-owned lights.
+
+QualitySignals now calls its timing value `frame_time_ms`, with `timing_source`
+and `observed_frame`. FrameTimeDiagnostics is recorded as FrameInterval; the renamed
+`StylizedDynamicQuality.frame_time_override_ms` is HostProvided (possibly synthetic).
+The observed frame is the facade's collection frame, not a GPU timestamp. Invalid
+(nonfinite/nonpositive) timing input does not advance the governor. No GPU timing
+claim is made by either source. The existing hysteresis/cooldown/capability policy
+is unchanged; hosts must migrate the two former `gpu_frame_time_*` field names.

@@ -45,7 +45,7 @@ cache, generation lifecycle or missing-input visibility policy.
 
 ## Complete skinning
 
-The glTF adapter registers the stable `CEL_JOINTS_1` / `CEL_WEIGHTS_1` aliases.
+The glTF adapter registers the stable `NPR_JOINTS_1` / `NPR_WEIGHTS_1` aliases.
 Surface, hull and prepass vertex paths add the secondary four influences after
 morphing. `skin_vertex_positions` and complete mesh bounds include both sets;
 malformed/incomplete pairs produce diagnostics. CPU inspection callers remain

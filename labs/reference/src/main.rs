@@ -52,21 +52,6 @@ fn main() {
         }
         return;
     }
-    let required = std::env::args().skip(1).any(|arg| arg == "--required");
-    match reference_comparison::run_reference_comparison() {
-        Ok(reports) => {
-            let passed = reports.iter().all(|r| r.tier2.passed);
-            println!(
-                "{}",
-                serde_json::json!({"capture_status":"PASS","parity_status":if passed {"PASS"}else{"FAIL"},"reports":reports})
-            );
-            if required && !passed {
-                std::process::exit(1);
-            }
-        }
-        Err(error) => {
-            eprintln!("BLOCKED: {error}");
-            std::process::exit(2);
-        }
-    }
+    eprintln!("use --character-case CASE --out DIR or --image-pairs MANIFEST --out DIR");
+    std::process::exit(2);
 }

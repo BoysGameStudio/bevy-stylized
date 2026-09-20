@@ -1,7 +1,6 @@
 # Independent reference and authoring workflow
 
-> Status: Current normative workflow. Historical migration-renderer instructions
-> are retained under docs/history and are not active prerequisites.
+> Status: Current normative workflow. Only the source-locked current authoring target is supported.
 
 There are two renderer sources and three forms of evidence: upstream Blender/Gacha
 behavior, regression against accepted production images, and independent semantic
@@ -28,36 +27,3 @@ The current static scope and unchanged image gates are defined by the
 [capture contract](09-static-character-capture.md). The isolation gate rebuilds
 this workflow from raw inputs and requires strict parity to pass. A rendering
 failure is not accepted merely because it was already known.
-
-## Historical reference evidence
-
-`gacha-reference`, `assets build --pack reference` and `check --lane reference`
-retain explicit access to the locked v3.6.2 experiment for historical investigation.
-They are not part of default acceptance, do not require repair and are not current
-project blockers. Dated failure reports remain unchanged. The historical
-`reference-toolchain.toml` must not be used as the current authoring version lock.
-
-## Authoring and runtime artifacts
-
-Source manifests identify original assets and tool archives. Recipes state mesh,
-material, pose and feature scope. Authoring outputs preserve the packed reference
-blend and audit; runtime export uses a separate transient scene without upstream
-outline geometry and widgets. Strict profile compilation creates typed runtime
-material data and an atomic new bundle. See the [integration guide](../authoring/05-integration-guide.md).
-
-## First-party regression
-
-The mandatory public lane uses self-made geometry and the self-made skinned/morph
-character. Accepted images live in fixtures/golden; diagnostic output is separate.
-External art and historical snapshots remain under ignored assets/local. See
-[comparison criteria](08-golden-tolerance-and-cross-layer-criteria.md) and
-[upgrade policy](04-upstream-contract-upgrade-and-golden.md).
-
-## Runtime comparison ownership
-
-The character reference coordinator validates its package, constructs a calibrated
-scene, then runs the fixed cases. Private modules under `labs/reference/src/character`
-own `input`, `scene`, `frames`, `calibration`, `diagnostics`, `metrics`, `cases` and
-local `io` helpers. Thresholds, sampling and independently authored reference data
-are preserved. This code is not an interactive inspector input adapter; see
-[input boundaries](../testing/03-capture-input-boundaries.md).

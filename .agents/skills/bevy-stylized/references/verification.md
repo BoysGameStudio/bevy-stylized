@@ -23,8 +23,7 @@ python3 tools/dev.py check --lane character-reference --required --case BUILD/ch
 
 GPU cases are explicitly ignored by ordinary CPU tests and executed by their GPU
 lane. Missing assets/device/baseline fails a required lane. The external character
-is not a default CPU fixture. Current character comparison uses the explicit matched static cases. The synthetic
-`reference` lane remains a historical opt-in comparison, not a current gate. Diagnostic capture success
+is not a default CPU fixture. Current character comparison uses the explicit matched static cases. Only the current declared character reference lane is supported. Diagnostic capture success
 is separate from the metric result; --required propagates actual failure.
 
 The repository `docs/reference/08-golden-tolerance-and-cross-layer-criteria.md`

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from pathlib import Path
 import re, sys, os, subprocess
+from doc_commands import missing_entrypoints
 
 ROOT = Path(__file__).resolve().parents[2]
 def project_markdown_files():
@@ -30,8 +31,6 @@ def text(path): return path.read_text(encoding="utf-8")
 
 # 1. Every non-archive Markdown file should have an H1.
 for f in MARKDOWN_FILES:
-    if "archive" in f.parts or "history" in f.parts:
-        continue
     lines = text(f).splitlines()
     if not any(line.startswith("# ") for line in lines):
         err(f"{f.relative_to(ROOT)}: missing H1")
@@ -40,6 +39,11 @@ for f in MARKDOWN_FILES:
 for f in MARKDOWN_FILES:
     if text(f).count("```") % 2:
         err(f"{f.relative_to(ROOT)}: unbalanced code fences")
+
+# Literal Python commands also occur in shell/text fences without Markdown links.
+for f in MARKDOWN_FILES:
+    for command in missing_entrypoints(text(f), ROOT, f):
+        err(f"{f.relative_to(ROOT)}: missing Python command entrypoint: {command}")
 
 # 3. ADR integrity.
 adr_dir = ROOT / "docs/adr"
@@ -81,8 +85,6 @@ if index_ids != all_ids:
 # 6. Local Markdown links to .md files must resolve.
 link_re = re.compile(r"\[[^\]]*\]\(([^)]+\.md(?:#[^)]+)?)\)")
 for f in MARKDOWN_FILES:
-    if "archive" in f.parts or "history" in f.parts:
-        continue
     for target in link_re.findall(text(f)):
         target_path = target.split("#",1)[0]
         if target_path.startswith(("http://","https://")):
@@ -120,16 +122,9 @@ if not claimed or claimed.group(1) != source['release']:
 # 7. Root-style textual paths like docs/foo.md should exist.
 path_re = re.compile(r"(?<![\w/])((?:docs|tools)/[A-Za-z0-9_./-]+\.md)")
 for f in MARKDOWN_FILES:
-    if "archive" in f.parts or "history" in f.parts:
-        continue
     for p in path_re.findall(text(f)):
         if not (ROOT/p).exists():
             err(f"{f.relative_to(ROOT)}: stale documentation path: {p}")
-
-# 8. Archive must be visibly non-normative.
-archive = ROOT/"docs/archive/bevy_npr_framework_master_plan.md"
-if archive.exists() and "ARCHIVED / NON-NORMATIVE" not in text(archive)[:1000]:
-    err("archived Master Plan missing NON-NORMATIVE banner")
 
 # 9. Forbidden legacy terminology outside archive.
 forbidden = [
@@ -139,8 +134,6 @@ forbidden = [
     "StylizedMaterialClass",
 ]
 for f in MARKDOWN_FILES:
-    if "archive" in f.parts or "history" in f.parts:
-        continue
     t = text(f)
     for term in forbidden:
         if term in t:

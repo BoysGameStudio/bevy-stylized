@@ -10,12 +10,12 @@ use bevy::{
 // Stable serialized provider IDs, shared with the glTF adapter without making
 // the rendering crate depend on the importer.
 pub const ATTRIBUTE_SECONDARY_JOINTS: MeshVertexAttribute = MeshVertexAttribute::new(
-    "_CEL_JOINTS_1",
+    "_NPR_JOINTS_1",
     0x4345_4c00_0000_000a,
     VertexFormat::Uint16x4,
 );
 pub const ATTRIBUTE_SECONDARY_WEIGHTS: MeshVertexAttribute = MeshVertexAttribute::new(
-    "_CEL_WEIGHTS_1",
+    "_NPR_WEIGHTS_1",
     0x4345_4c00_0000_000b,
     VertexFormat::Float32x4,
 );
@@ -150,9 +150,14 @@ pub fn complete_skin_bounds(
 }
 
 pub(crate) fn update_complete_skin_bounds(
-    mut events: MessageReader<AssetEvent<Mesh>>,
-    mut meshes: ResMut<Assets<Mesh>>,
+    events: Option<MessageReader<AssetEvent<Mesh>>>,
+    meshes: Option<ResMut<Assets<Mesh>>>,
 ) {
+    // Headless facade apps need no MeshPlugin. Do not require its event stream
+    // until mesh assets and their events have actually been installed.
+    let (Some(mut events), Some(mut meshes)) = (events, meshes) else {
+        return;
+    };
     for event in events.read() {
         let id = match *event {
             AssetEvent::Added { id }

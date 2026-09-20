@@ -62,8 +62,8 @@ def finish(path, inputs):
 
 
 def build(project, pack, blender='blender'):
-    if pack not in {'genshin-odette','reference'}:
-        raise ValueError('supported build packs: genshin-odette, reference')
+    if pack != 'genshin-odette':
+        raise ValueError('supported build pack: genshin-odette')
     raw=prepared(project,'genshin-odette')
     scripts=sorted((project.root/'tools/blender').glob('*.py'))
     inputs={'orchestrator':digest(__file__),'attempt_runner':digest(project.root/'tools/assets/attempt.py'),'source_preparation':digest(project.root/'tools/assets/prepare.py'),
@@ -74,17 +74,11 @@ def build(project, pack, blender='blender'):
             'scripts':{p.name:digest(p) for p in scripts}}
     inputs['authoring_schemas']={p.name:digest(p) for p in sorted((project.root/'schemas/authoring').glob('*.json'))}
     recipe=project.root/'assets/recipes/genshin-static-v4.json'
-    if pack=='genshin-odette':
-        addon=prepared(project,'gacha-authoring')
-        inputs['recipe']=digest(recipe)
-        inputs['addon_manifest']=digest(project.root/'assets/sources/gacha-authoring.json')
-        # Compiler source changes invalidate the runtime package as well.
-        inputs['compiler'] = compiler_inputs(project.root)
-    else:
-        addon=prepared(project,'gacha-reference')
-        inputs['addon_manifest']=digest(project.root/'assets/sources/gacha-reference.json')
-        inputs['lock']=digest(project.root/'docs/reference/reference-toolchain.toml')
-        inputs['fixture_generator']=digest(project.root/'tools/blender/make_reference_scene.py')
+    addon=prepared(project,'gacha-authoring')
+    inputs['recipe']=digest(recipe)
+    inputs['addon_manifest']=digest(project.root/'assets/sources/gacha-authoring.json')
+    # Compiler source changes invalidate the runtime package as well.
+    inputs['compiler'] = compiler_inputs(project.root)
     key=hashlib.sha256(json.dumps(inputs,sort_keys=True).encode()).hexdigest()
     out=project.cache/pack/'builds'/key
     out, attempt = completed_or_new(out, inputs, verify_run)
@@ -97,40 +91,29 @@ def build(project, pack, blender='blender'):
 def execute_build(project, pack, blender, raw, addon, recipe, out, inputs, attempt):
     manifest=project.root/'assets/sources/genshin-odette.json'
     tools=project.root/'tools/blender'
-    if pack=='genshin-odette':
-        # An isolated configuration avoids personal add-on dependencies and never
-        # saves/replaces the user's preferences or current authoring scene.
-        env=dict(os.environ)
-        config=out/'blender-config'
-        config.mkdir()
-        runtime_addon=out/'tooling/gacha'
-        shutil.copytree(addon,runtime_addon,ignore=shutil.ignore_patterns('__pycache__','*.pyc','unpacked-manifest.json'))
-        env.update(BLENDER_USER_CONFIG=str(config),STYLIZED_ADDON_ROOT=str(runtime_addon))
-        prefix=[blender,'--background','--python-exit-code','1','--python',tools/'bootstrap.py']
-        attempt.run(project,prefix+['--python',tools/'import_character.py','--','--source',raw,'--manifest',manifest,'--recipe',recipe,'--out',out/'authoring'],out/'import.log',env)
-        for script,arguments in [
-            ('inspect_character.py',['--out',out/'authoring/audit.json']),
-            ('capture_character.py',['--authoring',out/'authoring/authoring.json','--out',out/'reference']),
-            ('export_character.py',['--authoring',out/'authoring/authoring.json','--out',out/'runtime'])]:
-            attempt.run(project,[blender,'--background',out/'authoring/character.blend','--python-exit-code','1','--python',tools/'bootstrap.py','--python',tools/script,'--']+arguments,out/(script+'.log'),env)
-        audit=json.loads((out/'authoring/audit.json').read_text())
-        if audit['invalid_constraints'] or audit['invalid_drivers'] or any(not i['exists'] for i in audit['images']):
-            raise ValueError('static authoring audit failed; inspect authoring/audit.json')
-        attempt.run(project,['cargo','run','--locked','-p','bevy-stylized-tools','--features','profile-genshin','--','compile','--profile','genshin','--strict','--json','--out',out/'compiled',out/'runtime/character.glb'],out/'compile.log')
-        attempt.run(project,[blender,'--background',out/'authoring/character.blend','--python-exit-code','1','--python',tools/'bootstrap.py','--python',tools/'character_cases.py','--','--build',out,'--out',out/'character-cases'],out/'character-cases.log',env)
-        for script,source,target in [
-            ('lighting_probe.py','character-cases','character-diagnostics'),
-            ('matched_capture.py','character-diagnostics','character-matched')]:
-            attempt.run(project,[blender,'--background',out/'authoring/character.blend','--python-exit-code','1','--python',tools/'bootstrap.py','--python',tools/script,'--','--case',out/source/'case.json','--out',out/target],out/(target+'.log'),env)
-        shutil.rmtree(out/'tooling')
-    else:
-        vendor=addon/'setup_wizard/shaders/gi/HoYoverse - Genshin Impact v3.4.blend'
-        attempt.run(project,[blender,'--background','--python-exit-code','1','--python',tools/'prepare_reference_textures.py','--','--source',raw,'--manifest',manifest,'--vendor-blend',vendor,'--vendor-sha256',digest(vendor),'--out',out/'textures'],out/'textures.log')
-        (out/'fixture').mkdir()
-        attempt.run(project,[blender,'--background','--python-exit-code','1','--python',tools/'make_reference_scene.py','--','--out',out/'fixture/reference_scene.blend'],out/'fixture.log')
-        attempt.run(project,[blender,'--background',out/'fixture/reference_scene.blend','--python-exit-code','1','--python',tools/'export_reference.py','--','--signature','expected-signature.fixture-v1.json','--role','fixture','--out',out/'fixture-export'],out/'fixture-export.log')
-        attempt.run(project,[blender,'--background','--python-exit-code','1','--python',tools/'render_golden.py','--','--blend',out/'fixture/reference_scene.blend','--out-dir',out/'upstream','--vendor-blend',vendor,'--texture-dir',out/'textures'],out/'capture.log')
-        attempt.run(project,[blender,'--background',vendor,'--python-exit-code','1','--python',tools/'export_reference.py','--','--role','main','--out',out/'export-main'],out/'export-main.log')
-        record={'schema':'bevy_stylized.reference-case/v1','fixture':'fixture-export/reference_scene.glb','upstream':'upstream/gacha_upstream.png','sidecar':'export-main/export-sidecar.json','textures':'textures','output':os.path.relpath(project.output/'reference',out)}
-        (out/'case.json').write_text(json.dumps(record,indent=2)+'\n')
+    # An isolated configuration avoids personal add-on dependencies and never
+    # saves/replaces the user's preferences or current authoring scene.
+    env=dict(os.environ)
+    config=out/'blender-config'
+    config.mkdir()
+    runtime_addon=out/'tooling/gacha'
+    shutil.copytree(addon,runtime_addon,ignore=shutil.ignore_patterns('__pycache__','*.pyc','unpacked-manifest.json'))
+    env.update(BLENDER_USER_CONFIG=str(config),STYLIZED_ADDON_ROOT=str(runtime_addon))
+    prefix=[blender,'--background','--python-exit-code','1','--python',tools/'bootstrap.py']
+    attempt.run(project,prefix+['--python',tools/'import_character.py','--','--source',raw,'--manifest',manifest,'--recipe',recipe,'--out',out/'authoring'],out/'import.log',env)
+    for script,arguments in [
+        ('inspect_character.py',['--out',out/'authoring/audit.json']),
+        ('capture_character.py',['--authoring',out/'authoring/authoring.json','--out',out/'reference']),
+        ('export_character.py',['--authoring',out/'authoring/authoring.json','--out',out/'runtime'])]:
+        attempt.run(project,[blender,'--background',out/'authoring/character.blend','--python-exit-code','1','--python',tools/'bootstrap.py','--python',tools/script,'--']+arguments,out/(script+'.log'),env)
+    audit=json.loads((out/'authoring/audit.json').read_text())
+    if audit['invalid_constraints'] or audit['invalid_drivers'] or any(not i['exists'] for i in audit['images']):
+        raise ValueError('static authoring audit failed; inspect authoring/audit.json')
+    attempt.run(project,['cargo','run','--locked','-p','bevy-stylized-tools','--features','profile-genshin','--','compile','--profile','genshin','--strict','--json','--out',out/'compiled',out/'runtime/character.glb'],out/'compile.log')
+    attempt.run(project,[blender,'--background',out/'authoring/character.blend','--python-exit-code','1','--python',tools/'bootstrap.py','--python',tools/'character_cases.py','--','--build',out,'--out',out/'character-cases'],out/'character-cases.log',env)
+    for script,source,target in [
+        ('lighting_probe.py','character-cases','character-diagnostics'),
+        ('matched_capture.py','character-diagnostics','character-matched')]:
+        attempt.run(project,[blender,'--background',out/'authoring/character.blend','--python-exit-code','1','--python',tools/'bootstrap.py','--python',tools/script,'--','--case',out/source/'case.json','--out',out/target],out/(target+'.log'),env)
+    shutil.rmtree(out/'tooling')
     return finish(out,inputs)

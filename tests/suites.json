@@ -33,6 +33,7 @@
     ],
     "instance_table": [
       "table_golden_full_precision_face_thresholds",
+      "table_churn_preserves_pixels",
       "instance_db_measurement",
       "portable_materials_have_zero_storage_bindings"
     ],

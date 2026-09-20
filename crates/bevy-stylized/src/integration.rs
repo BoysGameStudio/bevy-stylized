@@ -16,7 +16,8 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// Attach to the application-owned scene root before loading its descendants.
 /// This is a one-time adoption configuration, not a live material editor.
-/// Recreate the scene to apply a new set; per-instance rendering state is separate.
+/// Use `rebind_stylized_material` for an explicit generation-checked retry/rebind;
+/// per-instance rendering state is separate.
 #[derive(Component, Clone, Debug)]
 pub struct StylizedMaterialSet {
     /// Exact glTF material names mapped to runtime descriptors.
@@ -39,6 +40,51 @@ pub struct StylizedMaterialAdoption {
     pub material_name: String,
     pub error: Option<String>,
     cache_key: String,
+    source: Handle<StandardMaterial>,
+    pub generation: u64,
+}
+
+#[derive(Component)]
+struct NextAdoptionGeneration(u64);
+
+/// Restore the original material and request one new adoption on the next update.
+/// A stale expected generation, missing entity or unavailable source changes nothing.
+/// Per-instance data is preserved because it may belong to the host.
+pub fn rebind_stylized_material(
+    world: &mut World,
+    entity: Entity,
+    expected_generation: u64,
+) -> Result<(), &'static str> {
+    let adoption = world
+        .get::<StylizedMaterialAdoption>(entity)
+        .ok_or("no completed adoption")?;
+    if adoption.generation != expected_generation {
+        return Err("stale adoption generation");
+    }
+    let next = expected_generation
+        .checked_add(1)
+        .ok_or("adoption generation exhausted")?;
+    let source = adoption.source.clone();
+    if world
+        .get_resource::<Assets<StandardMaterial>>()
+        .is_none_or(|assets| assets.get(&source).is_none())
+    {
+        return Err("original material is unavailable");
+    }
+    world
+        .entity_mut(entity)
+        .remove::<(
+            StylizedMaterialAdoption,
+            MeshMaterial3d<StylizedCelMaterial>,
+            MeshMaterial3d<StylizedCharacterMaterial>,
+            MeshMaterial3d<StylizedHeroMaterial>,
+            MeshMaterial3d<HostMaterial<StylizedCelMaterial>>,
+            MeshMaterial3d<HostMaterial<StylizedCharacterMaterial>>,
+            MeshMaterial3d<HostMaterial<StylizedHeroMaterial>>,
+            HostInstanceInput,
+        )>()
+        .insert((MeshMaterial3d(source), NextAdoptionGeneration(next)));
+    Ok(())
 }
 
 #[derive(Clone)]
@@ -82,6 +128,7 @@ fn adopt(
             Entity,
             &MeshMaterial3d<StandardMaterial>,
             Option<&GltfMaterialName>,
+            Option<&NextAdoptionGeneration>,
         ),
         Without<StylizedMaterialAdoption>,
     >,
@@ -97,7 +144,8 @@ fn adopt(
     mut host_character: Option<ResMut<Assets<HostMaterial<StylizedCharacterMaterial>>>>,
     mut host_hero: Option<ResMut<Assets<HostMaterial<StylizedHeroMaterial>>>>,
 ) {
-    for (entity, source, name) in &entities {
+    for (entity, source, name, requested_generation) in &entities {
+        let generation = requested_generation.map_or(1, |requested| requested.0);
         let Some((set, scope)) = owner(entity, &parents, &sets) else {
             continue;
         };
@@ -106,11 +154,16 @@ fn adopt(
         }
         let name = name.map(|n| n.0.clone()).unwrap_or_default();
         let Some(descriptor) = set.materials.get(&name) else {
-            commands.entity(entity).insert(StylizedMaterialAdoption {
-                material_name: name.clone(),
-                error: Some(format!("unmapped material: {name}")),
-                cache_key: String::new(),
-            });
+            commands
+                .entity(entity)
+                .insert(StylizedMaterialAdoption {
+                    material_name: name.clone(),
+                    error: Some(format!("unmapped material: {name}")),
+                    cache_key: String::new(),
+                    source: source.0.clone(),
+                    generation,
+                })
+                .remove::<NextAdoptionGeneration>();
             continue;
         };
         // Built only once at adoption. Identical descriptors share material assets
@@ -118,11 +171,16 @@ fn adopt(
         if scope.is_some()
             && (host_cel.is_none() || host_character.is_none() || host_hero.is_none())
         {
-            commands.entity(entity).insert(StylizedMaterialAdoption {
-                material_name: name,
-                error: Some("HostMaterialPlugin is required for host material scope".into()),
-                cache_key: String::new(),
-            });
+            commands
+                .entity(entity)
+                .insert(StylizedMaterialAdoption {
+                    material_name: name,
+                    error: Some("HostMaterialPlugin is required for host material scope".into()),
+                    cache_key: String::new(),
+                    source: source.0.clone(),
+                    generation,
+                })
+                .remove::<NextAdoptionGeneration>();
             continue;
         }
         let key = format!("{}:{}:{descriptor:?}", scope.is_some(), set.texture_prefix);
@@ -267,11 +325,15 @@ fn adopt(
         if scope.is_none() {
             target.insert_if_new(StylizedInstanceData::default());
         }
-        target.insert(StylizedMaterialAdoption {
-            material_name: name,
-            error: None,
-            cache_key: key,
-        });
+        target
+            .insert(StylizedMaterialAdoption {
+                material_name: name,
+                error: None,
+                cache_key: key,
+                source: source.0.clone(),
+                generation,
+            })
+            .remove::<NextAdoptionGeneration>();
     }
 }
 
@@ -362,6 +424,112 @@ mod tests {
             app.world()
                 .resource::<Assets<StylizedCelMaterial>>()
                 .get(handle_a)
+                .is_none()
+        );
+    }
+    #[test]
+    fn explicit_retry_recovers_errors_and_rebinds_without_stale_generations() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()));
+        app.init_asset::<StandardMaterial>()
+            .init_asset::<StylizedCelMaterial>()
+            .init_asset::<StylizedCharacterMaterial>()
+            .init_asset::<StylizedHeroMaterial>()
+            .add_plugins(StylizedAssetIntegrationPlugin);
+        let source = app
+            .world_mut()
+            .resource_mut::<Assets<StandardMaterial>>()
+            .add(StandardMaterial::default());
+        let root = app
+            .world_mut()
+            .spawn(StylizedMaterialSet {
+                materials: BTreeMap::new(),
+                texture_prefix: String::new(),
+            })
+            .id();
+        let entity = app
+            .world_mut()
+            .spawn((
+                ChildOf(root),
+                GltfMaterialName("body".into()),
+                MeshMaterial3d(source.clone()),
+            ))
+            .id();
+        app.update();
+        assert!(
+            app.world()
+                .get::<StylizedMaterialAdoption>(entity)
+                .unwrap()
+                .error
+                .is_some()
+        );
+        app.world_mut()
+            .get_mut::<StylizedMaterialSet>(root)
+            .unwrap()
+            .materials
+            .insert("body".into(), Default::default());
+        app.update(); // Configuration changes alone do not silently retry.
+        assert!(
+            app.world()
+                .get::<StylizedMaterialAdoption>(entity)
+                .unwrap()
+                .error
+                .is_some()
+        );
+        assert!(rebind_stylized_material(app.world_mut(), entity, 0).is_err());
+        rebind_stylized_material(app.world_mut(), entity, 1).unwrap();
+        app.update();
+        let outcome = app.world().get::<StylizedMaterialAdoption>(entity).unwrap();
+        assert_eq!(outcome.generation, 2);
+        assert!(outcome.error.is_none());
+        let old = app
+            .world()
+            .get::<MeshMaterial3d<StylizedCelMaterial>>(entity)
+            .unwrap()
+            .0
+            .id();
+        app.world_mut()
+            .get_mut::<StylizedMaterialSet>(root)
+            .unwrap()
+            .materials
+            .get_mut("body")
+            .unwrap()
+            .surface_class = StylizedSurfaceClass::Hero;
+        assert!(rebind_stylized_material(app.world_mut(), entity, 1).is_err());
+        rebind_stylized_material(app.world_mut(), entity, 2).unwrap();
+        assert_eq!(
+            app.world()
+                .get::<MeshMaterial3d<StandardMaterial>>(entity)
+                .unwrap()
+                .0,
+            source
+        );
+        assert!(
+            !app.world()
+                .entity(entity)
+                .contains::<MeshMaterial3d<StylizedCelMaterial>>()
+        );
+        app.update();
+        assert!(
+            app.world()
+                .entity(entity)
+                .contains::<MeshMaterial3d<StylizedHeroMaterial>>()
+        );
+        assert_eq!(
+            app.world()
+                .get::<StylizedMaterialAdoption>(entity)
+                .unwrap()
+                .generation,
+            3
+        );
+        assert_eq!(app.world().resource::<MaterialCache>().0.len(), 1);
+        for _ in 0..5 {
+            app.update();
+        }
+        assert!(
+            app.world()
+                .resource::<Assets<StylizedCelMaterial>>()
+                .get(old)
                 .is_none()
         );
     }

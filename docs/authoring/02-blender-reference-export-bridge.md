@@ -1,111 +1,63 @@
-# Blender Reference Export Bridge（V1 必需）
+# Current Blender reference export bridge
 
 > **Status:** Normative architecture specification
-> **Authority:** This document is authoritative for its domain; the archived Master Plan is historical only.
+> **Authority:** Current authoring/export responsibilities. The [reference workflow](../reference/01-reference-authoring-workflow.md) owns executable reproduction.
 
+The bridge converts the qualified Blender/Gacha source into the framework's
+current runtime inputs. It is development tooling; product crates do not depend
+on Blender, Gacha, a game checkout or the bridge itself.
 
-既然复杂 Gacha Shader Node Graph 不能依赖 glTF 自动序列化，V1 必须有一个**最小、无 UI 依赖、可脚本化**的 Blender Reference Export Bridge。
+## Supported entrypoint
 
-它不是 V3 的完整 Blender Add-on/Editor。
+Run from the project root after preparing the source-locked current inputs:
 
-它的唯一职责是让：
-
-```text
-Blender/Gacha Setup Reference
-→ bevy-stylized Runtime Input
+```sh
+python3 tools/dev.py assets prepare --pack genshin-odette
+python3 tools/dev.py assets prepare --pack gacha-authoring
+python3 tools/dev.py assets build --pack genshin-odette --blender blender
 ```
 
-这一步可重复、可验证、可自动化。
+The current recipe is `assets/recipes/genshin-static-v4.json`. The build runner
+in `tools/assets/build.py` supplies explicit paths/options to
+`tools/blender/import_character.py`, `inspect_character.py`,
+`capture_character.py` and `export_character.py`, followed by strict profile
+compilation and the current character comparison-case preparation stages.
+Use this runner rather than invoking an exporter with guessed arguments.
 
-建议：
+## Responsibilities and outputs
 
-```text
-tools/blender/
-├── README.md
-├── export_reference.py
-└── contracts/
-```
+The bridge must verify the prepared source identities and recipe, reject missing
+maps and unsupported source semantics, audit the imported authoring scene, and
+keep reference capture independent of production rendering.
 
-运行方式应支持 Blender background mode，例如：
+A successful content-addressed build directory contains:
 
-```text
-blender source.blend --background --python export_reference.py -- <profile/options>
-```
+- `authoring/character.blend`, `authoring/authoring.json` and `authoring/audit.json`:
+  the scoped authoring candidate and its input/audit records;
+- `reference/`: direct Blender reference captures and their metadata;
+- `runtime/character.glb` and its typed profile handoff, exported by
+  `tools/blender/export_character.py`;
+- `compiled/character.glb` and compiled material descriptors from strict Genshin
+  profile compilation;
+- `character-matched/case.json`: the completed comparison input, following the
+  current intermediate capture stages;
+- `build-manifest.json`: the current `bevy_stylized.build/v1` completion record,
+  with input identities and hashes of generated artifacts.
 
-### Bridge 职责
+A manifest is published only after successful build stages. Partial or failed
+attempts are not accepted outputs. Missing textures, invalid constraints/drivers,
+unknown semantic mappings, changed source identities and invalid artifact hashes
+must fail rather than silently guessing a compatible result.
 
-1. 验证当前 Blender 版本与 Toolchain Lock；
-2. 验证 Gacha Setup release/profile signature；
-3. 定位已知的 Gacha Material/Node Group 语义；
-4. 将上游行为映射到稳定 `bevy-stylized` Profile 字段；
-5. 验证/生成需要的 `_NPR_*` Mesh Attributes；
-6. 导出 Namespaced Custom Properties / sidecar metadata；
-7. 使用锁定的 glTF Export Settings 调用 Blender Exporter；
-8. 输出 `export-manifest.json`；
-9. 输出 Node-Graph/Material Signature，供上游升级时检测结构变化；
-10. 对未知/改变的上游节点拓扑 **Fail Closed**，而不是静默猜测。
+## Boundaries and validation
 
-### Fail Closed 原则
+Only the current qualified source/recipe is supported. The deleted synthetic
+reference exporter is not an alternate path or a compatibility requirement.
+Current glTF attribute and profile schemas own the runtime data contract; the
+[static capture contract](../reference/09-static-character-capture.md) owns the
+qualified scope and comparison stages.
 
-如果：
-
-```text
-Expected Node Group Missing
-Socket Name Changed
-Material Topology Changed
-Required Texture Missing
-Attribute Domain Changed
-Exporter Setting Drifted
-```
-
-则：
-
-```text
-Export Failure
-```
-
-而不是：
-
-```text
-Best-effort Guess
-```
-
-Reference Pipeline 的目标是可追溯正确性，不是“尽量导出来”。
-
-### Runtime 与 Bridge 解耦
-
-必须保持：
-
-```text
-bevy-stylized runtime
-    不依赖 bpy
-    不依赖 Blender
-    不依赖 Gacha Setup
-
-blender-reference-export
-    dev/tool only
-```
-
-### V1 与 V3 的边界
-
-V1：
-
-```text
-Scriptable Reference Export Bridge
-```
-
-V3：
-
-```text
-Full Blender Add-on
-├─ UI
-├─ Material authoring
-├─ Preview
-├─ Validation
-├─ Profile selection
-└─ Export workflow
-```
-
-V1 不需要完整 DCC UX，但必须具备确定性的 Reference 数据提取能力。
-
----
+Build completion proves an export/compile handoff. Independent image comparison,
+runtime adoption, GPU behavior and supported-platform qualification remain
+separate checks. A successful production capture does not manufacture its own
+upstream reference, and a failed metric must not be relabelled as success.

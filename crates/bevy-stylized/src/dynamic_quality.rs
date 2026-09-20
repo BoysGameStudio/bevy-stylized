@@ -25,8 +25,8 @@ use bevy::{
     prelude::*,
 };
 use bevy_stylized_core::{
-    QualityDecision, QualitySignals, StylizedExecutionTier, StylizedQualityGovernor,
-    StylizedQualityGovernorConfig,
+    QualityDecision, QualitySignals, QualityTimingSource, StylizedExecutionTier,
+    StylizedQualityGovernor, StylizedQualityGovernorConfig,
 };
 
 use crate::capability::{StylizedCapabilityConfig, StylizedResolvedCapabilities};
@@ -55,9 +55,9 @@ pub struct StylizedDynamicQuality {
     pub thermal_pressure: Option<f32>,
     /// 电池电量（0..=1；`None` = 平台不暴露）。
     pub battery_level: Option<f32>,
-    /// 合成帧时注入点（测试 / 真实 GPU timestamp 来源）：
-    /// `Some(ms)` 时优先于 FrameTimeDiagnostics 的读数。
-    pub gpu_frame_time_override_ms: Option<f32>,
+    /// Application timing override (may be synthetic), reported as HostProvided.
+    /// Some(ms) takes precedence over the Bevy frame interval. It is not GPU proof.
+    pub frame_time_override_ms: Option<f32>,
 }
 
 impl StylizedDynamicQuality {
@@ -77,7 +77,7 @@ impl StylizedDynamicQuality {
             scene_complexity: 0.0,
             thermal_pressure: None,
             battery_level: None,
-            gpu_frame_time_override_ms: None,
+            frame_time_override_ms: None,
         }
     }
 }
@@ -132,6 +132,7 @@ impl Plugin for StylizedDynamicQualityPlugin {
 /// 每帧采集信号 → governor tick → 应用决策（tier override + 事件）。
 pub fn dynamic_quality_system(
     diagnostics: Option<Res<DiagnosticsStore>>,
+    frame_count: Option<Res<bevy::diagnostic::FrameCount>>,
     resolved_caps: Option<Res<StylizedResolvedCapabilities>>,
     mut quality: ResMut<StylizedDynamicQuality>,
     mut tier_override: ResMut<StylizedTierOverride>,
@@ -147,7 +148,7 @@ pub fn dynamic_quality_system(
         quality.governor.set_ceiling(resolved.tier);
     }
 
-    let frame_time_ms = quality.gpu_frame_time_override_ms.or_else(|| {
+    let frame_time_ms = quality.frame_time_override_ms.or_else(|| {
         diagnostics
             .as_ref()
             .and_then(|store| store.get(&FrameTimeDiagnosticsPlugin::FRAME_TIME))
@@ -158,8 +159,17 @@ pub fn dynamic_quality_system(
         return; // 尚无帧时样本（首帧 / 无 diagnostics）：跳过本 tick
     };
 
+    if !frame_time_ms.is_finite() || frame_time_ms <= 0.0 {
+        return;
+    }
     let signals = QualitySignals {
-        gpu_frame_time_ms: frame_time_ms,
+        frame_time_ms,
+        timing_source: if quality.frame_time_override_ms.is_some() {
+            QualityTimingSource::HostProvided
+        } else {
+            QualityTimingSource::FrameInterval
+        },
+        observed_frame: frame_count.as_ref().map(|frame| frame.0),
         resolution: quality.resolution,
         scene_complexity: quality.scene_complexity,
         thermal_pressure: quality.thermal_pressure,

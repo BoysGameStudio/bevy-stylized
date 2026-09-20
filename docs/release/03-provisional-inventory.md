@@ -2,7 +2,7 @@
 
 This is the current implementation map, updated during R2 on 2026-09-15. ADR
 statuses remain owned by the [ADR index](../adr/ADR_INDEX.md); implementation or
-test success does not accept an ADR. The complete [2026-09-12 inventory](../history/provisional-inventory-2026-09-12.md)
+test success does not accept an ADR. The complete [current validation workflow](../../CONTRIBUTING.md)
 is preserved with its original measurements and limitations.
 
 ## Current implementation and remaining decisions

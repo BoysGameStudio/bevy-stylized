@@ -20,15 +20,19 @@
 //!   （MeshTag = 粗粒度子集；表 = 全字段全精度）；
 //! - **数据资产纪律**：表是 [`ShaderBuffer`] 数据资产（不是材质资产），
 //!   仅在记录变更/槽位增长时整体重写，无 per-frame 写；
-//! - **槽位只增不减**：despawn 的实体留下 tombstone 槽位（无人读取），
-//!   回收/压缩属后续迭代。
+//! - Slots are dense within a published snapshot. Membership changes rebuild the
+//!   snapshot and tags together; every membership change uses a fresh buffer asset and rebinds
+//!   dependent materials before extraction. In-flight draws retain their old buffer.
 
+use crate::{character::StylizedCharacterTableMaterial, instance::StylizedInstanceData};
 use bevy::{
     asset::{Assets, RenderAssetUsages},
+    mesh::MeshTag,
     prelude::{
-        Changed, Commands, Component, Entity, Or, PostUpdate, Query, ResMut, Resource, Without,
+        Commands, Component, Entity, Handle, MeshMaterial3d, Or, PostUpdate, Query, Res, ResMut,
+        Resource, With, Without,
     },
-    render::storage::ShaderBuffer,
+    render::{renderer::RenderDevice, storage::ShaderBuffer},
 };
 use bevy_stylized_core::StylizedInstanceGpuRecord;
 
@@ -101,118 +105,265 @@ pub fn unpack_instance_record(bytes: &[u8; INSTANCE_RECORD_STRIDE]) -> StylizedI
 #[derive(Component, Clone, Copy, Debug, PartialEq)]
 pub struct StylizedInstanceTableEntry(pub StylizedInstanceGpuRecord);
 
-/// 实例表（资源）：GPU buffer 句柄 + 槽位分配状态。
-#[derive(Resource)]
-pub struct StylizedInstanceTable {
-    /// 底层存储 buffer（数据资产；记录变更时整体重写）。
-    pub buffer: bevy::prelude::Handle<ShaderBuffer>,
-    /// 当前容量（槽位数）。
-    pub capacity: u32,
-    /// 下一个待分配槽位。
-    pub next_slot: u32,
+/// CPU and GPU budget for the provisional table transport. May be lowered by
+/// the host; actual RenderDevice limits and the 24-bit tag are always enforced.
+#[derive(Resource, Clone, Copy, Debug)]
+pub struct InstanceTableBudget {
+    pub max_bytes: u64,
+}
+impl Default for InstanceTableBudget {
+    fn default() -> Self {
+        Self {
+            max_bytes: 16 * 1024 * 1024,
+        }
+    }
+}
+impl InstanceTableBudget {
+    fn slots(self, device: Option<&RenderDevice>) -> u32 {
+        let bytes = device.map_or(self.max_bytes, |device| {
+            let limits = device.limits();
+            if limits.max_storage_buffers_per_shader_stage == 0 {
+                return 0;
+            }
+            self.max_bytes
+                .min(limits.max_buffer_size)
+                .min(limits.max_storage_buffer_binding_size)
+        });
+        (bytes / INSTANCE_RECORD_STRIDE as u64)
+            .min(u64::from(crate::instance::TAG_TABLE_INDEX_MASK) + 1) as u32
+    }
 }
 
-/// 表同步：分配槽位（只增不减）+ 记录变更时整体重写 buffer。
-///
-/// 先于 `sync_instance_tags`（同一 PostUpdate 内完成槽位 → 索引打包）。
-/// 注意 commands 插入的槽位本帧不可见，新实体的记录经本地分配表直接
-/// 写入（不等下一帧）。
+/// Admission failed; the table draw binding is suspended until capacity returns.
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct InstanceTableCapacityExceeded {
+    pub max_slots: u32,
+}
+
+#[derive(Component)]
+pub struct SuspendedTableMaterial(Handle<StylizedCharacterTableMaterial>);
+
+/// A complete table snapshot. Slot numbers are transient, not persistent handles.
+#[derive(Resource)]
+pub struct StylizedInstanceTable {
+    pub buffer: Handle<ShaderBuffer>,
+    pub capacity: u32,
+    /// Live record count (and the next dense slot), not historical allocations.
+    pub next_slot: u32,
+    records: Vec<(Entity, StylizedInstanceGpuRecord)>,
+}
+impl StylizedInstanceTable {
+    /// Seed a table with an existing buffer. The next upload replaces it and
+    /// rebinds all table materials that use it; callers must not cache slot IDs.
+    pub fn new(buffer: Handle<ShaderBuffer>) -> Self {
+        Self {
+            buffer,
+            capacity: 0,
+            next_slot: 0,
+            records: Vec::new(),
+        }
+    }
+}
+
+/// Publish records, tags and material dependencies before asset extraction.
+/// Fresh buffer identity on layout changes prevents a delayed upload from exposing new indices
+/// through an old prepared material. Bevy retains resources used by queued draws.
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub fn sync_instance_table(
     mut commands: Commands,
-    table: Option<ResMut<StylizedInstanceTable>>,
+    mut table: Option<ResMut<StylizedInstanceTable>>,
     mut buffers: Option<ResMut<Assets<ShaderBuffer>>>,
-    new_entries: Query<(Entity, &StylizedInstanceTableEntry), Without<StylizedInstanceSlot>>,
-    changed: Query<
-        (&StylizedInstanceSlot, &StylizedInstanceTableEntry),
-        Or<(
-            Changed<StylizedInstanceTableEntry>,
-            Changed<StylizedInstanceSlot>,
-        )>,
+    mut materials: Option<ResMut<Assets<StylizedCharacterTableMaterial>>>,
+    device: Option<Res<RenderDevice>>,
+    budget: Option<Res<InstanceTableBudget>>,
+    entries: Query<(
+        Entity,
+        &StylizedInstanceTableEntry,
+        Option<&StylizedInstanceSlot>,
+        Option<&MeshTag>,
+        Option<&StylizedInstanceData>,
+        Option<&MeshMaterial3d<StylizedCharacterTableMaterial>>,
+        Option<&SuspendedTableMaterial>,
+    )>,
+    orphans: Query<
+        (
+            Entity,
+            Option<&MeshMaterial3d<StylizedCharacterTableMaterial>>,
+        ),
+        (
+            Or<(With<StylizedInstanceSlot>, With<InstanceTableCapacityExceeded>)>,
+            Without<StylizedInstanceTableEntry>,
+        ),
     >,
-    all: Query<(&StylizedInstanceSlot, &StylizedInstanceTableEntry)>,
 ) {
-    // 懒初始化：Assets<ShaderBuffer> 仅在渲染栈就位时存在（headless 无
-    // RenderPlugin 的 App 跳过——纯逻辑测试可手动 init_asset）。
     let Some(buffers) = buffers.as_deref_mut() else {
         return;
     };
-    let mut table = match table {
-        Some(t) => t,
-        None => {
-            let buffer = buffers.add(ShaderBuffer::with_size(
-                INSTANCE_TABLE_INITIAL_CAPACITY as usize * INSTANCE_RECORD_STRIDE,
-                RenderAssetUsages::default(),
-            ));
-            commands.insert_resource(StylizedInstanceTable {
-                buffer,
-                capacity: INSTANCE_TABLE_INITIAL_CAPACITY,
-                next_slot: 0,
-            });
-            return; // 资源下一帧生效
+    // Keep the public lazy resource available to material setup, but do not
+    // allocate a storage asset until an entity explicitly requests this channel.
+    if entries.is_empty()
+        && orphans.is_empty()
+        && table
+            .as_deref()
+            .is_none_or(|table| table.records.is_empty() && buffers.get(&table.buffer).is_none())
+    {
+        if table.is_none() {
+            commands.insert_resource(StylizedInstanceTable::new(Handle::default()));
         }
-    };
-
-    // 槽位分配（确定性：按 query 迭代序 = 生成序）。commands 插入本帧
-    // 不可见，本地记录 (entity → slot) 供本帧写 buffer。
-    let mut assigned: Vec<(Entity, u32, StylizedInstanceGpuRecord)> = Vec::new();
-    for (entity, entry) in &new_entries {
-        let slot = table.next_slot;
-        table.next_slot += 1;
-        commands.entity(entity).insert(StylizedInstanceSlot(slot));
-        assigned.push((entity, slot, entry.0));
-    }
-    let dirty = !assigned.is_empty() || !changed.is_empty();
-    if !dirty {
         return;
     }
-
-    // 容量不足 → 倍增重建（只增不减；旧槽位内容随全量重写保留）。
-    if table.next_slot > table.capacity {
-        let mut new_capacity = table.capacity.max(1);
-        while new_capacity < table.next_slot {
-            new_capacity *= 2; // 指数增长保证摊销
+    let max_slots = budget
+        .as_deref()
+        .copied()
+        .unwrap_or_default()
+        .slots(device.as_deref());
+    // Removing an entry revokes the draw binding as well as its index. Re-adding
+    // the entry can restore the saved material after admission into a new snapshot.
+    for (entity, material) in &orphans {
+        let mut entity = commands.entity(entity);
+        entity.remove::<(
+            StylizedInstanceSlot,
+            InstanceTableCapacityExceeded,
+            MeshTag,
+            MeshMaterial3d<StylizedCharacterTableMaterial>,
+        )>();
+        if let Some(material) = material {
+            entity.insert(SuspendedTableMaterial(material.0.clone()));
         }
-        let fresh = buffers.add(ShaderBuffer::with_size(
-            new_capacity as usize * INSTANCE_RECORD_STRIDE,
-            RenderAssetUsages::default(),
-        ));
-        table.buffer = fresh;
-        table.capacity = new_capacity;
     }
-
-    // 全量重写（N × 48B；仅在脏时发生）。
-    let mut bytes = vec![0u8; table.capacity as usize * INSTANCE_RECORD_STRIDE];
-    for (slot, entry) in &all {
-        if slot.0 >= table.capacity {
-            continue; // 防御：容量刚重建的同一帧内 all 查询已含新槽位
-        }
-        let offset = slot.0 as usize * INSTANCE_RECORD_STRIDE;
-        bytes[offset..offset + INSTANCE_RECORD_STRIDE]
-            .copy_from_slice(&pack_instance_record(&entry.0));
-    }
-    for (_, slot, record) in &assigned {
-        if *slot >= table.capacity {
+    let mut ordered = entries.iter().collect::<Vec<_>>();
+    ordered.sort_unstable_by_key(|entry| entry.0.to_bits());
+    let mut records = Vec::with_capacity(ordered.len().min(max_slots as usize));
+    for (index, (entity, entry, slot, tag, data, material, suspended)) in
+        ordered.into_iter().enumerate()
+    {
+        let mut entity_commands = commands.entity(entity);
+        if index >= max_slots as usize {
+            entity_commands
+                .remove::<(
+                    StylizedInstanceSlot,
+                    MeshTag,
+                    MeshMaterial3d<StylizedCharacterTableMaterial>,
+                )>()
+                .insert(InstanceTableCapacityExceeded { max_slots });
+            if let Some(material) = material {
+                entity_commands.insert(SuspendedTableMaterial(material.0.clone()));
+            }
             continue;
         }
-        let offset = *slot as usize * INSTANCE_RECORD_STRIDE;
+        let index = index as u32;
+        records.push((entity, entry.0));
+        entity_commands.remove::<InstanceTableCapacityExceeded>();
+        if slot.is_none_or(|slot| slot.0 != index) {
+            entity_commands.insert(StylizedInstanceSlot(index));
+        }
+        let packed = StylizedInstanceData::index_tag(index, data.map_or(0, |data| data.flags));
+        if tag.is_none_or(|tag| tag.0 != packed.0) {
+            entity_commands.insert(packed);
+        }
+        if material.is_none()
+            && let Some(suspended) = suspended
+        {
+            entity_commands.insert(MeshMaterial3d(suspended.0.clone()));
+        }
+        entity_commands.remove::<SuspendedTableMaterial>();
+    }
+    if max_slots == 0 {
+        if let Some(table) = table.as_deref() {
+            if let Some(materials) = materials.as_deref_mut() {
+                for (_, material) in materials.iter_mut() {
+                    if material.instance_table == table.buffer {
+                        material.instance_table = Handle::default();
+                    }
+                }
+            }
+            commands.remove_resource::<StylizedInstanceTable>();
+        }
+        return;
+    }
+    let initializing = table.is_none();
+    let mut initial = StylizedInstanceTable::new(Handle::default());
+    let table = table.as_deref_mut().unwrap_or(&mut initial);
+    let capacity = (records.len().max(1) as u32)
+        .max(INSTANCE_TABLE_INITIAL_CAPACITY.min(max_slots))
+        .next_power_of_two()
+        .min(max_slots);
+    if table.records == records
+        && table.capacity == capacity
+        && buffers.get(&table.buffer).is_some()
+    {
+        return;
+    }
+    let mut bytes = vec![0u8; capacity as usize * INSTANCE_RECORD_STRIDE];
+    for (slot, (_, record)) in records.iter().enumerate() {
+        let offset = slot * INSTANCE_RECORD_STRIDE;
         bytes[offset..offset + INSTANCE_RECORD_STRIDE]
             .copy_from_slice(&pack_instance_record(record));
     }
-    let len = bytes.len() as u64;
-    if let Some(mut buffer) = buffers.get_mut(&table.buffer) {
+    let same_layout = table.capacity == capacity
+        && table
+            .records
+            .iter()
+            .map(|record| record.0)
+            .eq(records.iter().map(|record| record.0));
+    if same_layout && let Some(mut buffer) = buffers.get_mut(&table.buffer) {
+        // Every index still names the same entity. A delayed numeric upload can
+        // retain an older value, but cannot expose a recycled entity's record.
         buffer.data = Some(bytes);
-        buffer.buffer_description.size = len;
+        table.records = records;
+        return;
+    }
+    let mut snapshot = ShaderBuffer::with_size(bytes.len(), RenderAssetUsages::default());
+    snapshot.data = Some(bytes);
+    let buffer = buffers.add(snapshot);
+    if let Some(materials) = materials.as_deref_mut() {
+        for (_, material) in materials.iter_mut() {
+            if material.instance_table == table.buffer {
+                material.instance_table = buffer.clone();
+            }
+        }
+    }
+    table.buffer = buffer;
+    table.capacity = capacity;
+    table.next_slot = records.len() as u32;
+    table.records = records;
+    if initializing {
+        commands.insert_resource(initial);
     }
 }
 
 /// 注册表通道（资源懒初始化 + PostUpdate 系统，先于 instance tag 同步）。
 pub(crate) fn register(app: &mut bevy::app::App) {
     use bevy::prelude::IntoScheduleConfigs;
+    // Material preparation must see this frame's newly uploaded buffer, including
+    // continuous updates. The barrier orders existing Bevy systems without adding
+    // a second copy of either preparation system.
+    if let Some(render_app) = app.get_sub_app_mut(bevy::render::RenderApp) {
+        render_app.add_systems(
+            bevy::render::Render,
+            table_upload_barrier
+                .after(
+                    bevy::render::render_asset::prepare_assets::<
+                        bevy::render::storage::GpuShaderBuffer,
+                    >,
+                )
+                .before(
+                    bevy::render::erased_render_asset::prepare_erased_assets::<
+                        MeshMaterial3d<StylizedCharacterTableMaterial>,
+                    >,
+                ),
+        );
+    }
     app.add_systems(
         PostUpdate,
-        sync_instance_table.before(crate::instance::sync_instance_tags).in_set(crate::presentation::NativePresentationSystems),
+        sync_instance_table
+            .before(bevy::asset::AssetEventSystems)
+            .before(crate::instance::sync_instance_tags)
+            .in_set(crate::presentation::NativePresentationSystems),
     );
 }
+
+fn table_upload_barrier() {}
 
 #[cfg(test)]
 mod tests {
@@ -223,7 +374,8 @@ mod tests {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins)
             .add_plugins(bevy::asset::AssetPlugin::default())
-            .init_asset::<ShaderBuffer>();
+            .init_asset::<ShaderBuffer>()
+            .init_asset::<StylizedCharacterTableMaterial>();
         app.add_systems(
             PostUpdate,
             sync_instance_table.before(crate::instance::sync_instance_tags),
@@ -267,7 +419,7 @@ mod tests {
     #[test]
     fn slot_assignment_and_buffer_upload() {
         let mut app = table_app();
-        let entities: Vec<Entity> = (0..3)
+        let mut entities: Vec<Entity> = (0..3)
             .map(|i| {
                 app.world_mut()
                     .spawn((
@@ -283,6 +435,7 @@ mod tests {
         app.update(); // 懒初始化帧
         app.update(); // 槽位分配 + 上传
 
+        entities.sort_unstable_by_key(|entity| entity.to_bits());
         let table = app.world().resource::<StylizedInstanceTable>();
         assert_eq!(table.next_slot, 3);
         for (i, entity) in entities.iter().enumerate() {
@@ -311,7 +464,15 @@ mod tests {
         let mut record_bytes = [0u8; INSTANCE_RECORD_STRIDE];
         record_bytes.copy_from_slice(&data[INSTANCE_RECORD_STRIDE..INSTANCE_RECORD_STRIDE * 2]);
         let record = unpack_instance_record(&record_bytes);
-        assert_eq!(record.face_threshold, 0.2);
+        assert_eq!(
+            record.face_threshold,
+            app.world()
+                .entity(entities[1])
+                .get::<StylizedInstanceTableEntry>()
+                .unwrap()
+                .0
+                .face_threshold
+        );
     }
 
     #[test]
@@ -323,6 +484,11 @@ mod tests {
         ));
         app.update();
         app.update();
+        let original_buffer = app
+            .world()
+            .resource::<StylizedInstanceTable>()
+            .buffer
+            .clone();
         let generation = {
             let table = app.world().resource::<StylizedInstanceTable>();
             let buffers = app.world().resource::<Assets<ShaderBuffer>>();
@@ -335,5 +501,292 @@ mod tests {
         let buffers = app.world().resource::<Assets<ShaderBuffer>>();
         let buffer = buffers.get(&table.buffer).expect("buffer");
         assert_eq!(buffer.data, generation, "无变更时不得重写 buffer");
+        assert_eq!(table.buffer, original_buffer);
+    }
+    #[test]
+    fn churn_is_bounded_by_live_instances() {
+        let mut app = table_app();
+        for _ in 0..160 {
+            let entity = app
+                .world_mut()
+                .spawn((
+                    StylizedInstanceTableEntry(StylizedInstanceGpuRecord::default()),
+                    crate::instance::StylizedInstanceData::default(),
+                ))
+                .id();
+            app.update();
+            app.update();
+            let table = app.world().resource::<StylizedInstanceTable>();
+            assert!(table.capacity <= INSTANCE_TABLE_INITIAL_CAPACITY);
+            assert_eq!(table.next_slot, 1);
+            app.world_mut().despawn(entity);
+        }
+    }
+    #[test]
+    fn removal_rebind_and_budget_rejection_revoke_the_draw_binding() {
+        let mut app = table_app();
+        app.insert_resource(InstanceTableBudget {
+            max_bytes: INSTANCE_RECORD_STRIDE as u64,
+        });
+        app.update();
+        let buffer = app
+            .world()
+            .resource::<StylizedInstanceTable>()
+            .buffer
+            .clone();
+        let material = app
+            .world_mut()
+            .resource_mut::<Assets<StylizedCharacterTableMaterial>>()
+            .add(StylizedCharacterTableMaterial {
+                instance_table: buffer,
+                ..Default::default()
+            });
+        let a = app
+            .world_mut()
+            .spawn((
+                StylizedInstanceTableEntry(Default::default()),
+                MeshMaterial3d(material.clone()),
+                StylizedInstanceData::default(),
+            ))
+            .id();
+        app.update();
+        app.world_mut()
+            .entity_mut(a)
+            .remove::<StylizedInstanceTableEntry>();
+        app.update();
+        assert!(
+            app.world()
+                .entity(a)
+                .get::<StylizedInstanceSlot>()
+                .is_none()
+        );
+        assert!(
+            app.world()
+                .entity(a)
+                .get::<MeshMaterial3d<StylizedCharacterTableMaterial>>()
+                .is_none()
+        );
+        app.world_mut()
+            .entity_mut(a)
+            .insert(StylizedInstanceTableEntry(Default::default()));
+        app.update();
+        assert!(
+            app.world()
+                .entity(a)
+                .get::<MeshMaterial3d<StylizedCharacterTableMaterial>>()
+                .is_some()
+        );
+        let b = app
+            .world_mut()
+            .spawn((
+                StylizedInstanceTableEntry(Default::default()),
+                MeshMaterial3d(material),
+                StylizedInstanceData::default(),
+            ))
+            .id();
+        app.update();
+        let rejected = [a, b]
+            .into_iter()
+            .find(|entity| {
+                app.world()
+                    .entity(*entity)
+                    .contains::<InstanceTableCapacityExceeded>()
+            })
+            .unwrap();
+        assert!(
+            !app.world()
+                .entity(rejected)
+                .contains::<StylizedInstanceSlot>()
+        );
+        assert!(
+            !app.world()
+                .entity(rejected)
+                .contains::<MeshMaterial3d<StylizedCharacterTableMaterial>>()
+        );
+        app.insert_resource(InstanceTableBudget {
+            max_bytes: 2 * INSTANCE_RECORD_STRIDE as u64,
+        });
+        app.update();
+        assert!(
+            !app.world()
+                .entity(rejected)
+                .contains::<InstanceTableCapacityExceeded>()
+        );
+        assert!(
+            app.world()
+                .entity(rejected)
+                .contains::<MeshMaterial3d<StylizedCharacterTableMaterial>>()
+        );
+        assert_eq!(app.world().resource::<StylizedInstanceTable>().capacity, 2);
+        app.insert_resource(InstanceTableBudget { max_bytes: 0 });
+        app.update();
+        assert!(!app.world().contains_resource::<StylizedInstanceTable>());
+        assert!(!app.world().entity(a).contains::<StylizedInstanceSlot>());
+        assert!(
+            !app.world()
+                .entity(b)
+                .contains::<MeshMaterial3d<StylizedCharacterTableMaterial>>()
+        );
+    }
+
+    #[test]
+    fn growth_publishes_a_new_buffer_and_rebinds_existing_materials() {
+        let mut app = table_app();
+        app.update();
+        let old = app
+            .world()
+            .resource::<StylizedInstanceTable>()
+            .buffer
+            .clone();
+        let material = app
+            .world_mut()
+            .resource_mut::<Assets<StylizedCharacterTableMaterial>>()
+            .add(StylizedCharacterTableMaterial {
+                instance_table: old.clone(),
+                ..Default::default()
+            });
+        for _ in 0..65 {
+            app.world_mut()
+                .spawn(StylizedInstanceTableEntry(Default::default()));
+        }
+        app.update();
+        let table = app.world().resource::<StylizedInstanceTable>();
+        assert_eq!(table.capacity, 128);
+        assert_ne!(table.buffer, old);
+        assert_eq!(
+            app.world()
+                .resource::<Assets<StylizedCharacterTableMaterial>>()
+                .get(&material)
+                .unwrap()
+                .instance_table,
+            table.buffer
+        );
+        assert_eq!(
+            InstanceTableBudget {
+                max_bytes: u64::MAX
+            }
+            .slots(None),
+            1 << 24
+        );
+        assert_eq!(InstanceTableBudget { max_bytes: 47 }.slots(None), 0);
+    }
+    #[test]
+    fn numeric_updates_preserve_the_buffer_and_material_binding() {
+        let mut app = table_app();
+        let entity = app
+            .world_mut()
+            .spawn(StylizedInstanceTableEntry(Default::default()))
+            .id();
+        app.update();
+        let buffer = app
+            .world()
+            .resource::<StylizedInstanceTable>()
+            .buffer
+            .clone();
+        app.world_mut()
+            .entity_mut(entity)
+            .get_mut::<StylizedInstanceTableEntry>()
+            .unwrap()
+            .0
+            .face_threshold = 0.75;
+        app.update();
+        assert_eq!(
+            app.world().resource::<StylizedInstanceTable>().buffer,
+            buffer
+        );
+        let bytes = app
+            .world()
+            .resource::<Assets<ShaderBuffer>>()
+            .get(&buffer)
+            .unwrap()
+            .data
+            .as_ref()
+            .unwrap();
+        let record = unpack_instance_record(bytes[..INSTANCE_RECORD_STRIDE].try_into().unwrap());
+        assert_eq!(record.face_threshold, 0.75);
+    }
+    #[test]
+    fn removing_a_rejected_entry_clears_admission_failure_and_can_rejoin() {
+        let mut app = table_app();
+        app.insert_resource(InstanceTableBudget { max_bytes: 0 });
+        let material = app
+            .world_mut()
+            .resource_mut::<Assets<StylizedCharacterTableMaterial>>()
+            .add(StylizedCharacterTableMaterial::default());
+        let entity = app
+            .world_mut()
+            .spawn((
+                StylizedInstanceTableEntry(Default::default()),
+                MeshMaterial3d(material.clone()),
+            ))
+            .id();
+        app.update();
+        assert!(
+            app.world()
+                .entity(entity)
+                .contains::<InstanceTableCapacityExceeded>()
+        );
+        assert!(
+            !app.world()
+                .entity(entity)
+                .contains::<StylizedInstanceSlot>()
+        );
+        app.world_mut()
+            .entity_mut(entity)
+            .remove::<StylizedInstanceTableEntry>();
+        app.update();
+        assert!(
+            !app.world()
+                .entity(entity)
+                .contains::<InstanceTableCapacityExceeded>()
+        );
+        assert!(
+            app.world()
+                .entity(entity)
+                .contains::<SuspendedTableMaterial>()
+        );
+        assert!(
+            !app.world()
+                .entity(entity)
+                .contains::<MeshMaterial3d<StylizedCharacterTableMaterial>>()
+        );
+        app.insert_resource(InstanceTableBudget {
+            max_bytes: INSTANCE_RECORD_STRIDE as u64,
+        });
+        app.world_mut()
+            .entity_mut(entity)
+            .insert(StylizedInstanceTableEntry(Default::default()));
+        app.update();
+        assert_eq!(
+            app.world()
+                .entity(entity)
+                .get::<MeshMaterial3d<StylizedCharacterTableMaterial>>()
+                .unwrap()
+                .0,
+            material
+        );
+        assert!(
+            !app.world()
+                .entity(entity)
+                .contains::<SuspendedTableMaterial>()
+        );
+        assert_eq!(
+            app.world()
+                .entity(entity)
+                .get::<StylizedInstanceSlot>()
+                .unwrap()
+                .0,
+            0
+        );
+    }
+
+    #[test]
+    fn idle_native_app_does_not_allocate_a_storage_asset() {
+        let mut app = table_app();
+        app.update();
+        app.update();
+        assert!(app.world().resource::<Assets<ShaderBuffer>>().is_empty());
+        assert_eq!(app.world().resource::<StylizedInstanceTable>().next_slot, 0);
+        assert_eq!(app.world().resource::<StylizedInstanceTable>().capacity, 0);
     }
 }

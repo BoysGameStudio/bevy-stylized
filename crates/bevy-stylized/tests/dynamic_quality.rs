@@ -98,7 +98,7 @@ fn synthetic_feed_downgrades_and_recovers_with_events() {
     // Given：合成帧时 20ms（降档阈值 12ms），持续超支。
     app.world_mut()
         .resource_mut::<StylizedDynamicQuality>()
-        .gpu_frame_time_override_ms = Some(20.0);
+        .frame_time_override_ms = Some(20.0);
 
     // When
     update_n(&mut app, 3);
@@ -109,7 +109,7 @@ fn synthetic_feed_downgrades_and_recovers_with_events() {
     assert_eq!(quality.governor.tier(), StylizedExecutionTier::Portable);
     let last = quality.last_decision.expect("decision recorded");
     assert!(!last.reason.is_empty());
-    assert_eq!(last.signals.gpu_frame_time_ms, 20.0);
+    assert_eq!(last.signals.frame_time_ms, 20.0);
 
     let tier_override = app.world().resource::<StylizedTierOverride>();
     assert_eq!(tier_override.0, Some(StylizedExecutionTier::Portable));
@@ -127,7 +127,7 @@ fn synthetic_feed_downgrades_and_recovers_with_events() {
     // Given：帧时恢复 5ms（< 8ms 余量带）。
     app.world_mut()
         .resource_mut::<StylizedDynamicQuality>()
-        .gpu_frame_time_override_ms = Some(5.0);
+        .frame_time_override_ms = Some(5.0);
 
     // When：资格 2 + 冷却 2 → 每次升档约 2 tick。
     update_n(&mut app, 8);
@@ -159,7 +159,7 @@ fn stage_b_portable_fallback_clamps_governor_ceiling() {
     let mut app = build_app();
     app.world_mut()
         .resource_mut::<StylizedDynamicQuality>()
-        .gpu_frame_time_override_ms = Some(5.0);
+        .frame_time_override_ms = Some(5.0);
     update_n(&mut app, 1);
 
     let quality = app.world().resource::<StylizedDynamicQuality>();
@@ -186,7 +186,7 @@ fn disabled_resource_freezes_governor() {
 
     app.world_mut()
         .resource_mut::<StylizedDynamicQuality>()
-        .gpu_frame_time_override_ms = Some(50.0);
+        .frame_time_override_ms = Some(50.0);
     update_n(&mut app, 5);
 
     let quality = app.world().resource::<StylizedDynamicQuality>();
@@ -225,6 +225,15 @@ fn real_diagnostics_feed_reaches_governor() {
         last.smoothed_frame_time_ms
     );
     assert!(quality.governor.tier() < StylizedExecutionTier::High);
+    assert_eq!(
+        app.world()
+            .resource::<StylizedDynamicQuality>()
+            .last_decision
+            .unwrap()
+            .signals
+            .timing_source,
+        QualityTimingSource::FrameInterval
+    );
 }
 
 #[test]
@@ -252,7 +261,7 @@ fn governor_override_reaches_per_instance_lod() {
 
     app.world_mut()
         .resource_mut::<StylizedDynamicQuality>()
-        .gpu_frame_time_override_ms = Some(20.0);
+        .frame_time_override_ms = Some(20.0);
     update_n(&mut app, 4);
 
     assert_eq!(
@@ -271,4 +280,35 @@ fn governor_override_reaches_per_instance_lod() {
         0,
         "override=Portable 时 LOD 必须压低头实例（min 语义）"
     );
+}
+
+#[test]
+fn invalid_override_does_not_advance_the_governor() {
+    let mut app = build_app();
+    simulate_high_device(&mut app);
+    app.world_mut()
+        .resource_mut::<StylizedDynamicQuality>()
+        .frame_time_override_ms = Some(10.0);
+    app.update();
+    let before = app
+        .world()
+        .resource::<StylizedDynamicQuality>()
+        .last_decision;
+    assert_eq!(
+        before.unwrap().signals.timing_source,
+        QualityTimingSource::HostProvided
+    );
+    assert!(before.unwrap().signals.observed_frame.is_some());
+    for value in [f32::NAN, f32::INFINITY, -1.0, 0.0] {
+        app.world_mut()
+            .resource_mut::<StylizedDynamicQuality>()
+            .frame_time_override_ms = Some(value);
+        app.update();
+        assert_eq!(
+            app.world()
+                .resource::<StylizedDynamicQuality>()
+                .last_decision,
+            before
+        );
+    }
 }

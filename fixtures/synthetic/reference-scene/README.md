@@ -1,22 +1,9 @@
-# Reference Fixture (self-made, committable)
+# Current synthetic CLI fixture
 
-`reference_scene.blend` is a 100% self-made fixture scene generated
-deterministically by `tools/blender/make_reference_scene.py`
-(id `reference_scene_v2`, hashes locked in
-`docs/reference/reference-toolchain.toml` `[fixture]`). It contains no
-upstream-derived content and is committable per
-`docs/reference/05-license-and-provenance-boundary.md`.
-
-The binary `.blend` (~192 KB) is committed alongside its generator because
-the export bridge and the render step consume a `.blend` file directly;
-regenerate it with the script rather than editing it by hand.
-
-- `reference_scene.blend` — fixed camera/sun/ambient, 512x512, EEVEE /
-  sRGB / Standard; body sphere + head proxy + hair card + ground, carrying
-  the `_NPR_*` attribute set from
-  `schemas/authoring/npr-attributes.v1.json`.
-- `reference_scene.glb` — runtime export artifact produced by the export
-  bridge (fixture role) with the locked `blender-gltf-npr-v1` settings.
-- `export-manifest.json` / `export-sidecar.json` /
-  `node-graph-signature.json` — bridge outputs (see
-  `tools/blender/README.md`).
+This self-made geometry exercises the current `_NPR_*` importer, material
+classification and descriptor compiler in `crates/bevy-stylized-tools/tests/cli.rs`.
+It contains no upstream art. `reference_scene.glb` is the tested runtime input;
+`reference_scene.blend` is its unique authored source and `export-sidecar.json`
+records that source identity. These retained inputs are not an upstream visual
+reference or a qualification of a particular Gacha release. The retired synthetic
+reference generator, release manifest and graph-signature snapshot are gone.

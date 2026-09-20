@@ -92,7 +92,7 @@ thresholds. Gacha Setup acceptance continues to target only the latest stable
 qualified release.
 
 Camera/viewport interaction and generation-safe capture were informed by the
-[Tenacity source review](../research/tenacity-rendering-reuse-2026-09-15.md); the
+[current attribution](../../THIRD_PARTY_NOTICES.md); the
 inspector is implemented within this repository and has no sibling dependencies.
 
 ## Internal ownership

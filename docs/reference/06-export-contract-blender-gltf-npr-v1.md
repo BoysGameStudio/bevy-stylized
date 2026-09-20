@@ -62,7 +62,7 @@
 
 - **glTF accessor 形态**：`FLOAT` → `SCALAR` / componentType `FLOAT`(5126)；`FLOAT_VECTOR` → `VEC3` / componentType `FLOAT`(5126)；`normalized=false`。
 - **量化规则（待定，pending ADR-0012）**：v1 草案建议**不做量化**——全部以未压缩 float32 传输。依据 docs/authoring/03-authoring-schema-runtime-packing.md：glTF 2.0 禁止 application-specific attribute 使用 `UNSIGNED_INT`，且 Bevy 0.19.1 不支持 `KHR_mesh_quantization`；U8/Float16 压缩待 Bevy 侧能力验证后在未来合同版本中决定，v1 不凭感觉定格式。
-- **Shader location / runtime packing（待定，pending ADR-0012）**：v1 草案建议——经 `GltfPlugin::add_custom_vertex_attribute` 注册为 Bevy 自定义顶点属性（与 legacy `crates/legacy/bevy-cel-metadata/src/attributes.rs` 的既有机制同构），shader location 由 profile 在材质编译期分配，不固定在导出合同中。§4.3 保留历史命名对应；当前只注册规范 `_NPR_*`，不加载旧实现。
+- **Shader location / runtime packing（待定，pending ADR-0012）**：v1 草案建议——经 `GltfPlugin::add_custom_vertex_attribute` 注册为 Bevy 自定义顶点属性（与 legacy `crates/legacy/bevy-gltf-metadata/src/attributes.rs` 的既有机制同构），shader location 由 profile 在材质编译期分配，不固定在导出合同中。§4.3 保留历史命名对应；当前只注册规范 `_NPR_*`，不加载旧实现。
 - **Requiredness**：桥层面 v1 全部 attribute 为 warn-if-missing（vendor Gacha Setup v3.6.2 reference blend 不作者 `_NPR_*`，它们由 setup wizard / 资产管线后生成）；逐资产必需性由 runtime profile 强制，不由桥强制。
 - **Domain drift**：任何**存在**的 `_NPR_*` attribute 若 domain 或 data type 与本表不符，是 fail-closed 条件。
 
@@ -80,25 +80,6 @@
 | `_NPR_MATERIAL_ID` | POINT | FLOAT | `_NPR_MATERIAL_ID` / SCALAR float | Float32 | 0.0 | material slot index |
 | `_NPR_LEVEL_ROLE` | POINT | FLOAT | `_NPR_LEVEL_ROLE` / SCALAR float | Float32 | 0.0 | generic surface |
 | `_NPR_CONTROL0` | POINT | FLOAT_VECTOR | `_NPR_CONTROL0` / VEC3 float | Float32x3 | [0.0, 0.0, 0.0] | zero control vector |
-
-### 4.3 Legacy `_CEL_*` 别名表
-
-合同以 `_NPR_*` 为规范前缀；已退役实现曾在运行期注册 `_CEL_*` 名称（attribute id base `0x4345_4c00_0000_0000`，offset +1…+11）。下表仅保留兼容性命名信息；当前生成表和 Bevy 注册使用规范 `_NPR_*`：
-
-| `_NPR_*` | `_CEL_*` | 备注 |
-|---|---|---|
-| `_NPR_MASK` | `_CEL_MASK` | Float32 |
-| `_NPR_CLOTH_PIN` | `_CEL_CLOTH_PIN` | Float32 |
-| `_NPR_EMISSION` | `_CEL_EMISSION` | Float32 |
-| `_NPR_FACE_SDF` | `_CEL_FACE_SDF` | Float32 |
-| `_NPR_FACE_SIDE` | `_CEL_FACE_SIDE` | Float32 |
-| `_NPR_HAIR_MASK` | `_CEL_HAIR_MASK` | Float32 |
-| `_NPR_HAIR_TANGENT` | `_CEL_HAIR_TANGENT` | Float32x3 |
-| `_NPR_MATERIAL_ID` | `_CEL_MATERIAL_ID` | Float32 |
-| `_NPR_LEVEL_ROLE` | `_CEL_LEVEL_ROLE` | Float32 |
-| `_NPR_CONTROL0` | —（无对应） | legacy 未注册，v1 新增语义 |
-| —（legacy 独有） | `_CEL_JOINTS_1` | Uint16x4，glTF `JOINTS_1` 别名（Bevy stock loader 不导入） |
-| —（legacy 独有） | `_CEL_WEIGHTS_1` | Float32x4，glTF `WEIGHTS_1` 别名 |
 
 ## 5. Custom Properties：extras 与 sidecar
 
@@ -141,6 +122,6 @@ ADR-0020（glTF Extras vs Sidecar Precedence）仍为 Proposed，因此本合同
 | Shader location / runtime packing 分配 | 待定（pending ADR-0012）；v1 草案建议 profile 编译期分配 | ADR-0012 |
 | extras vs sidecar 消费优先级 | 显式推迟 | ADR-0020 |
 | 单位/scale/negative-scale 的桥内 fail-closed 检查 | 草案决策，当前仅为 fixture 制作规范 | ADR-0012 |
-| 逐资产 `_NPR_*` requiredness | 由 runtime profile 强制，profile schema 未定稿 | `[profile].genshin_schema` PENDING（docs/reference/reference-toolchain.toml） |
+| 逐资产 `_NPR_*` requiredness | 由 runtime profile 强制，profile schema 未定稿 | 当前 profile crate 与 authoring schema 明确 requiredness |
 
 ---

@@ -64,8 +64,7 @@ python3 tools/dev.py golden capture --asset BUILD/compiled/character.glb --out t
 ```
 
 Gacha Setup support targets only the latest stable release (currently qualified
-v3.6.4), pinned in `assets/sources/gacha-authoring.json`. Retired versions are
-historical evidence, not compatibility requirements or acceptance blockers.
+v3.6.4), pinned in `assets/sources/gacha-authoring.json`. Retired versions are not supported.
 
 The current external recipe is an explicitly restricted static body/face variant,
 not full rig/effect compatibility. Third-party raw and derived art lives only under
@@ -83,21 +82,15 @@ live A/B views, orbit/focus controls, shared lighting, material diagnostics and
 versioned screenshot recipes. It uses normal MSAA rendering, independently of the
 fixed Blender parity captures.
 
-## Current evidence and open decisions
+## Current qualification scope
 
-The [authoring source lock](assets/sources/gacha-authoring.json) owns the current
-release/hash. The [2026-09-15 qualification record](docs/quality/realtime-validation-2026-09-15.json)
-records engineering isolation and the supported static character comparison;
-[final refactor validation](docs/quality/refactor-final-validation-2026-09-15.json)
-records the later complete isolation and regression checks. The
-[execution summary](docs/plans/project-refactoring-final-2026-09-15.md) links each stage. Neither closes the
-[remaining ADR decisions](docs/adr/ADR_INDEX.md) or expands the
-[platform support matrix](docs/platforms/SUPPORT_MATRIX.md). Historical records
-retain their original results and version scope.
-
-Subsequent [precommit review](docs/plans/project-precommit-review-2026-09-15.md)
-records additional boundary fixes and their validation; earlier isolation records
-retain their original source identities.
+The [authoring source lock](assets/sources/gacha-authoring.json) owns the one
+supported release/hash. Current structural, rendering and asset qualification
+procedures are in [contributing](CONTRIBUTING.md), the [support matrix](docs/platforms/SUPPORT_MATRIX.md)
+and the [release checklist](docs/release/V1_RELEASE_CHECKLIST.md). Passing local
+checks does not establish every platform, upstream effect or publication gate.
+Use the current `character-reference` lane for declared character cases. There
+is no retired synthetic-reference renderer or old authoring-version lane.
 
 ## Layout and contracts
 
@@ -111,8 +104,8 @@ retain their original source identities.
 
 Start with [architecture](ARCHITECTURE.md), [contributing](CONTRIBUTING.md),
 [reference validation](docs/reference/01-reference-authoring-workflow.md), and
-[traceability](TRACEABILITY.md). History is retained under `docs/history` and is
-not an executable or normative dependency.
+[traceability](TRACEABILITY.md). Current provenance is in
+[third-party notices](THIRD_PARTY_NOTICES.md).
 
 A public rendering-contract change must update its specification, ADR/traceability
 and relevant validation. Publication remains disabled pending the existing

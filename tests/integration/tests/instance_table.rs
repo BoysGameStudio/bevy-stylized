@@ -120,8 +120,8 @@ fn table_golden_full_precision_face_thresholds() {
         return;
     };
     // 两通道同场景捕获：StorageTable（全精度）vs MeshTag（量化子集）。
-    let (table_image, table_lumas) = capture_threshold_gradient(&resources, true);
-    let (tag_image, tag_lumas) = capture_threshold_gradient(&resources, false);
+    let (table_image, table_lumas) = capture_threshold_gradient(&resources, true, false);
+    let (tag_image, tag_lumas) = capture_threshold_gradient(&resources, false, false);
     eprintln!("[instance-table golden] table lumas: {table_lumas:?}");
     eprintln!("[instance-table golden] meshtag lumas: {tag_lumas:?}");
 
@@ -167,6 +167,7 @@ fn table_golden_full_precision_face_thresholds() {
 fn capture_threshold_gradient(
     resources: &RenderResources,
     use_table: bool,
+    churn: bool,
 ) -> (golden_harness::CapturedImage, Vec<u32>) {
     let (mut app, target) = headless_app(resources.clone());
     app.insert_resource(bevy::prelude::ClearColor(bevy::prelude::Color::srgb(
@@ -214,11 +215,9 @@ fn capture_threshold_gradient(
                         bevy::asset::RenderAssetUsages::default(),
                     ));
                 app.insert_resource(
-                    bevy_stylized::stylized_render::instance_table::StylizedInstanceTable {
-                        buffer: buffer.clone(),
-                        capacity: 64,
-                        next_slot: 0,
-                    },
+                    bevy_stylized::stylized_render::instance_table::StylizedInstanceTable::new(
+                        buffer.clone(),
+                    ),
                 );
                 let material = app
                     .world_mut()
@@ -280,7 +279,53 @@ fn capture_threshold_gradient(
         Transform::from_xyz(0.0, 0.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
     for _ in 0..24 {
+        if churn {
+            let world = app.world_mut();
+            let mut query = world.query::<(
+                bevy::prelude::Entity,
+                &Mesh3d,
+                &MeshMaterial3d<StylizedCharacterTableMaterial>,
+                &StylizedInstanceTableEntry,
+                &StylizedInstanceData,
+                &Transform,
+            )>();
+            let previous = query
+                .iter(world)
+                .map(|(entity, mesh, material, entry, data, transform)| {
+                    (
+                        entity,
+                        mesh.clone(),
+                        material.clone(),
+                        *entry,
+                        *data,
+                        *transform,
+                    )
+                })
+                .collect::<Vec<_>>();
+            for (entity, mesh, material, entry, data, transform) in previous {
+                world.despawn(entity);
+                world.spawn((mesh, material, entry, data, transform));
+            }
+            let transient = (0..80)
+                .map(|_| {
+                    world
+                        .spawn(StylizedInstanceTableEntry(Default::default()))
+                        .id()
+                })
+                .collect::<Vec<_>>();
+            app.update(); // grow and publish with existing material bindings
+            for entity in transient {
+                app.world_mut().despawn(entity);
+            }
+        }
         app.update();
+    }
+    if use_table {
+        let table = app
+            .world()
+            .resource::<bevy_stylized::stylized_render::StylizedInstanceTable>();
+        assert_eq!(table.next_slot, N);
+        assert_eq!(table.capacity, 64);
     }
     let request = golden_harness::capture::request_capture(app.world_mut(), target);
     let mut captured = None;
@@ -418,6 +463,9 @@ fn measure_scenario(
                 instances as usize * bevy_stylized::stylized_render::INSTANCE_RECORD_STRIDE,
                 bevy::asset::RenderAssetUsages::default(),
             ));
+        app.insert_resource(bevy_stylized::stylized_render::StylizedInstanceTable::new(
+            buffer.clone(),
+        ));
         app.world_mut()
             .resource_mut::<Assets<StylizedCharacterTableMaterial>>()
             .add(StylizedCharacterTableMaterial {
@@ -592,7 +640,7 @@ fn instance_db_measurement() {
     // 合批 gate：两通道在全部规模下 draw 数都必须远小于实例数。
     for m in &report.measurements {
         assert!(
-            m.opaque_draw_calls * 50 <= m.instances as usize,
+            m.opaque_draw_calls > 0 && m.opaque_draw_calls * 50 <= m.instances as usize,
             "{} @ {} instances: batching looks broken ({} draws)",
             m.transport,
             m.instances,
@@ -642,5 +690,22 @@ fn portable_materials_have_zero_storage_bindings() {
     assert_eq!(
         table.storage_buffers, 1,
         "表变体恰好 1 个 storage binding（instance_table）"
+    );
+}
+
+#[test]
+#[ignore = "requires GPU; run the explicit GPU lane"]
+fn table_churn_preserves_pixels() {
+    let resources = golden_harness::probe_render_resources().expect("required GPU");
+    let (reference, _) = capture_threshold_gradient(&resources, true, false);
+    let (churned, _) = capture_threshold_gradient(&resources, true, true);
+    std::fs::write(
+        out_dir().join("table_churn.png"),
+        golden_harness::encode_png(&churned).unwrap(),
+    )
+    .unwrap();
+    assert!(
+        reference.data == churned.data,
+        "table lifecycle changed rendered pixels"
     );
 }

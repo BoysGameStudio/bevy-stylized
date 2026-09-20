@@ -24,31 +24,113 @@
     "_NPR_CONTROL0"
   ],
   "attributes": [
-    {"name": "_NPR_MASK", "domain": "POINT", "data_type": "FLOAT", "gltf_semantic": "_NPR_MASK", "bevy_vertex_format": "Float32", "required": false, "default": 0.0, "missing_fallback": "shader-default 0.0"},
-    {"name": "_NPR_CLOTH_PIN", "domain": "POINT", "data_type": "FLOAT", "gltf_semantic": "_NPR_CLOTH_PIN", "bevy_vertex_format": "Float32", "required": false, "default": 0.0, "missing_fallback": "no cloth pinning"},
-    {"name": "_NPR_EMISSION", "domain": "POINT", "data_type": "FLOAT", "gltf_semantic": "_NPR_EMISSION", "bevy_vertex_format": "Float32", "required": false, "default": 0.0, "missing_fallback": "no per-vertex emission"},
-    {"name": "_NPR_FACE_SDF", "domain": "POINT", "data_type": "FLOAT", "gltf_semantic": "_NPR_FACE_SDF", "bevy_vertex_format": "Float32", "required": false, "default": 0.0, "missing_fallback": "face SDF texture path"},
-    {"name": "_NPR_FACE_SIDE", "domain": "POINT", "data_type": "FLOAT", "gltf_semantic": "_NPR_FACE_SIDE", "bevy_vertex_format": "Float32", "required": false, "default": 1.0, "missing_fallback": "front face"},
-    {"name": "_NPR_HAIR_MASK", "domain": "POINT", "data_type": "FLOAT", "gltf_semantic": "_NPR_HAIR_MASK", "bevy_vertex_format": "Float32", "required": false, "default": 0.0, "missing_fallback": "no hair highlight"},
-    {"name": "_NPR_HAIR_TANGENT", "domain": "POINT", "data_type": "FLOAT_VECTOR", "gltf_semantic": "_NPR_HAIR_TANGENT", "bevy_vertex_format": "Float32x3", "required": false, "default": [0.0, 1.0, 0.0], "missing_fallback": "object-space +Y"},
-    {"name": "_NPR_MATERIAL_ID", "domain": "POINT", "data_type": "FLOAT", "gltf_semantic": "_NPR_MATERIAL_ID", "bevy_vertex_format": "Float32", "required": false, "default": 0.0, "missing_fallback": "material slot index"},
-    {"name": "_NPR_LEVEL_ROLE", "domain": "POINT", "data_type": "FLOAT", "gltf_semantic": "_NPR_LEVEL_ROLE", "bevy_vertex_format": "Float32", "required": false, "default": 0.0, "missing_fallback": "generic surface"},
-    {"name": "_NPR_CONTROL0", "domain": "POINT", "data_type": "FLOAT_VECTOR", "gltf_semantic": "_NPR_CONTROL0", "bevy_vertex_format": "Float32x3", "required": false, "default": [0.0, 0.0, 0.0], "missing_fallback": "zero control vector"}
-  ],
-  "legacy_cel_mapping": {
-    "notes": "Mapping decision (recorded 2026-09-11): the contract canonicalizes on _NPR_* per docs/reference/03; the legacy crate crates/legacy/bevy-cel-metadata registers _CEL_* names. This table is reference-only so the runtime shim can alias _NPR_* -> _CEL_* during migration.",
-    "map": {
-      "_NPR_MASK": "_CEL_MASK",
-      "_NPR_CLOTH_PIN": "_CEL_CLOTH_PIN",
-      "_NPR_EMISSION": "_CEL_EMISSION",
-      "_NPR_FACE_SDF": "_CEL_FACE_SDF",
-      "_NPR_FACE_SIDE": "_CEL_FACE_SIDE",
-      "_NPR_HAIR_MASK": "_CEL_HAIR_MASK",
-      "_NPR_HAIR_TANGENT": "_CEL_HAIR_TANGENT",
-      "_NPR_MATERIAL_ID": "_CEL_MATERIAL_ID",
-      "_NPR_LEVEL_ROLE": "_CEL_LEVEL_ROLE",
-      "_NPR_CONTROL0": null
+    {
+      "name": "_NPR_MASK",
+      "domain": "POINT",
+      "data_type": "FLOAT",
+      "gltf_semantic": "_NPR_MASK",
+      "bevy_vertex_format": "Float32",
+      "required": false,
+      "default": 0.0,
+      "missing_fallback": "shader-default 0.0"
     },
-    "legacy_only": ["_CEL_JOINTS_1", "_CEL_WEIGHTS_1"]
-  }
+    {
+      "name": "_NPR_CLOTH_PIN",
+      "domain": "POINT",
+      "data_type": "FLOAT",
+      "gltf_semantic": "_NPR_CLOTH_PIN",
+      "bevy_vertex_format": "Float32",
+      "required": false,
+      "default": 0.0,
+      "missing_fallback": "no cloth pinning"
+    },
+    {
+      "name": "_NPR_EMISSION",
+      "domain": "POINT",
+      "data_type": "FLOAT",
+      "gltf_semantic": "_NPR_EMISSION",
+      "bevy_vertex_format": "Float32",
+      "required": false,
+      "default": 0.0,
+      "missing_fallback": "no per-vertex emission"
+    },
+    {
+      "name": "_NPR_FACE_SDF",
+      "domain": "POINT",
+      "data_type": "FLOAT",
+      "gltf_semantic": "_NPR_FACE_SDF",
+      "bevy_vertex_format": "Float32",
+      "required": false,
+      "default": 0.0,
+      "missing_fallback": "face SDF texture path"
+    },
+    {
+      "name": "_NPR_FACE_SIDE",
+      "domain": "POINT",
+      "data_type": "FLOAT",
+      "gltf_semantic": "_NPR_FACE_SIDE",
+      "bevy_vertex_format": "Float32",
+      "required": false,
+      "default": 1.0,
+      "missing_fallback": "front face"
+    },
+    {
+      "name": "_NPR_HAIR_MASK",
+      "domain": "POINT",
+      "data_type": "FLOAT",
+      "gltf_semantic": "_NPR_HAIR_MASK",
+      "bevy_vertex_format": "Float32",
+      "required": false,
+      "default": 0.0,
+      "missing_fallback": "no hair highlight"
+    },
+    {
+      "name": "_NPR_HAIR_TANGENT",
+      "domain": "POINT",
+      "data_type": "FLOAT_VECTOR",
+      "gltf_semantic": "_NPR_HAIR_TANGENT",
+      "bevy_vertex_format": "Float32x3",
+      "required": false,
+      "default": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "missing_fallback": "object-space +Y"
+    },
+    {
+      "name": "_NPR_MATERIAL_ID",
+      "domain": "POINT",
+      "data_type": "FLOAT",
+      "gltf_semantic": "_NPR_MATERIAL_ID",
+      "bevy_vertex_format": "Float32",
+      "required": false,
+      "default": 0.0,
+      "missing_fallback": "material slot index"
+    },
+    {
+      "name": "_NPR_LEVEL_ROLE",
+      "domain": "POINT",
+      "data_type": "FLOAT",
+      "gltf_semantic": "_NPR_LEVEL_ROLE",
+      "bevy_vertex_format": "Float32",
+      "required": false,
+      "default": 0.0,
+      "missing_fallback": "generic surface"
+    },
+    {
+      "name": "_NPR_CONTROL0",
+      "domain": "POINT",
+      "data_type": "FLOAT_VECTOR",
+      "gltf_semantic": "_NPR_CONTROL0",
+      "bevy_vertex_format": "Float32x3",
+      "required": false,
+      "default": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "missing_fallback": "zero control vector"
+    }
+  ]
 }

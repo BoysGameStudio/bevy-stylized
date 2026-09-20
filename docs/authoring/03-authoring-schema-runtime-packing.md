@@ -170,7 +170,7 @@ KTX2/Basis 是候选技术，不是架构不变量。
 
 ## Vertex Attribute Contract
 
-当前多个 `_CEL_*` Attribute 不应无限扩张。新 schema 以 `_NPR_*` 为稳定语义前缀。
+Current authored attributes use the canonical `_NPR_*` semantic prefix.
 
 候选收敛：
 

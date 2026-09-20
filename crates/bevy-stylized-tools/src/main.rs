@@ -15,7 +15,7 @@ use std::{
 };
 
 use bevy_stylized_gltf::{
-    LEGACY_CEL_ALIASES, MATERIAL_EXTRAS_KEY, NPR_ATTRIBUTE_SPECS, NprAttributeSpec,
+    MATERIAL_EXTRAS_KEY, NPR_ATTRIBUTE_SPECS, NprAttributeSpec,
     StylizedImportError, extract_materials_from_document, load_sidecar, sidecar_path_for_gltf,
 };
 
@@ -302,15 +302,6 @@ fn contract_entry(loader_key: &str) -> Option<&'static NprAttributeSpec> {
         .find(|registration| registration.loader_key == loader_key)
 }
 
-/// legacy `_CEL_*` 语义 → 规范化 `_NPR_*`（别名表数据；仅提示，不注册）。
-fn legacy_alias_note(loader_key: &str) -> Option<&'static str> {
-    let cel = format!("_{loader_key}");
-    LEGACY_CEL_ALIASES
-        .iter()
-        .find(|alias| alias.cel_semantic == Some(cel.as_str()))
-        .map(|alias| alias.npr_semantic)
-}
-
 pub(crate) fn run_one(path: &Path, validate: bool) -> Result<FileReport, String> {
     let bytes = std::fs::read(path).map_err(|e| format!("read: {e}"))?;
     let gltf =
@@ -363,13 +354,6 @@ pub(crate) fn inspect_document(
                             ),
                         });
                     }
-                } else if let Some(npr) = legacy_alias_note(&name) {
-                    report.diagnostics.push(Diagnostic {
-                        severity: "warning",
-                        message: format!(
-                            "发现 legacy 语义 _{name}（对应 {npr}）；迁移期 shim 未注册，建议改用 {npr}"
-                        ),
-                    });
                 }
                 if let Some(existing) = found.iter_mut().find(|(k, ..)| *k == name) {
                     existing.3 += 1;

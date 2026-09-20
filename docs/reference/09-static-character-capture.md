@@ -2,7 +2,9 @@
 
 The versioned development contract `bevy_stylized.character-capture/v1`–`v3` lives under
 schemas/authoring. It is separate from runtime material/view schemas and from the
-locked 3.6.2 synthetic reference. The current character recipe uses Gacha 3.6.4.
+retired synthetic reference. These revisions identify current pipeline stages:
+initial cases, lighting diagnostics, then matched samples. The current recipe uses
+the source-locked Gacha release.
 
 Build prepared original sources with the existing asset workflow. The build now
 also emits `character-cases/case.json`, six two-repeat Blender captures, evaluated

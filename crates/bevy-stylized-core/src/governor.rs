@@ -1,7 +1,7 @@
 //! 动态质量调节器（V2-c，docs/roadmap/02 §8 V2-c / 01 §Dynamic Quality）。
 //!
 //! 纯逻辑状态机，不含任何 Bevy App/ECS 类型：每 tick 消费 [`QualitySignals`]
-//! （GPU 帧时 / 分辨率 / 场景复杂度 / 可选热压力与电量），产出
+//! （帧时 / 分辨率 / 场景复杂度 / 可选热压力与电量），产出
 //! [`QualityDecision`]（目标 tier + 可选 feature/LOD 调整建议）。
 //!
 //! 不变量（roadmap 强制项）：
@@ -70,11 +70,25 @@ impl Default for StylizedQualityGovernorConfig {
     }
 }
 
+/// Provenance of the timing signal; none of these variants claims GPU timestamp evidence.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum QualityTimingSource {
+    #[default]
+    Unspecified,
+    /// Bevy Time<Real> frame interval, including waits and scheduling.
+    FrameInterval,
+    /// An application-supplied value, which may be synthetic.
+    HostProvided,
+}
+
 /// 每 tick 的输入信号（热/电为平台可得时的可选信号）。
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct QualitySignals {
     /// 本 tick 观测到的帧时（ms；facade 侧为 diagnostics 平滑值）。
-    pub gpu_frame_time_ms: f32,
+    pub frame_time_ms: f32,
+    pub timing_source: QualityTimingSource,
+    /// Facade collection frame, not a GPU submission timestamp.
+    pub observed_frame: Option<u32>,
     /// 渲染分辨率（宽高像素；当前仅入快照，供观测与未来分辨率调整）。
     pub resolution: [u32; 2],
     /// 场景复杂度估计（单位由调用方定义；0 = 未提供）。
@@ -235,11 +249,11 @@ impl StylizedQualityGovernor {
     pub fn tick(&mut self, signals: &QualitySignals) -> QualityDecision {
         self.tick += 1;
         self.smoothed_ms = if self.has_smoothed {
-            self.config.ema_alpha * signals.gpu_frame_time_ms
+            self.config.ema_alpha * signals.frame_time_ms
                 + (1.0 - self.config.ema_alpha) * self.smoothed_ms
         } else {
             self.has_smoothed = true;
-            signals.gpu_frame_time_ms
+            signals.frame_time_ms
         };
         let smoothed = self.smoothed_ms;
         let cfg = self.config;
@@ -434,7 +448,7 @@ mod tests {
 
     fn signals(ms: f32) -> QualitySignals {
         QualitySignals {
-            gpu_frame_time_ms: ms,
+            frame_time_ms: ms,
             ..QualitySignals::default()
         }
     }
@@ -473,7 +487,7 @@ mod tests {
             decision.adjustment,
             QualityAdjustment::RequestFeatureFallback
         );
-        assert_eq!(decision.signals.gpu_frame_time_ms, 20.0);
+        assert_eq!(decision.signals.frame_time_ms, 20.0);
         assert!(decision.smoothed_frame_time_ms >= 12.0);
 
         // 冷却内继续超支：不再降。
@@ -613,7 +627,7 @@ mod tests {
         config.battery_saver_below = 0.2;
         let mut governor = StylizedQualityGovernor::new(config, High, High);
         let thermal = QualitySignals {
-            gpu_frame_time_ms: 5.0, // 帧时极好
+            frame_time_ms: 5.0, // 帧时极好
             thermal_pressure: Some(0.95),
             ..QualitySignals::default()
         };
@@ -637,7 +651,7 @@ mod tests {
         // 电量低于阈值同样构成降档压力。
         let mut governor = StylizedQualityGovernor::new(config, High, High);
         let battery = QualitySignals {
-            gpu_frame_time_ms: 5.0,
+            frame_time_ms: 5.0,
             battery_level: Some(0.1),
             ..QualitySignals::default()
         };
@@ -652,7 +666,7 @@ mod tests {
         config.scene_complexity_budget = 100.0;
         let mut governor = StylizedQualityGovernor::new(config, High, High);
         let d = governor.tick(&QualitySignals {
-            gpu_frame_time_ms: 5.0,
+            frame_time_ms: 5.0,
             scene_complexity: 250.0,
             ..QualitySignals::default()
         });
@@ -734,11 +748,12 @@ mod tests {
         let mut governor = StylizedQualityGovernor::new(test_config(), High, High);
         for ms in [20.0, 5.0, 10.0, 30.0, 1.0] {
             let sig = QualitySignals {
-                gpu_frame_time_ms: ms,
+                frame_time_ms: ms,
                 resolution: [1920, 1080],
                 scene_complexity: 42.0,
                 thermal_pressure: Some(0.3),
                 battery_level: Some(0.8),
+                ..QualitySignals::default()
             };
             let d = governor.tick(&sig);
             assert!(!d.reason.is_empty());

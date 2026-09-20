@@ -7,7 +7,7 @@
 //! **GltfPlugin 加入 App 之前**注册（ADR-0028，机制标记为 provisional）。
 //!
 //! Canonical attribute registration is checked against the generated contract.
-//! Historical naming aliases are data only, not a dependency on an old renderer:
+//! Only canonical NPR spellings are registered:
 //!
 //! - glTF 规范要求 application-specific attribute 以 `_` 开头；`gltf-json`
 //!   解析时会剥掉首字符下划线，因此注册 key 为语义名去掉首 `_`
@@ -76,17 +76,14 @@ pub const ATTRIBUTE_NPR_LEVEL_ROLE: MeshVertexAttribute = MeshVertexAttribute::n
     NPR_ATTRIBUTE_ID_BASE + 9,
     VertexFormat::Float32,
 );
-/// 通用控制向量（v1 新增语义，无 `_CEL_*` 对应）。
+/// General control vector.
 pub const ATTRIBUTE_NPR_CONTROL0: MeshVertexAttribute = MeshVertexAttribute::new(
     "_NPR_CONTROL0",
     NPR_ATTRIBUTE_ID_BASE + 10,
     VertexFormat::Float32x3,
 );
 
-pub use crate::contract::{
-    LEGACY_CEL_ALIASES, LEGACY_ONLY_CEL_ATTRIBUTES, LegacyCelAlias, NprAttributeDefault,
-    legacy_cel_alias,
-};
+pub use crate::contract::NprAttributeDefault;
 
 /// 一条 `_NPR_*` attribute 的完整契约条目。
 #[derive(Clone, Copy, Debug)]
@@ -282,21 +279,7 @@ mod tests {
             );
         }
 
-        // `_CEL_*` 别名表与 contract 的 legacy_cel_mapping 一致。
-        let legacy_map = contract["legacy_cel_mapping"]["map"]
-            .as_object()
-            .expect("legacy map");
-        for alias in LEGACY_CEL_ALIASES {
-            let expected = legacy_map[alias.npr_semantic].as_str();
-            assert_eq!(expected, alias.cel_semantic);
-        }
-        let legacy_only: Vec<&str> = contract["legacy_cel_mapping"]["legacy_only"]
-            .as_array()
-            .expect("legacy_only array")
-            .iter()
-            .map(|v| v.as_str().unwrap())
-            .collect();
-        assert_eq!(legacy_only, LEGACY_ONLY_CEL_ATTRIBUTES);
+
     }
 
     #[test]

@@ -42,7 +42,7 @@ visible in the [current inventory](../release/03-provisional-inventory.md).
 Existing tests cover shared adoption/release, removed head bindings, morph/skin and
 outline updates, instance batching/table precision, class fallback and whole-pipeline
 budgets. R6 retains these identities while grouping deformation, profile lighting
-and sampling/camera cases. See the [migration map](../plans/refactor-test-migration-2026-09-15.json).
+and sampling/camera cases. See the [current contract checks](../../tests/current-contracts.json).
 
 A future split should cite a concrete editing or validation problem and demonstrate
 that a small trial removes it. No performance improvement or new platform support

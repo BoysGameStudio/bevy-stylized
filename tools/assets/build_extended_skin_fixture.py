@@ -38,8 +38,8 @@ def build():
         "JOINTS_1": accessor([[1, 0, 0, 0]] * 3, 4, "VEC4", "H"),
         "WEIGHTS_1": accessor([[0.75, 0.0, 0.0, 0.0]] * 3, 4, "VEC4"),
     }
-    attrs["_CEL_JOINTS_1"] = attrs["JOINTS_1"]
-    attrs["_CEL_WEIGHTS_1"] = attrs["WEIGHTS_1"]
+    attrs["_NPR_JOINTS_1"] = attrs["JOINTS_1"]
+    attrs["_NPR_WEIGHTS_1"] = attrs["WEIGHTS_1"]
     indices = accessor([0, 1, 2], 1, "SCALAR", "H")
     delta = accessor([[0.0, 0.0, 0.5]] * 3, 3, "VEC3")
     identity = [1.0 if row == column else 0.0 for column in range(4) for row in range(4)]

@@ -21,9 +21,7 @@ use bevy_stylized_core::{
 /// Profile 标识（schema namespace 约定）。
 pub const GENSHIN_PROFILE_ID: &str = "bevy_stylized.profile.genshin";
 
-/// Profile 数据 schema 版本（v1；与 reference-toolchain.toml 的
-/// `[profile].genshin_schema` 对齐——该字段当前仍 PENDING，本版本号随
-/// 其定稿可能调整）。
+/// Current profile data schema version, shared by producers and validators.
 pub const GENSHIN_SCHEMA_VERSION: StylizedSchemaVersion = StylizedSchemaVersion::new(1, 0);
 
 /// metadata_map 键（docs/reference/07 §5；仅列出签名证据支撑的条目）。

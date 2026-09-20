@@ -258,11 +258,11 @@ fn complete_skin_and_morph_match_baked_surface_and_outline() {
 fn loader_registers_complete_skin_aliases_with_renderer_identity() {
     let plugin = bevy_stylized::stylized_gltf_plugin();
     assert_eq!(
-        plugin.custom_vertex_attributes["CEL_JOINTS_1"].id,
+        plugin.custom_vertex_attributes["NPR_JOINTS_1"].id,
         ATTRIBUTE_SECONDARY_JOINTS.id
     );
     assert_eq!(
-        plugin.custom_vertex_attributes["CEL_WEIGHTS_1"].id,
+        plugin.custom_vertex_attributes["NPR_WEIGHTS_1"].id,
         ATTRIBUTE_SECONDARY_WEIGHTS.id
     );
 }

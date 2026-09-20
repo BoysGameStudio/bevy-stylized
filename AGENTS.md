@@ -3,12 +3,12 @@
 Read README.md, CONTRIBUTING.md and the relevant architecture/authoring/reference
 contract before changing that domain. The project is independent: no sibling game
 checkout, game exporter, processed game model or personal absolute path may become
-an operational requirement. Historical provenance is retained under docs/history.
+an operational requirement. Current source attribution is maintained in THIRD_PARTY_NOTICES.md.
 
-The user has authorized execution of the independent-project plan v4 in this
-session. Continue required reversible work and validation without asking again.
-Do not create Git commits, publish packages or overwrite accepted baselines unless
-requested. Keep unrelated user changes and authored source scenes intact.
+Continue authorized reversible maintenance and local validation without asking
+for repeated stage approval. Keep current assets and unrelated working changes.
+Do not create commits or publish unless requested. Only the current version is
+supported; retired compatibility APIs and obsolete historical material are removed.
 
 Use repository skills when applicable:
 

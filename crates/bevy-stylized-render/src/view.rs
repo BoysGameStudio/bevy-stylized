@@ -39,6 +39,20 @@ use bevy_stylized_core::{StylizedEnvironment, StylizedViewDescriptor};
 #[derive(Resource, Clone, Debug, Default)]
 pub struct StylizedViewSettings(pub StylizedViewDescriptor);
 
+/// Select which cameras the native global view may modify. The default preserves
+/// the original single-view integration; embedded editors should opt into marking.
+#[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum StylizedViewScope {
+    #[default]
+    AllNativeCameras,
+    MarkedCameras,
+}
+
+/// Opt this camera into native view settings when MarkedCameras is selected.
+/// Removing the marker stops future writes; it does not restore prior components.
+#[derive(Component)]
+pub struct StylizedViewCamera;
+
 /// 框架托管的 key light 实体标记（由 [`sync_stylized_view`] 生成/更新）。
 #[derive(Component, Clone, Copy, Debug, Default)]
 pub struct StylizedKeyLight;
@@ -153,6 +167,7 @@ pub fn environment_distance_fog(environment: &StylizedEnvironment) -> Option<Dis
 pub fn sync_stylized_view(
     mut commands: Commands,
     settings: Option<Res<StylizedViewSettings>>,
+    scope: Option<Res<StylizedViewScope>>,
     mut key_lights: Query<(&mut Transform, &mut DirectionalLight), With<StylizedKeyLight>>,
     mut cameras: Query<
         (
@@ -161,6 +176,7 @@ pub fn sync_stylized_view(
             Option<&mut AmbientLight>,
             Option<&mut DistanceFog>,
             &mut Camera,
+            bevy::prelude::Has<StylizedViewCamera>,
         ),
         With<Camera3d>,
     >,
@@ -202,7 +218,11 @@ pub fn sync_stylized_view(
     // 环境 NPR（V2-d）：DistanceFog 组件（雾 + 阴影染色通道）与 zenith
     // 天色（清屏色）；恒等默认下 DistanceFog 移除/不挂（零开销路径）。
     let distance_fog = environment_distance_fog(&descriptor.environment);
-    for (entity, current_exposure, current_ambient, current_fog, mut camera) in &mut cameras {
+    for (entity, current_exposure, current_ambient, current_fog, mut camera, marked) in &mut cameras
+    {
+        if scope.as_deref() == Some(&StylizedViewScope::MarkedCameras) && !marked {
+            continue;
+        }
         match current_exposure {
             Some(mut current) => *current = exposure,
             None => {
@@ -243,9 +263,12 @@ pub fn sync_stylized_view(
 
 /// 注册 View 同步系统。
 pub(crate) fn register(app: &mut bevy::prelude::App) {
-    use bevy::prelude::{PostUpdate, IntoScheduleConfigs};
+    use bevy::prelude::{IntoScheduleConfigs, PostUpdate};
     app.init_resource::<StylizedViewSettings>();
-    app.add_systems(PostUpdate, sync_stylized_view.in_set(crate::presentation::NativePresentationSystems));
+    app.add_systems(
+        PostUpdate,
+        sync_stylized_view.in_set(crate::presentation::NativePresentationSystems),
+    );
 }
 
 #[cfg(test)]
@@ -467,5 +490,43 @@ mod tests {
             app.world().entity(camera).get::<DistanceFog>().is_none(),
             "identity must remove the fog component (zero-cost path)"
         );
+    }
+    #[test]
+    fn marked_scope_leaves_unrelated_cameras_and_rebuilt_cameras_untouched() {
+        use bevy::prelude::*;
+        let mut app = App::new();
+        app.add_plugins(bevy::app::TaskPoolPlugin::default());
+        app.insert_resource(StylizedViewScope::MarkedCameras);
+        app.init_resource::<StylizedViewSettings>();
+        app.add_systems(PostUpdate, sync_stylized_view);
+        let other = app
+            .world_mut()
+            .spawn((Camera3d::default(), Exposure { ev100: 7.0 }))
+            .id();
+        let owned = app
+            .world_mut()
+            .spawn((Camera3d::default(), StylizedViewCamera))
+            .id();
+        app.update();
+        assert_eq!(app.world().get::<Exposure>(other).unwrap().ev100, 7.0);
+        assert!(app.world().get::<AmbientLight>(other).is_none());
+        assert!(app.world().get::<AmbientLight>(owned).is_some());
+        app.world_mut()
+            .entity_mut(owned)
+            .remove::<StylizedViewCamera>();
+        app.world_mut()
+            .entity_mut(owned)
+            .insert(Exposure { ev100: 9.0 });
+        app.update();
+        assert_eq!(app.world().get::<Exposure>(owned).unwrap().ev100, 9.0);
+        app.world_mut().despawn(owned);
+        let rebuilt = app.world_mut().spawn(Camera3d::default()).id();
+        app.update();
+        assert!(app.world().get::<AmbientLight>(rebuilt).is_none());
+        app.world_mut()
+            .entity_mut(rebuilt)
+            .insert(StylizedViewCamera);
+        app.update();
+        assert!(app.world().get::<AmbientLight>(rebuilt).is_some());
     }
 }

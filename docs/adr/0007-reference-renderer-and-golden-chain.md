@@ -28,7 +28,7 @@ The direct-source, project-owned reference preparation reproduces the earlier
 upstream pixels exactly. Required-mode comparison preserves the failing production
 metrics (about 20.96 dB), rather than reporting the capture as parity success.
 The isolated workflow runs without another game checkout or preprocessed character.
-Coverage dispositions are recorded in docs/plans/independence-coverage.json.
+Coverage dispositions are recorded in tests/current-contracts.json.
 
 ## Consequences
 

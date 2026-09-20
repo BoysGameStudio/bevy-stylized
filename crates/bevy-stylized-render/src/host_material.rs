@@ -420,6 +420,51 @@ impl Plugin for HostMaterialPlugin {
     }
 }
 
+
+fn collect_priorities(
+    cel: Res<Assets<HostMaterial<StylizedCelMaterial>>>,
+    character: Res<Assets<HostMaterial<StylizedCharacterMaterial>>>,
+    hero: Res<Assets<HostMaterial<StylizedHeroMaterial>>>,
+    outline: Res<Assets<HostMaterial<StylizedOutlineMaterial>>>,
+    physical: Option<Res<Assets<HostMaterial<crate::physical::PhysicalCelMaterial>>>>,
+    mut priorities: ResMut<crate::outline_order::MaterialPriorities>,
+) {
+    if !cel.is_changed()
+        && !character.is_changed()
+        && !hero.is_changed()
+        && !outline.is_changed()
+        && physical
+            .as_ref()
+            .is_none_or(|materials| !materials.is_changed())
+    {
+        return;
+    }
+    priorities.0 = cel
+        .iter()
+        .map(|(id, m)| (id.untyped(), m.opaque_priority()))
+        .chain(
+            character
+                .iter()
+                .map(|(id, m)| (id.untyped(), m.opaque_priority())),
+        )
+        .chain(
+            hero.iter()
+                .map(|(id, m)| (id.untyped(), m.opaque_priority())),
+        )
+        .chain(
+            outline
+                .iter()
+                .map(|(id, m)| (id.untyped(), m.opaque_priority())),
+        )
+        .filter(|(_, p)| *p != 0)
+        .collect();
+    if let Some(materials) = physical {
+        priorities.0.extend(materials.iter().filter_map(|(id, m)| {
+            (m.opaque_priority() != 0).then_some((id.untyped(), m.opaque_priority()))
+        }));
+    }
+}
+
 #[cfg(test)]
 mod frame_tests {
     use super::*;
@@ -525,49 +570,5 @@ mod frame_tests {
         app.update();
         assert!(!app.world().resource::<HostFrameStatus>().ready);
         assert_eq!(app.world().resource::<HostFrameInputs>().version, 0);
-    }
-}
-
-fn collect_priorities(
-    cel: Res<Assets<HostMaterial<StylizedCelMaterial>>>,
-    character: Res<Assets<HostMaterial<StylizedCharacterMaterial>>>,
-    hero: Res<Assets<HostMaterial<StylizedHeroMaterial>>>,
-    outline: Res<Assets<HostMaterial<StylizedOutlineMaterial>>>,
-    physical: Option<Res<Assets<HostMaterial<crate::physical::PhysicalCelMaterial>>>>,
-    mut priorities: ResMut<crate::outline_order::MaterialPriorities>,
-) {
-    if !cel.is_changed()
-        && !character.is_changed()
-        && !hero.is_changed()
-        && !outline.is_changed()
-        && physical
-            .as_ref()
-            .is_none_or(|materials| !materials.is_changed())
-    {
-        return;
-    }
-    priorities.0 = cel
-        .iter()
-        .map(|(id, m)| (id.untyped(), m.opaque_priority()))
-        .chain(
-            character
-                .iter()
-                .map(|(id, m)| (id.untyped(), m.opaque_priority())),
-        )
-        .chain(
-            hero.iter()
-                .map(|(id, m)| (id.untyped(), m.opaque_priority())),
-        )
-        .chain(
-            outline
-                .iter()
-                .map(|(id, m)| (id.untyped(), m.opaque_priority())),
-        )
-        .filter(|(_, p)| *p != 0)
-        .collect();
-    if let Some(materials) = physical {
-        priorities.0.extend(materials.iter().filter_map(|(id, m)| {
-            (m.opaque_priority() != 0).then_some((id.untyped(), m.opaque_priority()))
-        }));
     }
 }

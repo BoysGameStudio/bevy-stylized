@@ -22,18 +22,12 @@ def check(root):
                 for rel in re.findall(r'include_(?:str|bytes)!\("([^"]+)"\)',source):
                     target=(path.parent/rel).resolve()
                     if not target.is_relative_to(root) or not target.is_file():errors.append(f'bad include: {path.relative_to(root)} -> {rel}')
-    ledger=json.loads((root/'docs/plans/independence-coverage.json').read_text())
-    count=0
-    for file in ledger['files']:
-        for test in file['tests']:
-            count+=1
-            if test.get('migration_status')=='pending' or not test.get('reason') or not test.get('replacement'):
-                errors.append(f'unresolved coverage: {file["path"]}:{test["name"]}')
-            if test.get('migration_status') == 'preserved':
-                replacements = [root/r for r in test.get('replacement') or []]
-                if not any(p.is_file() and re.search(r'fn\s+'+re.escape(test['name'])+r'\b',p.read_text()) for p in replacements):
-                    errors.append(f'preserved test disappeared: {test["name"]}')
-            for replacement in test.get('replacement') or []:
-                if not (root/replacement).is_file():errors.append(f'missing replacement: {replacement}')
-    return {'check':'independence-static','status':'FAIL' if errors else 'PASS','coverage_records':count,'errors':sorted(set(errors)),
-            'scope':'static boundaries only; isolated execution is a separate required validation'}
+    contract=json.loads((root/'tests/current-contracts.json').read_text())
+    for test in contract['required_tests']:
+        if not any((root/p).is_file() and re.search(r'fn\s+'+re.escape(test['name'])+r'\b',(root/p).read_text()) for p in test['sources']):
+            errors.append(f'required current test disappeared: {test["name"]}')
+    for path in contract['required_sources']:
+        if not (root/path).is_file(): errors.append(f'missing current test owner: {path}')
+    return {'check':'independence-static','status':'FAIL' if errors else 'PASS',
+            'required_tests':len(contract['required_tests']),'errors':sorted(set(errors)),
+            'scope':'static current-source boundaries; test execution is verified separately'}

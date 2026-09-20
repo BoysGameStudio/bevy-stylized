@@ -46,8 +46,8 @@ pub use descriptor::{
 };
 pub use environment::{StylizedEnvironment, StylizedFog, StylizedShadowTint, stylized_fog_factor};
 pub use governor::{
-    QualityAdjustment, QualityDecision, QualitySignals, QualityTransition, StylizedQualityGovernor,
-    StylizedQualityGovernorConfig,
+    QualityAdjustment, QualityDecision, QualitySignals, QualityTimingSource, QualityTransition,
+    StylizedQualityGovernor, StylizedQualityGovernorConfig,
 };
 pub use lod::{
     StylizedLodBandPolicy, StylizedLodPolicy, StylizedLodResolution, StylizedLodThresholds,
@@ -74,7 +74,7 @@ pub mod prelude {
     };
     pub use crate::environment::{StylizedEnvironment, StylizedFog, StylizedShadowTint};
     pub use crate::governor::{
-        QualityAdjustment, QualityDecision, QualitySignals, QualityTransition,
+        QualityAdjustment, QualityDecision, QualitySignals, QualityTimingSource, QualityTransition,
         StylizedQualityGovernor, StylizedQualityGovernorConfig,
     };
     pub use crate::lod::{StylizedLodPolicy, StylizedLodResolution, StylizedLodThresholds};

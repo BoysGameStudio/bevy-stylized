@@ -127,3 +127,33 @@ class MaterialRampResolution(unittest.TestCase):
             self.assertEqual(a,b);self.assertNotEqual(a['a']['texture_sha256'],a['b']['texture_sha256'])
             self.assertEqual(a['b']['texture'],'Body01_Ramp.png')
             with self.assertRaisesRegex(ValueError,'missing named ramp'):ramp_bindings(root,{'files':[f for f in files if f['path']!='Body01_Ramp.png']},recipe)
+
+
+class IndependentDependencyGraph(unittest.TestCase):
+    def test_snapshot_does_not_inherit_parent_patch_or_mutate_source_lock(self):
+        from checks.dependencies import independent_check
+        with tempfile.TemporaryDirectory() as tmp:
+            parent = pathlib.Path(tmp)
+            root = parent / 'product'
+            (root / 'src').mkdir(parents=True)
+            (root / 'Cargo.toml').write_text('[workspace]\n[package]\nname="fixture"\nversion="0.1.0"\nedition="2021"\n')
+            (root / 'src/lib.rs').write_text('')
+            (parent / '.cargo').mkdir()
+            # Cargo would reject this missing enclosing override in the original cwd.
+            (parent / '.cargo/config.toml').write_text('[patch.crates-io]\nmissing={path="does-not-exist"}\n')
+            project = Project(root)
+            result = independent_check(project)
+            self.assertEqual(result['errors'], [])
+            self.assertEqual(result['mode'], 'independent-source-snapshot')
+            self.assertFalse((root / 'Cargo.lock').exists())
+
+    def test_product_cannot_depend_on_a_local_lab(self):
+        m = {'packages': [
+            {'id':'core','name':'bevy-stylized-core','source':None,
+             'manifest_path':'/repo/crates/core/Cargo.toml',
+             'dependencies':[{'name':'lab','kind':None,'path':'/repo/labs/lab'}]},
+            {'id':'lab','name':'lab','source':None,
+             'manifest_path':'/repo/labs/lab/Cargo.toml','dependencies':[]}],
+            'resolve':{'nodes':[{'id':'core','deps':[{'pkg':'lab','dep_kinds':[{'kind':None}]}]}]}}
+        self.assertTrue(any('forbidden product edge' in e for e in violations(m, '/repo')))
+        self.assertTrue(any('closure' in e for e in violations(m, '/repo')))

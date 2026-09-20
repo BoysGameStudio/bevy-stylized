@@ -10,9 +10,7 @@ from an existing GLB, inspect that exact file and its provenance instead.
 Locate the project's actual paths; the inspected workspace uses:
 
 - `assets/sources/gacha-authoring.json`: current qualified authoring release/hash.
-- `docs/reference/reference-toolchain.toml`: historical opt-in reference lock.
-- `tools/blender/export_reference.py`: version/signature/texture/
-  attribute checks, metadata extraction and GLB export.
+- `tools/blender/export_character.py`: current scoped character export.
 - `schemas/authoring/`: signatures, exporter settings,
   `_NPR_*` definitions, manifest schema.
 - `crates/bevy-stylized-gltf/src/metadata.rs`: typed runtime sidecar/extras.
@@ -43,7 +41,7 @@ Use a fresh candidate output directory. Normal command shape:
 
 ```sh
 blender --background SOURCE.blend --python-exit-code 1 \
-  --python tools/blender/export_reference.py -- --out CANDIDATE_DIR
+  --python tools/blender/export_character.py -- --authoring BUILD/authoring/authoring.json --out CANDIDATE_DIR
 ```
 
 Select `--role` and `--signature` only when the source genuinely matches that
@@ -59,7 +57,7 @@ Before calling the bridge, inspect export scope. The 2026-09-14 settings use
 or selecting the character is insufficient. Prepare a runtime-only transient
 scene/file, remove upstream outline geometry modifiers from that export copy,
 exclude authoring widgets and verify how morphs/skin survive modifier application.
-The generic bridge does not perform all of this character-specific preparation.
+The declared character pipeline owns this preparation.
 
 Gacha Shader-to-RGB graphs are not directly glTF PBR graphs. A suitable exporter
 must expose supported base material inputs and preserve NPR maps separately.

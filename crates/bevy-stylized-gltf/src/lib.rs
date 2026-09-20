@@ -28,10 +28,7 @@ pub use attributes::{
     ATTRIBUTE_NPR_MATERIAL_ID, NPR_ATTRIBUTE_ID_BASE, NPR_VERTEX_ATTRIBUTES,
     NprVertexAttributeRegistration, StylizedGltfPluginExt,
 };
-pub use contract::{
-    LEGACY_CEL_ALIASES, LEGACY_ONLY_CEL_ATTRIBUTES, LegacyCelAlias, NPR_ATTRIBUTE_SPECS,
-    NprAttributeDefault, NprAttributeSpec, legacy_cel_alias,
-};
+pub use contract::{NPR_ATTRIBUTE_SPECS, NprAttributeDefault, NprAttributeSpec};
 pub use metadata::{
     MATERIAL_EXTRAS_KEY, STYLIZED_SIDECAR_EXTENSION, STYLIZED_SIDECAR_SCHEMA,
     StylizedImportDiagnostic, StylizedImportDiagnosticCode, StylizedImportError,

@@ -1,7 +1,0 @@
-{
-  "old_reference_pixels_equal": true,
-  "max_byte_delta": 0,
-  "mean_byte_delta": 0.0,
-  "new_source": "assets/sources/genshin-odette.json",
-  "shader_source": "assets/sources/gacha-reference.json"
-}

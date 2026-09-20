@@ -10,12 +10,6 @@ configuration. No task resets or saves the user's personal preferences.
 - `capture_character.py`: declared full-body/face reference captures and provenance.
 - `export_character.py`: upstream diffuse/pupil rasterization, independent NPR map
   extraction and runtime-only geometry export → typed profile input.
-- `prepare_reference_textures.py`: direct source + locked shader → reference maps.
-- `make_reference_scene.py`: first-party fixed fixture generator.
-- `render_golden.py`: explicit fixture/vendor/maps → upstream captures/provenance.
-- `export_reference.py`: locked artifact/signature export bridge; this is distinct
-  from the character exporter, not a bypass for a mismatching character signature.
-- `run_batch.py`: explicit .blend artifact batch export with the same bridge checks.
 - `compare_golden.py`: read-only same-toolchain image comparison.
 - `inspect_node_math.py`: inspect upstream graph math in a supplied source file.
 

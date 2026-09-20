@@ -1,0 +1,362 @@
+{
+  "schema": "current-contract-presence/v1",
+  "required_tests": [
+    {
+      "name": "stylized_plugin_runs_headless_updates",
+      "sources": [
+        "crates/bevy-stylized/tests/app_skeleton.rs"
+      ]
+    },
+    {
+      "name": "capability_config_resource_overrides_plugin_default",
+      "sources": [
+        "crates/bevy-stylized/tests/app_skeleton.rs"
+      ]
+    },
+    {
+      "name": "reduce_tier_policy_keeps_class_on_cpu_fallback",
+      "sources": [
+        "crates/bevy-stylized/tests/app_skeleton.rs"
+      ]
+    },
+    {
+      "name": "third_party_profile_works_through_core_contract_only",
+      "sources": [
+        "crates/bevy-stylized/tests/custom_profile.rs"
+      ]
+    },
+    {
+      "name": "dynamic_quality_is_opt_in_off_by_default",
+      "sources": [
+        "crates/bevy-stylized/tests/dynamic_quality.rs"
+      ]
+    },
+    {
+      "name": "synthetic_feed_downgrades_and_recovers_with_events",
+      "sources": [
+        "crates/bevy-stylized/tests/dynamic_quality.rs"
+      ]
+    },
+    {
+      "name": "stage_b_portable_fallback_clamps_governor_ceiling",
+      "sources": [
+        "crates/bevy-stylized/tests/dynamic_quality.rs"
+      ]
+    },
+    {
+      "name": "disabled_resource_freezes_governor",
+      "sources": [
+        "crates/bevy-stylized/tests/dynamic_quality.rs"
+      ]
+    },
+    {
+      "name": "real_diagnostics_feed_reaches_governor",
+      "sources": [
+        "crates/bevy-stylized/tests/dynamic_quality.rs"
+      ]
+    },
+    {
+      "name": "governor_override_reaches_per_instance_lod",
+      "sources": [
+        "crates/bevy-stylized/tests/dynamic_quality.rs"
+      ]
+    },
+    {
+      "name": "facade_configured_app_loads_npr_attribute_and_extras",
+      "sources": [
+        "crates/bevy-stylized/tests/gltf_ordering.rs"
+      ]
+    },
+    {
+      "name": "configuring_gltf_after_plugin_added_fails_closed",
+      "sources": [
+        "crates/bevy-stylized/tests/gltf_ordering.rs"
+      ]
+    },
+    {
+      "name": "facade_normal_dependency_closure_excludes_reference_and_dev_crates",
+      "sources": [
+        "crates/bevy-stylized/tests/no_reference_deps.rs"
+      ]
+    },
+    {
+      "name": "adr_0001_backend_comparison_spike",
+      "sources": [
+        "tests/integration/tests/adr_0001_spike.rs"
+      ]
+    },
+    {
+      "name": "alpha_mask_cutout_probe",
+      "sources": [
+        "tests/integration/tests/alpha_probe.rs"
+      ]
+    },
+    {
+      "name": "outline_sync_is_noop_without_outline_components",
+      "sources": [
+        "tests/integration/tests/disabled_feature_cost.rs"
+      ]
+    },
+    {
+      "name": "flag_sync_is_noop_without_material_events",
+      "sources": [
+        "tests/integration/tests/disabled_feature_cost.rs"
+      ]
+    },
+    {
+      "name": "post_sync_is_noop_without_post_component",
+      "sources": [
+        "tests/integration/tests/disabled_feature_cost.rs"
+      ]
+    },
+    {
+      "name": "screen_outline_absent_means_zero_prepass_work",
+      "sources": [
+        "tests/integration/tests/disabled_feature_cost.rs"
+      ]
+    },
+    {
+      "name": "cel_portable_golden_cases",
+      "sources": [
+        "tests/integration/tests/golden_cel.rs"
+      ]
+    },
+    {
+      "name": "instances_batch_with_per_instance_variation",
+      "sources": [
+        "tests/integration/tests/instance_batching.rs"
+      ]
+    },
+    {
+      "name": "table_golden_full_precision_face_thresholds",
+      "sources": [
+        "tests/integration/tests/instance_table.rs"
+      ]
+    },
+    {
+      "name": "instance_db_measurement",
+      "sources": [
+        "tests/integration/tests/instance_table.rs"
+      ]
+    },
+    {
+      "name": "portable_materials_have_zero_storage_bindings",
+      "sources": [
+        "tests/integration/tests/instance_table.rs"
+      ]
+    },
+    {
+      "name": "whole_pipeline_budget_fits_baseline_models",
+      "sources": [
+        "tests/integration/tests/interim_budget.rs"
+      ]
+    },
+    {
+      "name": "uniform_packing_and_sampler_audit",
+      "sources": [
+        "tests/integration/tests/interim_budget.rs"
+      ]
+    },
+    {
+      "name": "morph_target_deformation_renders",
+      "sources": [
+        "tests/integration/tests/morph_skinning.rs"
+      ]
+    },
+    {
+      "name": "skinned_deformation_renders",
+      "sources": [
+        "tests/integration/tests/morph_skinning.rs"
+      ]
+    },
+    {
+      "name": "outline_advanced_hull_screen_hybrid",
+      "sources": [
+        "tests/integration/tests/outline_advanced.rs"
+      ]
+    },
+    {
+      "name": "alpha_cull_matrix_semantics_hold",
+      "sources": [
+        "tests/integration/tests/semantics_matrix.rs"
+      ]
+    },
+    {
+      "name": "hero_matrix_flags_and_keys_hold",
+      "sources": [
+        "tests/integration/tests/semantics_matrix.rs"
+      ]
+    },
+    {
+      "name": "no_per_frame_material_mutation_with_shared_material",
+      "sources": [
+        "tests/integration/tests/semantics_matrix.rs"
+      ]
+    },
+    {
+      "name": "blend_is_unreachable_in_v1_materials",
+      "sources": [
+        "tests/integration/tests/semantics_matrix.rs"
+      ]
+    },
+    {
+      "name": "prepass_and_shadow_contract_is_explicit",
+      "sources": [
+        "tests/integration/tests/semantics_matrix.rs"
+      ]
+    },
+    {
+      "name": "every_embedded_wgsl_shader_composes_and_validates_with_naga",
+      "sources": [
+        "tests/integration/tests/shader_validation.rs"
+      ]
+    },
+    {
+      "name": "adr_0004_instance_transport_spike",
+      "sources": [
+        "tests/integration/tests/spike_instance_transport.rs"
+      ]
+    },
+    {
+      "name": "fixture_glb_validates_clean",
+      "sources": [
+        "crates/bevy-stylized-tools/tests/cli.rs"
+      ]
+    },
+    {
+      "name": "fixture_glb_inspect_reports_classes",
+      "sources": [
+        "crates/bevy-stylized-tools/tests/cli.rs"
+      ]
+    },
+    {
+      "name": "wrong_accessor_type_fails_closed",
+      "sources": [
+        "crates/bevy-stylized-tools/tests/cli.rs"
+      ]
+    },
+    {
+      "name": "correct_synthetic_gltf_passes_with_warnings",
+      "sources": [
+        "crates/bevy-stylized-tools/tests/cli.rs"
+      ]
+    },
+    {
+      "name": "json_output_is_machine_readable",
+      "sources": [
+        "crates/bevy-stylized-tools/tests/cli.rs"
+      ]
+    },
+    {
+      "name": "missing_file_exits_2",
+      "sources": [
+        "crates/bevy-stylized-tools/tests/cli.rs"
+      ]
+    },
+    {
+      "name": "compile_fixture_emits_parseable_descriptors",
+      "sources": [
+        "crates/bevy-stylized-tools/tests/cli.rs"
+      ]
+    },
+    {
+      "name": "compile_packs_ilm_and_rewrites_texture_ref",
+      "sources": [
+        "crates/bevy-stylized-tools/tests/cli.rs"
+      ]
+    },
+    {
+      "name": "compile_missing_pack_source_fails_closed",
+      "sources": [
+        "crates/bevy-stylized-tools/tests/cli.rs"
+      ]
+    },
+    {
+      "name": "compile_contract_violation_blocks_emission",
+      "sources": [
+        "crates/bevy-stylized-tools/tests/cli.rs"
+      ]
+    },
+    {
+      "name": "compile_out_flag_rejected_for_other_commands",
+      "sources": [
+        "crates/bevy-stylized-tools/tests/cli.rs"
+      ]
+    },
+    {
+      "name": "compile_directives_from_sidecar",
+      "sources": [
+        "crates/bevy-stylized-tools/tests/cli.rs"
+      ]
+    },
+    {
+      "name": "usage_error_exits_2",
+      "sources": [
+        "crates/bevy-stylized-tools/tests/cli.rs"
+      ]
+    },
+    {
+      "name": "fixed_benchmark_scenes_run",
+      "sources": [
+        "labs/benchmarks/tests/fixed_scenes.rs"
+      ]
+    },
+    {
+      "name": "gpu_cull_matches_cpu_reference",
+      "sources": [
+        "labs/spikes/gpu-driven/tests/spike.rs"
+      ]
+    },
+    {
+      "name": "gpu_driven_spike_measurement",
+      "sources": [
+        "labs/spikes/gpu-driven/tests/spike.rs"
+      ]
+    },
+    {
+      "name": "sweep_smoke_single_cell_measures",
+      "sources": [
+        "labs/regression/tests/sweep_smoke.rs"
+      ]
+    },
+    {
+      "name": "all_showcase_cases_capture_non_black",
+      "sources": [
+        "apps/showcase/tests/capture_all.rs"
+      ]
+    }
+  ],
+  "required_sources": [
+    "apps/showcase/tests/capture_all.rs",
+    "crates/bevy-stylized-gltf/src/metadata.rs",
+    "crates/bevy-stylized-profile-genshin/src/mapping.rs",
+    "crates/bevy-stylized-render/src/outline.rs",
+    "crates/bevy-stylized-render/src/post.rs",
+    "crates/bevy-stylized-render/src/view.rs",
+    "crates/bevy-stylized-tools/tests/cli.rs",
+    "crates/bevy-stylized/tests/app_skeleton.rs",
+    "crates/bevy-stylized/tests/custom_profile.rs",
+    "crates/bevy-stylized/tests/dynamic_quality.rs",
+    "crates/bevy-stylized/tests/gltf_ordering.rs",
+    "crates/bevy-stylized/tests/no_reference_deps.rs",
+    "labs/benchmarks/tests/fixed_scenes.rs",
+    "labs/reference/src/lib.rs",
+    "labs/regression/tests/sweep_smoke.rs",
+    "labs/spikes/gpu-driven/tests/spike.rs",
+    "tests/integration/tests/adr_0001_spike.rs",
+    "tests/integration/tests/alpha_probe.rs",
+    "tests/integration/tests/asset_adoption.rs",
+    "tests/integration/tests/disabled_feature_cost.rs",
+    "tests/integration/tests/golden_cel.rs",
+    "tests/integration/tests/golden_character.rs",
+    "tests/integration/tests/instance_batching.rs",
+    "tests/integration/tests/instance_table.rs",
+    "tests/integration/tests/interim_budget.rs",
+    "tests/integration/tests/morph_skinning.rs",
+    "tests/integration/tests/outline_advanced.rs",
+    "tests/integration/tests/semantics_matrix.rs",
+    "tests/integration/tests/shader_validation.rs",
+    "tests/integration/tests/spike_instance_transport.rs"
+  ],
+  "scope": "source-presence guard, not evidence of executed tests"
+}

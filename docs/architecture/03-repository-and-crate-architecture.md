@@ -34,7 +34,7 @@ there; module tests stay with their implementation.
 The default workspace selection is the six products. `--workspace` includes all
 13 current members. No retired renderer is hidden by changing default-members.
 The former migration renderer is absent from the active source graph. Historical
-attribution is kept in [legacy provenance](../history/legacy-provenance.md).
+attribution is kept in [current attribution](../../THIRD_PARTY_NOTICES.md).
 
 Runtime WGSL is embedded from `crates/bevy-stylized-render/src/shaders`. There is
 no second root shaders tree. Examples belong to the facade's examples directory.
@@ -96,3 +96,18 @@ identical shared texture bytes are deduplicated, while material-name collisions 
 different bytes targeting one path are errors. Validation errors
 prevent the plan from reaching publication; output directories remain new candidates.
 Moving source changes the build cache key, not the runtime bundle format.
+
+## Explicit adoption retry and rebind (2026-09-20)
+
+Adoption still runs once; changing StylizedMaterialSet alone does not trigger
+repeated conversion. Each StylizedMaterialAdoption carries a generation and retains
+the original StandardMaterial handle. Call
+`integration::rebind_stylized_material(world, entity, expected_generation)` to
+restore that source, revoke the previous native/HostMaterial bindings and request
+one new adoption on the next update. A stale generation, missing completed outcome,
+exhausted generation or unavailable source returns an error before mutation.
+
+The retry may succeed or record another inspectable error. It preserves host-owned
+instance data and uses the existing live-owner cache collection. This supports
+recovering an unmapped material or rebinding a changed descriptor without recreating
+the scene, and does not introduce automatic replay of external writes.

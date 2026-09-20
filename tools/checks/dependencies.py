@@ -50,8 +50,8 @@ def violations(metadata, root):
     return sorted(set(errors))
 
 
-def check(root):
-    result = subprocess.run(['cargo', 'metadata', '--locked', '--offline', '--format-version', '1'],
+def check(root, *, locked=True):
+    result = subprocess.run(['cargo', 'metadata', *(['--locked'] if locked else []), '--offline', '--format-version', '1'],
                             cwd=root, capture_output=True, text=True)
     if result.returncode:
         raise RuntimeError(result.stderr)
@@ -60,3 +60,32 @@ def check(root):
             'workspace_members': len(metadata['workspace_members']),
             'default_members': len(metadata['workspace_default_members']),
             'scope': 'complete resolved normal/build graph; optional feature combinations additionally require isolated consumers'}
+
+
+def independent_check(project):
+    """Check a source snapshot outside ancestor Cargo config discovery.
+
+    This is dependency-graph evidence, not Bubblewrap/runtime qualification.
+    Only the disposable lock may change to resolve registry replacements for
+    enclosing-workspace patches. The original source and lock stay untouched.
+    """
+    from checks.isolated import source_snapshot
+    from task_runner import ResourceBlocked
+    import hashlib
+    import tempfile
+    source = Path(tempfile.mkdtemp(prefix='stylized graph '))
+    digest = source_snapshot(project, source)
+    try:
+        result = check(source, locked=False)
+    except RuntimeError as error:
+        if any(marker in str(error) for marker in
+               ['attempting to make an HTTP request', 'no matching package named', 'failed to download']):
+            raise ResourceBlocked(f'independent graph dependencies unavailable: {error}') from error
+        raise
+    lock = source / 'Cargo.lock'
+    result.update(mode='independent-source-snapshot', snapshot_sha256=digest,
+                  source_copy=str(source),
+                  resolved_lock_sha256=hashlib.sha256(lock.read_bytes()).hexdigest(),
+                  source_lock_mutated=False,
+                  scope='strict standalone dependency graph; not isolated runtime, image or parity qualification')
+    return result

@@ -42,7 +42,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--run-id');parser.add_argument('--root');parser.add_argument('--config');parser.add_argument('--cache')
     sub=parser.add_subparsers(dest='command',required=True);sub.add_parser('paths')
-    check=sub.add_parser('check');check.add_argument('--lane',choices=['docs','architecture','schema','cpu','gpu','asset-integration','reference','character-reference','inspector','realtime','independence','consumers','inspector-cpu'],required=True)
+    check=sub.add_parser('check');check.add_argument('--lane',choices=['docs','architecture','schema','cpu','gpu','asset-integration','character-reference','inspector','realtime','independence','consumers','inspector-cpu'],required=True)
     check.add_argument('--fetch',action='store_true',help='prepare independent consumer dependencies online');check.add_argument('--required',action='store_true');check.add_argument('--asset');check.add_argument('--case');check.add_argument('--pack',default='synthetic');check.add_argument('--out')
     check.add_argument('--suite', action='append', help='GPU lane only: select an exact registered test binary; reports partial coverage')
     assets=sub.add_parser('assets');asset_sub=assets.add_subparsers(dest='action',required=True)
@@ -140,10 +140,10 @@ def execute(project, args):
         return 0
     lane=args.lane
     if lane in {'docs','cpu'}:run(project,[sys.executable,'tools/checks/check_docs.py'])
-    if lane in {'architecture','cpu','independence'}:
-        from checks.dependencies import check as graph
+    if lane in {'architecture','cpu'}:
+        from checks.dependencies import independent_check as graph
         from checks.independence import check as independence
-        report_check(project,graph(project.root));report_check(project,independence(project.root))
+        report_check(project,graph(project));report_check(project,independence(project.root))
     if lane in {'schema','cpu'}:
         run(project,[sys.executable,'tools/checks/generate_attributes.py','--check'])
         run(project,['cargo','run','--locked','-p','bevy-stylized-tools','--features','schema','--bin','stylized-schema','--','schemas/runtime','--check'])
@@ -218,10 +218,6 @@ def execute(project, args):
         if result.returncode:
             if 'BLOCKED: required GPU unavailable' in result.stdout:raise ResourceBlocked(f'required GPU unavailable; inspect {log}')
             raise subprocess.CalledProcessError(result.returncode,result.args)
-    elif lane=='reference':
-        if not args.case:raise ValueError('--case must identify the prepared reference case JSON')
-        env=dict(os.environ,STYLIZED_REQUIRE_GPU='1',STYLIZED_REFERENCE_CASE=str(project.resolve(args.case)))
-        run(project,['cargo','run','--locked','-p','reference-comparison','--']+(['--required'] if args.required else []),env)
     elif lane=='inspector-cpu':
         run(project,['cargo','test','--locked','-p','showcase','--features','inspector','--lib','--','--test-threads=1'])
         run(project,['cargo','clippy','--locked','-p','showcase','--features','inspector','--all-targets','--','-D','warnings'])

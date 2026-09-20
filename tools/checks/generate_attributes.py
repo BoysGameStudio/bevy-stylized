@@ -42,21 +42,6 @@ pub missing_fallback: &'static str,
         d=a['default'];default=f'NprAttributeDefault::Vec3({d!r})' if isinstance(d,list) else f'NprAttributeDefault::Scalar({float(d)})'
         source+='NprAttributeSpec {'+','.join(f'{k}: {q(v)}' for k,v in {'authored_semantic':a['name'],'loader_key':a['name'][1:],'blender_domain':a['domain'],'blender_data_type':a['data_type'],'vertex_format':a['bevy_vertex_format'],'missing_fallback':a['missing_fallback']}.items())+f', default: {default}'+ '},\n'
     source+='];\n'
-    source+='''/// Compatibility name mapping, never automatically registered.
-#[derive(Clone, Copy, Debug)]
-pub struct LegacyCelAlias { /// Canonical semantic.
-pub npr_semantic: &'static str, /// Previous spelling when available.
-pub cel_semantic: Option<&'static str> }
-'''
-    mapping=spec['legacy_cel_mapping'];source+=f'/// Previous spellings.\npub const LEGACY_CEL_ALIASES: [LegacyCelAlias; {len(mapping["map"])}] = [\n'
-    for key,v in mapping['map'].items():source+=f'LegacyCelAlias {{npr_semantic: {q(key)}, cel_semantic: '+(f'Some({q(v)})' if v else 'None')+'},\n'
-    source+='];\n/// Non-canonical historical attributes.\npub const LEGACY_ONLY_CEL_ATTRIBUTES: &[&str] = &['+','.join(q(v) for v in mapping['legacy_only'])+'];\n'
-    source+='''/// Return the previous spelling, if any.
-#[must_use]
-pub fn legacy_cel_alias(name: &str) -> Option<&'static str> {
-LEGACY_CEL_ALIASES.iter().find(|x| x.npr_semantic == name).and_then(|x| x.cel_semantic)
-}
-'''
     return subprocess.run(['rustfmt','--edition','2024'],input=source,text=True,capture_output=True,check=True).stdout
 
 

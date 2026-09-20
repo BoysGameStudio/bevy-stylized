@@ -78,7 +78,6 @@ Independent semantic fixtures validate data and rendering contracts.
 | Goals, scope, three-axis model | `docs/architecture/01-goals-scope-and-three-axis-model.md` |
 | Target architecture | `docs/architecture/02-target-architecture.md` |
 | Repository/crate architecture | `docs/architecture/03-repository-and-crate-architecture.md` |
-| Historical renderer review (non-normative) | `docs/history/legacy-implementation-review.md` |
 | Surface classes, tiers, resource budgets | `docs/rendering/01-surface-tier-resource-and-bindless.md` |
 | Material / Instance / View | `docs/rendering/02-material-instance-view.md` |
 | Shader / lighting / outline / post | `docs/rendering/03-shader-lighting-outline-post.md` |
@@ -100,7 +99,6 @@ Independent semantic fixtures validate data and rendering contracts.
 | Performance target format | `docs/performance/targets.md` |
 | Showcase / fixtures | `docs/showcase/01-showcase-examples-fixtures.md` |
 | Tooling / versioning / publishing | `docs/release/01-tooling-versioning-and-publication.md` |
-| Historical migration (non-normative) | `docs/history/tenacity-migration.md` |
 | V1/V2/V3 roadmap | `docs/roadmap/01-v1-v2-v3-roadmap.md` |
 | V1 release gate | `docs/release/02-v1-release-gate.md` |
 | Invariants / risks / ADR governance | `docs/governance/01-invariants-risks-and-adrs.md` |
@@ -112,7 +110,3 @@ Independent semantic fixtures validate data and rendering contracts.
 
 Anything marked **Pending ADR**, **Spike**, **Candidate**, **Experimental**, or an explicit qualification state is intentionally unresolved.  
 It must not silently become a runtime contract through implementation.
-
-The original single-file plan is retained only as historical context:
-
-`docs/archive/bevy_npr_framework_master_plan.md`

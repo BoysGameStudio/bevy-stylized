@@ -8,7 +8,8 @@ change needs rendering evidence; a documentation change needs document validatio
 
 Run validation locally through the commands below. GitHub Actions is disabled;
 do not add remote CI as a required step or re-enable workflows. Retired workflow
-definitions are preserved under docs/history.
+definitions are not active validation inputs. Current commands and contracts own
+maintenance; obsolete plans and historical report copies are removed.
 
 ## Common commands
 
@@ -102,3 +103,19 @@ It needs the X11/Wayland development libraries used by that feature, but no live
 window, Blender or character pack. `consumers --fetch` explicitly permits Cargo
 to prepare each independent consumer's dependencies before offline checks; omit
 `--fetch` when dependencies are already cached. It never downloads character art.
+
+
+### Standalone graph versus enclosing-workspace integration
+
+`architecture` (also used by `cpu`) resolves the strict dependency graph in a
+Git-free source snapshot outside ancestor Cargo configuration discovery. It retains
+the source snapshot identity and the standalone resolved lock hash. Only that copy's
+lock may change when registry dependencies replace enclosing-workspace patches.
+The checkout lock is unchanged. This does not allow arbitrary external paths or
+product-to-lab edges, and is not a runtime isolation claim.
+
+An enclosing workspace validates its reviewed local overrides independently.
+`independence` goes directly to the existing Bubblewrap execution; its inner CPU
+lane performs the strict graph checks within the isolated source environment.
+Missing raw inputs, toolchains or GPU resources remain BLOCKED. Architecture PASS
+does not imply the full independence/visual/parity lanes ran.

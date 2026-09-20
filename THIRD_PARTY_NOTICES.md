@@ -9,7 +9,7 @@ Historical code provenance:
 - The former bevy_cel / bevy_gltf_metadata reference crates were imported from
   Tenacity at b5b26ac with their original MIT declarations, then retired from the
   active tree by the independent-project migration. Their source and notices remain
-  in Git history; see [the preserved provenance](docs/history/legacy-provenance.md).
+  in Git history; see [current attribution](THIRD_PARTY_NOTICES.md).
 - The former character prepass adaptation referenced Bevy 0.19.1 (MIT OR Apache-2.0).
   Retirement does not remove its historical attribution or establish the license
   of any other source in the current repository.
@@ -32,7 +32,6 @@ Development inspector provenance (2026-09-15): camera/viewport interaction and
 capture cancellation behavior were informed by Tenacity's `view-ink` Showcase at
 commit `85565fd65a5feed57b0ef4898b049eb4e2c711a2`, whose workspace declares
 MIT OR Apache-2.0. The selected worktree hashes and migration assessment are recorded
-in `docs/quality/tenacity-reuse-inventory-2026-09-15.json` and
-`docs/research/tenacity-rendering-reuse-2026-09-15.md`. The new inspector uses this
+in `docs/quality/tenacity-reuse-inventory-2026-09-15.json` as the current source-attribution record. The new inspector uses this
 repository's material facade and capture harness; no Tenacity crate or art is
 vendored. Its optional UI uses `bevy_egui` 0.41.1 and dependency-bundled fonts.

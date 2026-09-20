@@ -96,8 +96,8 @@ pub use screen_outline::{
     StylizedScreenOutlineMaterial, StylizedScreenOutlineParams, resolve_outline_mode,
 };
 pub use view::{
-    StylizedKeyLight, StylizedViewSettings, environment_distance_fog, exposure_component,
-    resolve_ambient_light,
+    StylizedKeyLight, StylizedViewCamera, StylizedViewScope, StylizedViewSettings,
+    environment_distance_fog, exposure_component, resolve_ambient_light,
 };
 
 use bevy::{
@@ -118,7 +118,10 @@ pub struct StylizedRenderPlugin;
 impl Plugin for StylizedRenderPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<presentation::PresentationSchedule>()
-            .configure_sets(PostUpdate, presentation::NativePresentationSystems.run_if(presentation::native_schedule));
+            .configure_sets(
+                PostUpdate,
+                presentation::NativePresentationSystems.run_if(presentation::native_schedule),
+            );
         embedded_asset!(app, "shaders/cel/portable_forward.wgsl");
         embedded_asset!(app, "shaders/character/character_forward.wgsl");
         embedded_asset!(app, "shaders/outline/portable_outline.wgsl");
@@ -208,7 +211,8 @@ impl Plugin for StylizedRenderPlugin {
             );
             core::mem::forget(handle);
             let handle: bevy::prelude::Handle<bevy::shader::Shader> = bevy::asset::load_embedded_asset!(
-                app.world_mut(), "shaders/common/host_inputs.wgsl"
+                app.world_mut(),
+                "shaders/common/host_inputs.wgsl"
             );
             core::mem::forget(handle);
         }

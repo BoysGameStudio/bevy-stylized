@@ -33,24 +33,10 @@ All applicable criteria must pass. Missing resources and baseline images are not
 metric successes. `reference-comparison --required` returns failure if any actual
 criterion fails; diagnostic capture success is reported separately.
 
-## 4. Current evidence
+## 4. Qualification scope
 
-The independent direct-source recipe reproduced the prior upstream reference
-pixels exactly (maximum delta 0). Production/upstream comparison remains around
-20.96 dB PSNR, mean 0.0379 and shadow IoU 0.8957: **FAIL**, unchanged by the
-retirement of the legacy renderer. This is a synthetic reference scene with real
-source maps, not a full-character parity claim.
-
-The independently imported static character passes structural/material adoption,
-sharing and reload checks. That result does not supersede the failing upstream
-metrics or qualify full-rig/effect rendering. Original images, detailed historical
-experiments and previous three-renderer metrics are preserved in
-[the archived criteria record](../history/pre-independence-08-golden-tolerance-and-cross-layer-criteria.md).
-
-## 5. Baseline changes
-
-First-party accepted images live in fixtures/golden. External source/derived art
-stays under assets/local. Capture writes a candidate; comparison is read-only;
-explicit acceptance requires provenance and preserves the previous version.
-Neither a green Rust report-generation test nor a newly created file accepts a
-Golden baseline. See the [upgrade policy](04-upstream-contract-upgrade-and-golden.md).
+Use the declared current character case and source lock. Its report must name
+actual inputs, adapter, metrics and pass/fail for each applicable criterion.
+A prior source or renderer result is not a substitute for a current changed
+case. Structural adoption, independent image criteria and platform qualification
+remain separate. The retired synthetic reference lane is not an acceptance input.
