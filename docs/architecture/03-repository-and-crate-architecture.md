@@ -25,14 +25,14 @@ the core crate for that requirement.
 
 ## Development layout
 
-`apps/showcase`, `labs/reference`, `labs/benchmarks`, `labs/regression` and
+`apps/showcase`, `apps/android-smoke`, `labs/reference`, `labs/benchmarks`, `labs/regression` and
 `labs/spikes/gpu-driven` own their development executables. `tests/harness` is a
 product-neutral capture library. `tests/integration` is an explicit Cargo package,
 not a magically discovered root test directory. GPU/file/cross-crate tests live
 there; module tests stay with their implementation.
 
 The default workspace selection is the six products. `--workspace` includes all
-13 current members. No retired renderer is hidden by changing default-members.
+14 current members. No retired renderer is hidden by changing default-members.
 The former migration renderer is absent from the active source graph. Historical
 attribution is kept in [current attribution](../../THIRD_PARTY_NOTICES.md).
 

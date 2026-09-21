@@ -138,7 +138,10 @@ fn vertex(vertex_in: Vertex,
 
 @fragment
 fn fragment(in: OutlineVertexOutput) -> FragmentOutput {
-    let params=material_params();
+    // Keep dynamic source_colors indexing on an addressable struct. A value
+    // (`let`) makes Naga extract the whole array; MoltenVK 1.4.0 then emits an
+    // invalid float4[5] -> spvUnsafeArray<float4, 5> copy in the Metal shader.
+    var params=material_params();
     var color=params.color_width.rgb;
     if params.source_state.x != 0u {
         var selected=0u;

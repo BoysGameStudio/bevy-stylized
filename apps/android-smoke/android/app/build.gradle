@@ -1,0 +1,46 @@
+plugins { id 'com.android.application' }
+
+android {
+    namespace 'org.bevystylized.smoke'
+    compileSdk 36
+    buildToolsVersion '37.0.0'
+    ndkVersion '30.0.16248370'
+    defaultConfig {
+        applicationId 'org.bevystylized.smoke'
+        minSdk 31
+        targetSdk 35
+        versionCode 1
+        versionName '0.1'
+        ndk { abiFilters 'arm64-v8a' }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    sourceSets.main.jniLibs.srcDirs = ['../../../../target/android-smoke/jniLibs']
+    def characterDir = System.getenv('STYLIZED_ANDROID_CHARACTER_DIR')
+    if (characterDir) {
+        if (!file("${characterDir}/character.glb").isFile() ||
+            !file("${characterDir}/character.npr.json").isFile() ||
+            !file("${characterDir}/character.view.json").isFile()) {
+            throw new GradleException('Character mode requires a complete compiled character directory.')
+        }
+        sourceSets.main.assets.srcDirs = [characterDir]
+    }
+}
+
+dependencies {
+    // Matches android-activity 0.6.1's bundled native GameActivity glue.
+    implementation 'androidx.games:games-activity:4.4.0'
+    implementation 'androidx.appcompat:appcompat:1.7.1'
+}
+
+tasks.register('verifyNativeLibrary') {
+    doLast {
+        def library = file('../../../../target/android-smoke/jniLibs/arm64-v8a/libstylized_android_smoke.so')
+        if (!library.isFile()) {
+            throw new GradleException('Build stylized-android-smoke with cargo-ndk first; see CONTRIBUTING.md.')
+        }
+    }
+}
+tasks.named('preBuild').configure { dependsOn 'verifyNativeLibrary' }

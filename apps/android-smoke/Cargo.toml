@@ -1,0 +1,21 @@
+[package]
+name = "stylized-android-smoke"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lib]
+name = "stylized_android_smoke"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+bevy = { workspace = true, features = ["std", "async_executor", "multi_threaded", "bevy_winit", "bevy_pbr", "android-game-activity"] }
+bevy-stylized = { path = "../../crates/bevy-stylized", default-features = false, features = ["render"] }
+serde_json = { workspace = true, optional = true }
+
+[features]
+character = ["bevy-stylized/gltf", "bevy/bevy_gltf", "bevy/bevy_scene", "bevy/png", "bevy/reflect_auto_register", "dep:serde_json"]
+
+[lints]
+workspace = true

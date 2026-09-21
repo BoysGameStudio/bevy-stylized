@@ -1,0 +1,182 @@
+//! Android Vulkan fixture with procedural and compiled-character modes.
+#[cfg(feature = "character")]
+mod character;
+
+#[cfg(not(feature = "character"))]
+use bevy::{
+    camera::ScalingMode, core_pipeline::tonemapping::Tonemapping,
+    render::renderer::RenderAdapterInfo,
+};
+use bevy::{
+    prelude::*,
+    render::{
+        RenderPlugin,
+        settings::{Backends, RenderCreation, WgpuSettings},
+    },
+    window::AppLifecycle,
+};
+use bevy_stylized::prelude::*;
+
+#[bevy_main]
+pub fn main() {
+    let plugins = DefaultPlugins.build().set(RenderPlugin {
+        render_creation: RenderCreation::Automatic(Box::new(WgpuSettings {
+            backends: Some(Backends::VULKAN),
+            ..default()
+        })),
+        ..default()
+    });
+    #[cfg(feature = "character")]
+    let plugins = plugins
+        .set(bevy_stylized::stylized_gltf_plugin())
+        .set(AssetPlugin {
+            meta_check: bevy::asset::AssetMetaCheck::Never,
+            ..default()
+        });
+    let mut app = App::new();
+    app.insert_resource(ClearColor(Color::srgb(0.08, 0.10, 0.15)))
+        .add_plugins(plugins)
+        .add_plugins(StylizedPlugin::default())
+        .add_systems(Update, (input_and_lifecycle, heartbeat));
+    #[cfg(not(feature = "character"))]
+    app.add_systems(Startup, setup);
+    #[cfg(feature = "character")]
+    app.add_plugins(bevy_stylized::StylizedAssetIntegrationPlugin)
+        .init_resource::<character::CharacterState>()
+        .add_systems(Startup, character::setup)
+        .add_systems(Update, character::check_loaded);
+    app.run();
+}
+
+#[derive(Component)]
+struct Sample;
+
+#[cfg(not(feature = "character"))]
+fn setup(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut standard: ResMut<Assets<StandardMaterial>>,
+    mut cel: ResMut<Assets<StylizedCelMaterial>>,
+    mut character: ResMut<Assets<StylizedCharacterMaterial>>,
+    mut hero: ResMut<Assets<StylizedHeroMaterial>>,
+    mut outlines: ResMut<Assets<StylizedOutlineMaterial>>,
+    adapter: Res<RenderAdapterInfo>,
+    caps: Res<StylizedResolvedCapabilities>,
+) {
+    info!(
+        "ANDROID_SMOKE adapter={:?} capabilities={:?}",
+        adapter.0, caps
+    );
+    let sphere = meshes.add(Sphere::new(0.65));
+    let outline = outlines.add(StylizedOutlineMaterial::default());
+    commands.spawn((
+        Sample,
+        Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
+        MeshMaterial3d(standard.add(StandardMaterial {
+            base_color: Color::srgb(0.8, 0.8, 0.8),
+            ..default()
+        })),
+        Transform::from_xyz(-0.9, 1.1, 0.0).with_rotation(Quat::from_rotation_y(0.4)),
+    ));
+    let cel_params = StylizedCelParams {
+        base_color_factor: Vec4::new(0.15, 0.5, 0.95, 1.0),
+        ..default()
+    };
+    commands.spawn((
+        Sample,
+        Mesh3d(sphere.clone()),
+        MeshMaterial3d(cel.add(StylizedCelMaterial {
+            params: cel_params,
+            ..default()
+        })),
+        StylizedOutline::new(outline.clone()),
+        Transform::from_xyz(0.9, 1.1, 0.0),
+    ));
+    let character_params = StylizedCharacterParams {
+        cel: StylizedCelParams {
+            base_color_factor: Vec4::new(0.9, 0.25, 0.12, 1.0),
+            ..default()
+        },
+        ..default()
+    };
+    commands.spawn((
+        Sample,
+        Mesh3d(sphere.clone()),
+        MeshMaterial3d(character.add(StylizedCharacterMaterial {
+            params: character_params,
+            ..default()
+        })),
+        StylizedOutline::new(outline.clone()),
+        Transform::from_xyz(-0.9, -1.1, 0.0),
+    ));
+    let hero_params = StylizedHeroParams {
+        character: StylizedCharacterParams {
+            cel: StylizedCelParams {
+                base_color_factor: Vec4::new(0.2, 0.8, 0.3, 1.0),
+                ..default()
+            },
+            ..default()
+        },
+        ..default()
+    };
+    commands.spawn((
+        Sample,
+        Mesh3d(sphere),
+        MeshMaterial3d(hero.add(StylizedHeroMaterial {
+            params: hero_params,
+            ..default()
+        })),
+        StylizedOutline::new(outline),
+        Transform::from_xyz(0.9, -1.1, 0.0),
+    ));
+    commands.spawn((
+        DirectionalLight::default(),
+        Transform::from_xyz(3.0, 5.0, 4.0).looking_at(Vec3::ZERO, Vec3::Y),
+    ));
+    commands.spawn((
+        Camera3d::default(),
+        Projection::Orthographic(OrthographicProjection {
+            scaling_mode: ScalingMode::FixedVertical {
+                viewport_height: 8.0,
+            },
+            ..OrthographicProjection::default_3d()
+        }),
+        Transform::from_xyz(0.0, 0.0, 8.0).looking_at(Vec3::ZERO, Vec3::Y),
+        Msaa::Off,
+        Tonemapping::None,
+    ));
+    info!(
+        "ANDROID_SMOKE scene_spawned standard=1 cel=1 character=1 hero=1 hull_requested=3 msaa=off"
+    );
+}
+
+fn input_and_lifecycle(
+    touches: Res<Touches>,
+    mut samples: Query<&mut Transform, With<Sample>>,
+    mut lifecycle: MessageReader<AppLifecycle>,
+) {
+    for event in lifecycle.read() {
+        info!("ANDROID_SMOKE lifecycle={event:?}");
+    }
+    if touches.any_just_pressed() {
+        for mut transform in &mut samples {
+            #[cfg(not(feature = "character"))]
+            transform.rotate_z(0.2);
+            #[cfg(feature = "character")]
+            transform.rotate_y(0.2);
+        }
+        info!("ANDROID_SMOKE touch_received");
+    }
+}
+
+fn heartbeat(mut frame: Local<u64>, outlines: Query<(), With<StylizedOutlineReplica>>) {
+    *frame += 1;
+    if *frame == 120 || (*frame).is_multiple_of(600) {
+        // Update progress is deliberately not a GPU timing or a visual PASS.
+        info!(
+            "ANDROID_SMOKE update_frames={} hull_entities={}",
+            *frame,
+            outlines.iter().count()
+        );
+    }
+}

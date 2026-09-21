@@ -145,6 +145,86 @@ visual, platform or publication decisions.
 For documentation only, run `python3 tools/checks/check_docs.py` and verify moved
 anchors, command entrypoints, generated inputs and source/schema references.
 
+## Android Vulkan smoke
+
+`apps/android-smoke` is a procedural ARM64 application using the public renderer.
+It displays a standard-material cube (top left), Cel (top right), Character
+(bottom left), and Hero (bottom right), with three hull outlines. It uses Vulkan,
+Portable defaults, MSAA off and explicit `Tonemapping::None` (no LUT assets).
+Tap to rotate the samples. Logcat markers prefixed
+`ANDROID_SMOKE` record the adapter, capability resolution, scene counts, update
+progress, touch input and application lifecycle. Update progress is not GPU timing
+or proof of correct pixels. No external character assets are required; advanced
+texture effects, skin/morph, post, GLES and real-device performance are separate.
+
+Prerequisites: the pinned Rust 1.98.0 toolchain and its `aarch64-linux-android`
+target, cargo-ndk, JDK 26, Android SDK platform 36, Build Tools 37.0.0 and NDK
+30.0.16248370. Set `JAVA_HOME`, `ANDROID_HOME` and `ANDROID_NDK_HOME` to existing
+installations. The wrapper pins Gradle 9.4.1; AGP is 9.2.1 and GameActivity 4.4.0
+matches android-activity 0.6.1. Android Studio is optional for the CLI workflow.
+
+From this repository root, prepare dependencies and review the lock as usual
+(enclosing workbench source overrides produce a local-only lock), then build
+serially:
+
+```sh
+rustup target add --toolchain 1.98.0 aarch64-linux-android
+CARGO_INCREMENTAL=0 cargo ndk -t arm64-v8a -P 31 -o target/android-smoke/jniLibs build --release --locked -p stylized-android-smoke
+cd apps/android-smoke/android
+./gradlew --no-daemon :app:assembleDebug
+adb -s emulator-5554 install -r app/build/outputs/apk/debug/app-debug.apk
+adb -s emulator-5554 shell am start -W -n org.bevystylized.smoke/.MainActivity
+```
+
+Choose the serial reported by `adb devices -l`. Start an ARM64 API 31+ AVD with
+`"$ANDROID_HOME/emulator/emulator" -avd YOUR_AVD -gpu host -no-snapshot`.
+Capture the emulator log and check actual backend/driver, not just its configured
+mode. Apple Silicon host Vulkan uses MoltenVK; a separate `-gpu swiftshader` run
+can help distinguish host-driver translation failures. Never combine timings
+from these modes. Preserve logcat, screenshots and device identity under `.local/`.
+Check Home/relaunch and touch explicitly. Compare repeat screenshots at the same
+pose; do not replace accepted Golden fixtures. Emulator evidence does not qualify
+a physical phone's performance or thermal behavior. Qualification belongs in the
+[support matrix](docs/platforms/SUPPORT_MATRIX.md).
+
+The 2026-09-21 hardware follow-up resolves the MoltenVK 1.4.0 outline shader
+translation failure; `-gpu host` renders both fixtures on Apple M4 Pro. Keep the
+outline fragment's indexed palette in an addressable local `var`: changing it to
+`let` causes this translator to emit an invalid array copy. For investigation,
+set `MVK_CONFIG_SHADER_DUMP_DIR` to an absolute local evidence directory when
+starting the emulator; preserve the generated SPIR-V/MSL and the failing APK.
+Do not disable affected materials or outlines and count a reduced scene as the
+full smoke fixture. Consult the support matrix for the exact tested scope.
+
+### Compiled character on Android
+
+The opt-in `character` app feature replaces the procedural samples with the
+compiled static character. It registers NPR glTF attributes before loading,
+adopts the exact sidecar material names, applies the authored view, and logs
+`ANDROID_CHARACTER` adoption counts. Tap rotates the character around its up
+axis. It does not add animation or physics.
+
+Prepare/build the default character using the commands in
+[the integration guide](docs/authoring/05-integration-guide.md#inputs-and-preparation).
+Use the returned successful `BUILD/compiled` directory, not a partial build or
+raw game GLB. From this repository root, keep the same exported directory for
+both commands so the embedded descriptors and APK textures match:
+
+```sh
+export STYLIZED_ANDROID_CHARACTER_DIR="/absolute/path/to/BUILD/compiled"
+CARGO_INCREMENTAL=0 cargo ndk -t arm64-v8a -P 31 -o target/android-smoke/jniLibs build --release --locked -p stylized-android-smoke --features character
+cd apps/android-smoke/android
+./gradlew --no-daemon :app:assembleDebug
+adb -s emulator-5554 install -r app/build/outputs/apk/debug/app-debug.apk
+adb -s emulator-5554 shell am start -W -n org.bevystylized.smoke/.MainActivity
+```
+
+The directory must contain `character.glb`, `character.npr.json`,
+`character.view.json` and all referenced textures. Third-party character data is
+packaged only into ignored local build outputs. To return to the procedural
+fixture, unset `STYLIZED_ANDROID_CHARACTER_DIR`, rebuild without `--features
+character`, then repackage/reinstall. Both modes use the same application ID.
+
 ## Browser WebGPU
 
 `python3 tools/dev.py check --lane webgpu --required --asset BUILD/compiled/character.glb --out target/stylized/NEW_WEBGPU`
