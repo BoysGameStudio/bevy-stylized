@@ -62,9 +62,11 @@ resources. `StylizedAssetIntegrationPlugin` is opt-in: a root MaterialSet maps e
 material names to descriptors; descendants receive shared materials, and the cache
 releases unused entries after adoption components are removed.
 
-MaterialSet is a one-time scene adoption configuration: replace the scene to apply
-a different set. Mutating it after adoption is not a supported live editor API.
-Per-instance state updates remain separate from shared material assets.
+MaterialSet is a one-time scene adoption configuration. Mutating it after adoption
+does not automatically update completed bindings. To apply a changed descriptor,
+replace the scene or explicitly rebind the affected entities using the
+generation-checked API described below. Per-instance state updates remain separate
+from shared material assets.
 
 Static material data, per-instance data and view/frame settings have separate
 owners. Asset compilation is not a GPU loader. Blender node graphs, controls and
