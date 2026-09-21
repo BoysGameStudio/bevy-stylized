@@ -156,6 +156,9 @@ Tap to rotate the samples. Logcat markers prefixed
 progress, touch input and application lifecycle. Update progress is not GPU timing
 or proof of correct pixels. No external character assets are required; advanced
 texture effects, skin/morph, post, GLES and real-device performance are separate.
+The app's code and dependencies are Android-only; native workspace checks compile
+an empty library without adding a window-system backend or requiring character
+assets, including when the `character` feature is selected.
 
 Prerequisites: the pinned Rust 1.98.0 toolchain and its `aarch64-linux-android`
 target, cargo-ndk, JDK 26, Android SDK platform 36, Build Tools 37.0.0 and NDK

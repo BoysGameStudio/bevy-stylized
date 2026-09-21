@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 
 use bevy::{
     core_pipeline::tonemapping::Tonemapping,
+    ecs as bevy_ecs,
     gltf::GltfAssetLabel,
     prelude::*,
     render::renderer::RenderAdapterInfo,

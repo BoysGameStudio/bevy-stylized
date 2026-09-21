@@ -9,7 +9,7 @@ publish = false
 name = "stylized_android_smoke"
 crate-type = ["cdylib", "rlib"]
 
-[dependencies]
+[target.'cfg(target_os = "android")'.dependencies]
 bevy = { workspace = true, features = ["std", "async_executor", "multi_threaded", "bevy_winit", "bevy_pbr", "android-game-activity"] }
 bevy-stylized = { path = "../../crates/bevy-stylized", default-features = false, features = ["render"] }
 serde_json = { workspace = true, optional = true }

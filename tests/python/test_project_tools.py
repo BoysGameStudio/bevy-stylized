@@ -1,6 +1,7 @@
 import hashlib
 import json
 import pathlib
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -130,6 +131,59 @@ class MaterialRampResolution(unittest.TestCase):
 
 
 class IndependentDependencyGraph(unittest.TestCase):
+    def test_android_outputs_do_not_change_identity_or_source_snapshot(self):
+        from checks.isolated import source_snapshot
+        for git_checkout in [False, True]:
+            with self.subTest(git_checkout=git_checkout), tempfile.TemporaryDirectory() as tmp:
+                root = pathlib.Path(tmp)/'source'
+                root.mkdir()
+                (root/'Cargo.toml').write_text('[workspace]\nmembers=[]\n')
+                android = root/'apps/android-smoke/android'
+                sources = {
+                    'apps/android-smoke/src/lib.rs': '// app source',
+                    'apps/android-smoke/android/app/build.gradle': '// build configuration',
+                    'apps/android-smoke/android/app/src/main/AndroidManifest.xml': '<manifest/>',
+                    'apps/android-smoke/android/gradle/wrapper/gradle-wrapper.jar': 'wrapper',
+                    'apps/android-smoke/android/gradlew': '#!/bin/sh\n',
+                    'fixtures/build/authoring.json': '{}',
+                    'crates/example/src/build/input.rs': '// real source, not generated',
+                }
+                for name, data in sources.items():
+                    path = root/name
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text(data)
+                (android/'.gitignore').write_bytes(
+                    (ROOT/'apps/android-smoke/android/.gitignore').read_bytes())
+                if git_checkout:
+                    subprocess.run(['git', 'init', '-q', str(root)], check=True)
+                    subprocess.run(['git', '-C', str(root), 'add', '.'], check=True)
+                project = Project(root)
+                before = project.source_identity()
+                clean_snapshot = source_snapshot(project, pathlib.Path(tmp)/'clean')
+                generated = ['.gradle/cache.bin', '.kotlin/session', '.idea/workspace.xml',
+                             'local.properties', 'build/report.json', 'app/build/output.apk']
+                for name in generated:
+                    path = android/name
+                    path.parent.mkdir(parents=True, exist_ok=True)
+                    path.write_text('generated output')
+                self.assertEqual(project.source_identity(), before)
+                destination = pathlib.Path(tmp)/'after-build'
+                self.assertEqual(source_snapshot(project, destination), clean_snapshot)
+                self.assertEqual(Project(destination).source_identity(), before)
+                for name in generated:
+                    self.assertFalse((destination/'apps/android-smoke/android'/name).exists())
+                for name in sources:
+                    self.assertEqual((destination/name).read_bytes(), (root/name).read_bytes())
+                # Real changes must still invalidate the same identity.
+                for name in ['apps/android-smoke/src/lib.rs',
+                             'apps/android-smoke/android/app/build.gradle',
+                             'fixtures/build/authoring.json']:
+                    path = root/name
+                    saved = path.read_bytes()
+                    path.write_bytes(saved + b'\nchanged')
+                    self.assertNotEqual(project.source_identity(), before)
+                    path.write_bytes(saved)
+
     def test_snapshot_does_not_inherit_parent_patch_or_mutate_source_lock(self):
         from checks.dependencies import independent_check
         with tempfile.TemporaryDirectory() as tmp:

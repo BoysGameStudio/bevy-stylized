@@ -1,4 +1,6 @@
 //! Android Vulkan fixture with procedural and compiled-character modes.
+#![cfg(target_os = "android")]
+
 #[cfg(feature = "character")]
 mod character;
 
@@ -8,6 +10,8 @@ use bevy::{
     render::renderer::RenderAdapterInfo,
 };
 use bevy::{
+    // Bevy derives do not discover dependencies in Cargo target tables.
+    ecs as bevy_ecs,
     prelude::*,
     render::{
         RenderPlugin,

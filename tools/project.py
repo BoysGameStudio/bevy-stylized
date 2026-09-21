@@ -9,6 +9,23 @@ import uuid
 from datetime import datetime, timezone
 
 
+def is_generated_source_path(relative):
+    """Shared exclusions for identities and Git/Git-free source snapshots.
+
+    Android paths are scoped to the app: a directory named build elsewhere may
+    contain authoring inputs. Keep this list aligned with android/.gitignore.
+    """
+    relative = Path(relative)
+    if any(part in {'target', '.git', '__pycache__'} for part in relative.parts):
+        return True
+    if relative.suffix == '.pyc' or relative.is_relative_to('assets/local'):
+        return True
+    android = Path('apps/android-smoke/android')
+    return any(relative.is_relative_to(android / name) for name in (
+        '.gradle', '.kotlin', '.idea', 'local.properties', 'build', 'app/build',
+    ))
+
+
 class Project:
     def __init__(self, root=None, config=None, cache=None):
         self.root = Path(root or Path(__file__).resolve().parents[1]).resolve(strict=True)
@@ -57,9 +74,11 @@ class Project:
             if not folder.exists():
                 continue
             for directory, dirs, names in os.walk(folder):
-                dirs[:] = sorted(d for d in dirs if d not in {'__pycache__', 'target', '.git'}
+                dirs[:] = sorted(d for d in dirs
+                                 if not is_generated_source_path((Path(directory) / d).relative_to(self.root))
                                  and not (Path(directory) / d).is_symlink())
-                files.extend(Path(directory) / n for n in names if not n.endswith('.pyc'))
+                files.extend(Path(directory) / n for n in names
+                             if not is_generated_source_path((Path(directory) / n).relative_to(self.root)))
         for path in sorted(files):
             if path.is_symlink():
                 raise ValueError(f'source symlink is not an identity input: {path}')

@@ -121,3 +121,9 @@ performance_status distinguishes a smoke measurement from accepted performance
 qualification. The full Git-free copy hash is snapshot_sha256; source_sha256 stays
 the task's bounded execution identity. These different digest scopes must not be
 compared as though they were identical.
+
+Both source scans exclude the Android app's Gradle build outputs, local caches,
+IDE state and `local.properties`, including in Git-free copies. The shared rule
+in `tools/project.py` follows `apps/android-smoke/android/.gitignore`; it keeps
+wrapper files and build configuration as inputs. These Android exclusions are
+path-specific: unrelated directories named `build` remain source inputs.

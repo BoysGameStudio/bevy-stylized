@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 from assets.build import DEFAULT_RECIPE
+from project import is_generated_source_path
 
 
 def source_snapshot(project, destination):
@@ -22,14 +23,15 @@ def source_snapshot(project, destination):
     else:
         files=[]
         for directory,dirs,names in os.walk(project.root):
-            dirs[:]=[d for d in dirs if d not in {'target','.git','local','__pycache__'}]
+            dirs[:]=[d for d in dirs if d != 'local'
+                     and not is_generated_source_path((Path(directory)/d).relative_to(project.root))]
             files.extend(Path(directory)/n for n in names)
     revision=hashlib.sha256()
     for path in files:
         if not path.is_file():continue
         if not path.resolve().is_relative_to(project.root):raise ValueError(f'external source symlink: {path}')
         rel=path.relative_to(project.root)
-        if any(part in {'target','.git','__pycache__'} for part in rel.parts) or rel.parts[:2]==('assets','local'):continue
+        if is_generated_source_path(rel):continue
         data=path.read_bytes();revision.update(str(rel).encode()+b'\0'+data)
         out=destination/rel;out.parent.mkdir(parents=True,exist_ok=True);out.write_bytes(data)
     (destination/'SOURCE_REVISION').write_text('worktree-sha256:'+revision.hexdigest()+'\n')
