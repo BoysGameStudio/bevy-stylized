@@ -1,4 +1,4 @@
-#import bevy_stylized_render::common::npr_common::deformed_world_normal
+#import bevy_stylized_render::common::npr_common::{deformed_world_normal, sample_cubic}
 #define_import_path bevy_stylized_render::outline::portable_outline
 
 // Hull Outline（Inverted Hull）Portable 编译单元（It-3b 切片，
@@ -36,6 +36,18 @@ fn host_instance(index:u32) -> HostInstance { return host_uniform.instances[mesh
 fn material_params() -> StylizedOutlineParams { return outline; }
 #endif
 
+fn instance_width(index:u32) -> f32 {
+#ifdef NPR_HOST_INPUTS
+    return host_instance(index).face_up.w;
+#else
+    // Replica-only tag, independent of a source StorageTable index. Absence is
+    // exactly unit width, preserving authored shell coordinates bit-for-bit.
+    let tag=mesh_functions::get_tag(index);
+    if (tag & 0x80000000u)!=0u {return f32(tag & 127u)/63.5;}
+    return 1.0;
+#endif
+}
+
 @group(#{MATERIAL_BIND_GROUP}) @binding(1) var class_texture: texture_2d<f32>;
 @group(#{MATERIAL_BIND_GROUP}) @binding(2) var class_sampler: sampler;
 
@@ -51,6 +63,9 @@ struct OutlineVertexOutput {
 
 @vertex
 fn vertex(vertex_in: Vertex,
+#ifdef NPR_OUTLINE_SOURCE_POSITION
+    @location(10) source_position: vec3<f32>,
+#endif
 #ifdef NPR_SKIN_EXTENDED
     @location(8) extra_joint_indices: vec4<u32>,
     @location(9) extra_joint_weights: vec4<f32>,
@@ -68,13 +83,19 @@ fn vertex(vertex_in: Vertex,
         vertex_width=clamp(vertex_in.color.a,0.0,1.0);
 #endif
         var local_width=max(material_params().source_params.x,0.0);
-#ifdef NPR_HOST_INPUTS
-        let host_width=host_instance(vertex_in.instance_index).face_up.w;
+        let host_width=instance_width(vertex_in.instance_index);
         if host_width!=1.0 {local_width*=host_width;}
-#endif
         // Preserve the authored extrusion's multiplication order at the
         // default instance width; tiny depth changes matter on touching shells.
-        local_position += normalize(deformed.local_normal)*local_width*vertex_width;
+        if material_params().source_params.z>0.5 {
+#ifdef NPR_OUTLINE_SOURCE_POSITION
+            local_position=source_position;
+            let host_scale=instance_width(vertex_in.instance_index);
+            if host_scale!=1.0 {local_position=mix(deformed.local_position,source_position,host_scale);}
+#endif
+        } else {
+            local_position += normalize(deformed.local_normal)*local_width*vertex_width;
+        }
     }
 #endif
     let world_position = mesh_functions::mesh_position_local_to_world(
@@ -97,9 +118,7 @@ fn vertex(vertex_in: Vertex,
     let normal_ndc = normal_clip.xy / normal_w - clip_position.xy / clip_w;
     let normal_length = length(normal_ndc);
     var width_pixels = material_params().color_width.w * vertex_width;
-#ifdef NPR_HOST_INPUTS
-    width_pixels *= host_instance(vertex_in.instance_index).face_up.w;
-#endif
+    width_pixels *= instance_width(vertex_in.instance_index);
     if material_params().source_state.x == 0u && normal_length > 0.00001 && width_pixels > 0.0 {
         let pixel_to_ndc = vec2<f32>(2.0) / max(view.viewport.zw, vec2<f32>(1.0));
         let offset = normal_ndc / normal_length * pixel_to_ndc * width_pixels * clip_position.w;
@@ -125,7 +144,8 @@ fn fragment(in: OutlineVertexOutput) -> FragmentOutput {
         var selected=0u;
 #ifdef VERTEX_UVS_A
         if params.source_state.z==0u && params.source_state.w!=0u {
-            let alpha=textureSampleLevel(class_texture,class_sampler,in.uv,0.0).a;
+            var alpha=textureSampleLevel(class_texture,class_sampler,in.uv,0.0).a;
+            if (params.source_state.w & 2u)!=0u { alpha=sample_cubic(class_texture,class_sampler,in.uv).a; }
             // Authored class order from low to high alpha: 1,4,3,5,2.
             if alpha>0.8 { selected=1u; }
             else if alpha>0.6 { selected=4u; }

@@ -1,14 +1,14 @@
 {
   "schema": "bevy_stylized.recipe/v1",
   "id": "genshin-static-v4",
-  "blender": "5.2.1 LTS",
+  "blender": "5.2.2 LTS",
   "gacha_version": [
     3,
     6,
-    4
+    9
   ],
-  "gacha_release_url": "https://github.com/PaoloESAN/gacha-setup/releases/tag/v3.6.4",
-  "gacha_archive_sha256": "7042aeeaac488ac60515773a1414bd643175f91c950bba2a05b2e6d826744321",
+  "gacha_release_url": "https://github.com/PaoloESAN/gacha-setup/releases/tag/v3.6.9",
+  "gacha_archive_sha256": "e3d8b6d85214ec1dc1d9bd4510d643b4ee5da3305f7ffc89eafc67404838a074",
   "addon_files": {
     "material_data_import_setup/material_data_applier.py": "77319d9d9212cfae2f84b62dd28ddc378a2eea23a7731808cb41cb2e91e481fe",
     "shaders/gi/HoYoverse - Genshin Impact v3.4.blend": "a49420725f6732f82cccb4f814ee08cdcba785b494f7084c9fc6a6b99853f01e",

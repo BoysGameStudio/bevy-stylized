@@ -21,6 +21,8 @@ python3 tools/dev.py check --lane cpu
 python3 tools/dev.py check --lane inspector-cpu
 python3 tools/dev.py check --lane consumers --fetch
 python3 tools/dev.py check --lane gpu --required
+python3 tools/dev.py check --lane performance --required --out target/stylized/NEW_SWEEP
+python3 tools/dev.py check --lane workloads --required --out target/stylized/NEW_WORKLOADS
 ```
 
 All CLI paths are relative to the explicit project root (or to the config file for
@@ -75,6 +77,17 @@ python3 tools/dev.py assets prepare --pack genshin-odette
 python3 tools/dev.py assets prepare --pack gacha-authoring
 python3 tools/dev.py check --lane independence --required
 ```
+
+Both ordinary builds and isolation default to `genshin-static-emission-v1`, with
+source outlines, metal/ramp, normals and emission; `Eff_001` and `Eff_002` are
+excluded. To select a reduced-feature regression recipe, add for example
+`--recipe assets/recipes/genshin-static-normals-v1.json`. Only repository recipes
+under `assets/recipes` are accepted; generated assets and external recipe paths
+cannot bypass the empty-cache rebuild. The selected recipe and hash appear in
+the inner and outer qualification records.
+The runner resolves the standalone lock offline in the disposable source copy
+before locked builds; it preserves the checkout's workbench lock and records the
+standalone hash. Cargo remains offline throughout the isolated job.
 
 The Bubblewrap recipe creates a Git-free source copy with spaces in its path,
 starts with an empty project asset cache, disables networking, mounts only verified
@@ -131,3 +144,23 @@ visual, platform or publication decisions.
 
 For documentation only, run `python3 tools/checks/check_docs.py` and verify moved
 anchors, command entrypoints, generated inputs and source/schema references.
+
+## Browser WebGPU
+
+`python3 tools/dev.py check --lane webgpu --required --asset BUILD/compiled/character.glb --out target/stylized/NEW_WEBGPU`
+builds one standalone consumer outside ancestor Cargo configuration, first for
+wasm32 and then native Vulkan. It renders the same 512² character/class/outline
+fixture in a disposable Chromium profile and a local native window, checks shader
+and GPU errors, and compares actual RGBA readbacks exactly. A failed comparison
+is retained, never rebaselined. This lane currently qualifies this Linux adapter;
+it is not a portable browser support claim.
+
+Prerequisites: pinned Rust `wasm32-unknown-unknown` target, cached standalone Cargo
+dependencies, Node 22+, Pillow, a local display, Chromium and wasm-bindgen-cli
+matching the workspace lock. Select executables with `STYLIZED_CHROME` and
+`STYLIZED_WASM_BINDGEN`. `STYLIZED_CHROME_FLAGS` is a JSON array, recorded in the
+report; the qualified Linux/Wayland invocation used
+`["--ozone-platform=wayland","--enable-gpu","--enable-unsafe-webgpu","--use-angle=vulkan","--enable-features=Vulkan"]`.
+Native X11 requires working `DISPLAY`/`XAUTHORITY`. The lane uses no personal
+browser session, remote runner or WebGL2 fallback. See the
+[support matrix](docs/platforms/SUPPORT_MATRIX.md) for the exact measured scope.

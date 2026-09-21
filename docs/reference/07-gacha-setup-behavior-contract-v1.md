@@ -2,7 +2,7 @@
 
 The supported source is the release/hash in
 [the authoring lock](../../assets/sources/gacha-authoring.json), consumed through
-[the current static recipe](../../assets/recipes/genshin-static-v4.json).
+[the current static recipe](../../assets/recipes/genshin-static-emission-v1.json).
 
 Current responsibilities are split deliberately:
 

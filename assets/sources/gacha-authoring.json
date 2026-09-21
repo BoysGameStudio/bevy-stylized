@@ -1,14 +1,14 @@
 {
   "schema": "bevy_stylized.source/v1",
   "id": "gacha-authoring",
-  "release": "v3.6.4",
-  "archive": "Gacha_Setup-v3.6.4.zip",
+  "release": "v3.6.9",
+  "archive": "Gacha_Setup-v3.6.9.zip",
   "files": [
     {
-      "path": "Gacha_Setup-v3.6.4.zip",
-      "bytes": 20298723,
-      "sha256": "7042aeeaac488ac60515773a1414bd643175f91c950bba2a05b2e6d826744321",
-      "url": "https://github.com/PaoloESAN/gacha-setup/releases/download/v3.6.4/Gacha_Setup-v3.6.4.zip"
+      "path": "Gacha_Setup-v3.6.9.zip",
+      "bytes": 21071483,
+      "sha256": "e3d8b6d85214ec1dc1d9bd4510d643b4ee5da3305f7ffc89eafc67404838a074",
+      "url": "https://github.com/PaoloESAN/gacha-setup/releases/download/v3.6.9/Gacha_Setup-v3.6.9.zip"
     }
   ]
 }

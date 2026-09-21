@@ -327,10 +327,14 @@ impl StylizedCharacterMaterial {
             ..Default::default()
         };
         for (index, texture) in descriptor.textures.iter().enumerate() {
-            if descriptor
-                .static_params
-                .get("surface_control_index")
-                .is_some_and(|v| *v == index as f32)
+            if ["surface_control_index", "outline_class_texture_index"]
+                .iter()
+                .any(|key| {
+                    descriptor
+                        .static_params
+                        .get(*key)
+                        .is_some_and(|v| *v == index as f32)
+                })
             {
                 continue;
             }
@@ -430,10 +434,14 @@ impl Material for StylizedCharacterMaterial {
     }
 
     // 与 Cel 一致：prepass 由相机选择，shadow 关闭（pending ADR-0023）。
-    // prepass 参与在类型级开启（默认 prepass shader 即可）；**成本门控在
+    // prepass 参与在类型级开启（共享裁切/完整蒙皮 shader）；**成本门控在
     // 相机**：只有带 DepthPrepass/NormalPrepass 组件的相机才产生 prepass
     // 开销（StylizedScreenOutline 的 per-camera opt-in），默认相机零成本。
     fn prepass_vertex_shader() -> ShaderRef {
+        crate::skinning::COMPLETE_SKIN_PREPASS_SHADER.into()
+    }
+
+    fn prepass_fragment_shader() -> ShaderRef {
         crate::skinning::COMPLETE_SKIN_PREPASS_SHADER.into()
     }
 
@@ -452,6 +460,9 @@ impl Material for StylizedCharacterMaterial {
         key: bevy::pbr::MaterialPipelineKey<Self>,
     ) -> Result<(), bevy::render::render_resource::SpecializedMeshPipelineError> {
         crate::skinning::specialize_secondary_skin(descriptor, layout)?;
+        if let Some(fragment) = descriptor.fragment.as_mut() {
+            fragment.shader_defs.push("NPR_PREPASS_CHARACTER".into());
+        }
         if key.bind_group_data.double_sided {
             descriptor.primitive.cull_mode = None;
         }
@@ -560,6 +571,29 @@ mod tests {
         assert!(material.face_sdf_texture.is_some());
         assert!(material.params.has_flag(CHAR_FLAG_FACE_SDF_TEXTURE));
         assert!((material.params.face_misc.x - 0.55).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn outline_classification_does_not_enable_face_shading() {
+        let mut descriptor = StylizedMaterialDescriptor::default();
+        descriptor
+            .textures
+            .push(bevy_stylized_core::StylizedTextureRef {
+                semantic: StylizedTextureSemantic::DiscreteClassification,
+                uri: "outline.png".into(),
+            });
+        descriptor
+            .static_params
+            .insert("outline_class_texture_index".into(), 0.0);
+        let material = StylizedCharacterMaterial::from_descriptor(&descriptor, |_| {
+            panic!("outline map belongs to its own material")
+        });
+        assert!(material.face_sdf_texture.is_none());
+        assert!(!material.params.has_flag(CHAR_FLAG_FACE_SDF_TEXTURE));
+        let hero = crate::hero::StylizedHeroMaterial::from_descriptor(&descriptor, |_| {
+            panic!("outline map must not be a body control")
+        });
+        assert!(hero.face_sdf_texture.is_none());
     }
 }
 
@@ -670,6 +704,10 @@ impl Material for StylizedCharacterTableMaterial {
         crate::skinning::COMPLETE_SKIN_PREPASS_SHADER.into()
     }
 
+    fn prepass_fragment_shader() -> ShaderRef {
+        crate::skinning::COMPLETE_SKIN_PREPASS_SHADER.into()
+    }
+
     fn enable_prepass() -> bool {
         true
     }
@@ -685,6 +723,9 @@ impl Material for StylizedCharacterTableMaterial {
         key: bevy::pbr::MaterialPipelineKey<Self>,
     ) -> Result<(), bevy::render::render_resource::SpecializedMeshPipelineError> {
         crate::skinning::specialize_secondary_skin(descriptor, layout)?;
+        if let Some(fragment) = descriptor.fragment.as_mut() {
+            fragment.shader_defs.push("NPR_PREPASS_CHARACTER".into());
+        }
         // 表通道 shader 变体（同一 WGSL 编译单元，def 分支）。
         let def = bevy::shader::ShaderDefVal::from("INSTANCE_STORAGE_TABLE");
         descriptor.vertex.shader_defs.push(def.clone());

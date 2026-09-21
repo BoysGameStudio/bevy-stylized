@@ -10,6 +10,11 @@ if sha(bpy.data.filepath)!=author['blend_sha256']:raise RuntimeError('frozen sce
 if a.out.exists():raise RuntimeError('candidate exists')
 shutil.copytree(a.case.parent,a.out,ignore=shutil.ignore_patterns('case.json'))
 scene=bpy.context.scene;scene.frame_set(recipe['frame']);objects=[bpy.data.objects[n] for n in recipe['meshes']]
+# Factor/coverage masks retain their existing base-surface meaning. Beauty
+# captures include the separately qualified source hulls.
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
+from blender.outline_handoff import modifiers
+for _,modifier in modifiers(objects):modifier.show_render=modifier.show_viewport=False
 for obj in scene.objects:
  if obj.type=='MESH':obj.hide_render=obj not in objects
 saved=[(o,list(o.data.materials)) for o in objects];factor_materials={};bindings={}

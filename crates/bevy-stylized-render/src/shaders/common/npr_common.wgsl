@@ -179,3 +179,31 @@ fn deformed_world_normal(vertex:NprDeformedVertex)->vec3<f32> {
     return mesh_functions::mesh_normal_local_to_world(vertex.local_normal,vertex.instance_index);
 #endif
 }
+
+// Cubic B-spline reconstruction of level-zero authored control data.
+// Positive weights let each adjacent pair share one bilinear lookup.
+fn cubic_weights(t: vec2<f32>) -> array<vec2<f32>,4> {
+    let t2=t*t;
+    let t3=t2*t;
+    return array<vec2<f32>,4>(
+        (vec2<f32>(1.0)-t)*(vec2<f32>(1.0)-t)*(vec2<f32>(1.0)-t)/6.0,
+        (3.0*t3-6.0*t2+vec2<f32>(4.0))/6.0,
+        (-3.0*t3+3.0*t2+3.0*t+vec2<f32>(1.0))/6.0,
+        t3/6.0,
+    );
+}
+fn sample_cubic(tex: texture_2d<f32>, smp: sampler, uv: vec2<f32>) -> vec4<f32> {
+    let dimensions=vec2<f32>(textureDimensions(tex));
+    let pixel=uv*dimensions-0.5;
+    let weights=cubic_weights(fract(pixel));
+    var result=vec4<f32>(0.0);
+    for(var y=0u;y<2u;y+=1u) {
+        for(var x=0u;x<2u;x+=1u) {
+            let weight=vec2<f32>(weights[2u*x].x+weights[2u*x+1u].x,weights[2u*y].y+weights[2u*y+1u].y);
+            let offset=vec2<f32>(weights[2u*x+1u].x,weights[2u*y+1u].y)/weight;
+            let coordinate=(floor(pixel)+vec2<f32>(f32(2u*x),f32(2u*y))-0.5+offset)/dimensions;
+            result+=textureSampleLevel(tex,smp,coordinate,0.0)*weight.x*weight.y;
+        }
+    }
+    return result;
+}

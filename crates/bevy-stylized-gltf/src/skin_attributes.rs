@@ -1,5 +1,8 @@
 //! Current optional second skin-influence set, shared with render passes.
-use bevy::{gltf::GltfPlugin, mesh::{MeshVertexAttribute, VertexFormat}};
+use bevy::{
+    gltf::GltfPlugin,
+    mesh::{MeshVertexAttribute, VertexFormat},
+};
 
 pub const ATTRIBUTE_SECONDARY_JOINTS: MeshVertexAttribute = MeshVertexAttribute::new(
     "_NPR_JOINTS_1",

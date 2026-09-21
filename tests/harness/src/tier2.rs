@@ -405,8 +405,8 @@ mod tests {
                 chunk[0] = 255 - chunk[0];
             }
         }
-        let global = evaluate_tier2("global", &a, &b, [0, 0, 0], Tier2Thresholds::default())
-            .expect("diff");
+        let global =
+            evaluate_tier2("global", &a, &b, [0, 0, 0], Tier2Thresholds::default()).expect("diff");
         assert!(!global.passed);
         let mask: Vec<bool> = (0..64 * 64).map(|i| i % 64 < 32 && i / 64 < 32).collect();
         let region = evaluate_tier2_region(
@@ -420,7 +420,17 @@ mod tests {
         .expect("region");
         assert!(region.passed, "{:?}", region.violations);
         assert_eq!(region.pixels, 32 * 32);
-        assert!(evaluate_tier2_region("global", "empty", &a, &b, &vec![false; 64 * 64], Tier2Thresholds::default()).is_err());
+        assert!(
+            evaluate_tier2_region(
+                "global",
+                "empty",
+                &a,
+                &b,
+                &vec![false; 64 * 64],
+                Tier2Thresholds::default()
+            )
+            .is_err()
+        );
     }
 }
 

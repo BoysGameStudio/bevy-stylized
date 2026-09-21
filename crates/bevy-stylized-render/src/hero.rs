@@ -92,7 +92,7 @@ impl Default for StylizedGenshinLightingParams {
 /// Opt-in authored matcap/specular branch; colors precede their gamma nodes.
 #[derive(Clone, Copy, Debug, PartialEq, Reflect, ShaderType)]
 pub struct StylizedMetalParams {
-    /// Enabled, matcap brightness, horizontal tile scale, reserved.
+    /// Enabled, matcap brightness, horizontal tile scale, source specular-ramp switch.
     pub controls: bevy::math::Vec4,
     pub dark: bevy::math::Vec4,
     pub light: bevy::math::Vec4,
@@ -134,8 +134,10 @@ pub struct StylizedHeroParams {
     /// Zero preserves the existing profile behavior.
     pub authored_energy: bevy::math::Vec4,
     pub metal: StylizedMetalParams,
-    /// Source bump scale (0 disables), sequential prepared ramp, level-zero controls, incoming-light body convention.
+    /// Authored normal-map strength (0 selects generic reconstruction), sequential prepared ramp, level-zero controls, incoming-light body convention.
     pub source_conventions: bevy::math::Vec4,
+    /// Source Alpha emission: gamma-decoded tint times strength in RGB, enable in W.
+    pub source_emission: bevy::math::Vec4,
 }
 
 impl Default for StylizedHeroParams {
@@ -148,6 +150,7 @@ impl Default for StylizedHeroParams {
             authored_energy: bevy::math::Vec4::ZERO,
             metal: StylizedMetalParams::default(),
             source_conventions: bevy::math::Vec4::ZERO,
+            source_emission: bevy::math::Vec4::ZERO,
         }
     }
 }
@@ -457,6 +460,8 @@ impl StylizedHeroMaterial {
         };
         material.params.source_conventions =
             metal_vector("source_conventions", material.params.source_conventions);
+        material.params.source_emission =
+            metal_vector("source_emission", material.params.source_emission);
         let m = &mut material.params.metal;
         m.controls = metal_vector("metal_controls", m.controls);
         m.dark = metal_vector("metal_dark", m.dark);
@@ -651,10 +656,14 @@ impl Material for StylizedHeroMaterial {
         }
     }
 
-    // prepass 参与在类型级开启（默认 prepass shader 即可）；**成本门控在
+    // prepass 参与在类型级开启（共享裁切/完整蒙皮 shader）；**成本门控在
     // 相机**：只有带 DepthPrepass/NormalPrepass 组件的相机才产生 prepass
     // 开销（StylizedScreenOutline 的 per-camera opt-in），默认相机零成本。
     fn prepass_vertex_shader() -> ShaderRef {
+        crate::skinning::COMPLETE_SKIN_PREPASS_SHADER.into()
+    }
+
+    fn prepass_fragment_shader() -> ShaderRef {
         crate::skinning::COMPLETE_SKIN_PREPASS_SHADER.into()
     }
 
@@ -677,6 +686,9 @@ impl Material for StylizedHeroMaterial {
         key: bevy::pbr::MaterialPipelineKey<Self>,
     ) -> Result<(), bevy::render::render_resource::SpecializedMeshPipelineError> {
         crate::skinning::specialize_secondary_skin(descriptor, layout)?;
+        if let Some(fragment) = descriptor.fragment.as_mut() {
+            fragment.shader_defs.push("NPR_PREPASS_HERO".into());
+        }
         let debug_define = match key.bind_group_data.debug_view {
             StylizedHeroDebugView::Beauty => None,
             StylizedHeroDebugView::LightingFactors => Some("STYLIZED_LIGHTING_FACTORS"),

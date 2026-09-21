@@ -17,12 +17,17 @@ python3 tools/dev.py assets prepare --pack gacha-authoring
 python3 tools/dev.py assets build --pack genshin-odette --blender blender
 ```
 
-The current recipe is `assets/recipes/genshin-static-v4.json`. The build runner
+The default recipe is `assets/recipes/genshin-static-emission-v1.json`: static
+body/face with source outlines, metal/specular ramps, optimized normals and
+emission. `Eff_001` and `Eff_002` are excluded from runtime export and reference
+captures; the original meshes remain in the authoring blend. The build runner
 in `tools/assets/build.py` supplies explicit paths/options to
 `tools/blender/import_character.py`, `inspect_character.py`,
 `capture_character.py` and `export_character.py`, followed by strict profile
 compilation and the current character comparison-case preparation stages.
 Use this runner rather than invoking an exporter with guessed arguments.
+`tools/assets/build.py::DEFAULT_RECIPE` owns the shared build/isolation default.
+Use `--recipe` only when deliberately selecting a regression variant.
 
 ## Responsibilities and outputs
 
@@ -51,7 +56,7 @@ must fail rather than silently guessing a compatible result.
 
 ## Boundaries and validation
 
-Only the current qualified source/recipe is supported. The deleted synthetic
+Only the current qualified source and declared static recipe scopes are supported. The deleted synthetic
 reference exporter is not an alternate path or a compatibility requirement.
 Current glTF attribute and profile schemas own the runtime data contract; the
 [static capture contract](../reference/09-static-character-capture.md) owns the

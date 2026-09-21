@@ -246,7 +246,9 @@ pub fn build_portable_instances(app: &mut App, n: u32) {
     let cols = (n as f32).sqrt().ceil() as u32;
     for i in 0..n {
         let x = (i % cols) as f32 - cols as f32 * 0.5;
-        let y = (i / cols) as f32 * 0.5;
+        // Diameter is 0.6: leave a gap so instanced draw ordering cannot
+        // choose different surfaces at equal-depth sphere intersections.
+        let y = (i / cols) as f32 * 0.65;
         app.world_mut().spawn((
             Mesh3d(mesh.clone()),
             MeshMaterial3d(material.clone()),

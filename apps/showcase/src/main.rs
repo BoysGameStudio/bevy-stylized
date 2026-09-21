@@ -18,6 +18,21 @@ fn main() {
         #[cfg(feature = "inspector")]
         return;
     }
+    if args.first().is_some_and(|arg| arg == "workloads") {
+        #[cfg(feature = "inspector")]
+        {
+            if let Err(error) = showcase::workloads::run(&args[1..]) {
+                eprintln!("workloads: {error}");
+                std::process::exit(1);
+            }
+            return;
+        }
+        #[cfg(not(feature = "inspector"))]
+        {
+            eprintln!("workloads requires --features inspector");
+            std::process::exit(2);
+        }
+    }
     let capture_mode = args.iter().any(|a| a == "--capture");
     let name = args
         .iter()

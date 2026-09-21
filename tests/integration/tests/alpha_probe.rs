@@ -23,9 +23,26 @@ use golden_harness::capture;
 #[test]
 #[ignore = "requires GPU; run the explicit GPU lane"]
 fn alpha_mask_cutout_probe() {
-    let Some(resources) = capture::probe_render_resources() else {
-        return;
-    };
+    render_mask(0, 0);
+}
+
+#[test]
+#[ignore = "requires GPU; run the explicit GPU lane"]
+fn native_mask_prepass_preserves_cutouts_for_all_classes() {
+    for class in 0..3 {
+        let forward = render_mask(class, 0);
+        for mode in [1, 2] {
+            let prepass = render_mask(class, mode);
+            assert_eq!(
+                forward.data, prepass.data,
+                "class {class}: prepass {mode} must preserve cutouts and shading"
+            );
+        }
+    }
+}
+
+fn render_mask(class: u8, prepass: u8) -> golden_harness::CapturedImage {
+    let resources = capture::probe_render_resources().expect("required GPU unavailable");
     let mut app = App::new();
     app.add_plugins(
         DefaultPlugins
@@ -47,8 +64,14 @@ fn alpha_mask_cutout_probe() {
     );
     app.add_plugins(StylizedPlugin::default());
     capture::install(&mut app);
+    golden_harness::readiness::install(&mut app);
     app.finish();
     app.cleanup();
+    {
+        let mut view = app.world_mut().resource_mut::<StylizedViewSettings>();
+        view.0.key_light_direction = Vec3::Z;
+        view.0.ambient_override = Some(bevy::color::LinearRgba::WHITE);
+    }
 
     // 64x64: alpha=255 左半, 0 右半
     let mut data = Vec::new();
@@ -76,14 +99,65 @@ fn alpha_mask_cutout_probe() {
         .world_mut()
         .resource_mut::<Assets<Mesh>>()
         .add(bevy::math::primitives::Rectangle::new(2.0, 2.0));
-    let material = app
+    let params = StylizedCelParams::default().with_alpha_cutoff(0.5);
+    let entity = app
+        .world_mut()
+        .spawn((Mesh3d(mesh.clone()), Transform::IDENTITY))
+        .id();
+    match class {
+        0 => {
+            let material = app
+                .world_mut()
+                .resource_mut::<Assets<StylizedCelMaterial>>()
+                .add(StylizedCelMaterial {
+                    params,
+                    base_color_texture: Some(base.clone()),
+                    ..Default::default()
+                });
+            app.world_mut()
+                .entity_mut(entity)
+                .insert(MeshMaterial3d(material));
+        }
+        1 => {
+            let mut material = StylizedCharacterMaterial {
+                base_color_texture: Some(base.clone()),
+                ..Default::default()
+            };
+            material.params.cel = params;
+            let material = app
+                .world_mut()
+                .resource_mut::<Assets<StylizedCharacterMaterial>>()
+                .add(material);
+            app.world_mut()
+                .entity_mut(entity)
+                .insert(MeshMaterial3d(material));
+        }
+        _ => {
+            let mut material = StylizedHeroMaterial {
+                base_color_texture: Some(base.clone()),
+                ..Default::default()
+            };
+            material.params.character.cel = params;
+            let material = app
+                .world_mut()
+                .resource_mut::<Assets<StylizedHeroMaterial>>()
+                .add(material);
+            app.world_mut()
+                .entity_mut(entity)
+                .insert(MeshMaterial3d(material));
+        }
+    }
+    let mut background = StylizedCelMaterial::default();
+    background.params.base_color_factor = bevy::math::Vec4::new(0., 1., 0., 1.);
+    let background = app
         .world_mut()
         .resource_mut::<Assets<StylizedCelMaterial>>()
-        .add(StylizedCelMaterial {
-            params: StylizedCelParams::default().with_alpha_cutoff(0.5),
-            base_color_texture: Some(base.clone()),
-            ..StylizedCelMaterial::default()
-        });
+        .add(background);
+    app.world_mut().spawn((
+        Mesh3d(mesh),
+        MeshMaterial3d(background),
+        Transform::from_xyz(0., 0., -0.1),
+    ));
     // 读回：确认 alpha 数据在资产内正确。
     {
         let img = app
@@ -95,21 +169,31 @@ fn alpha_mask_cutout_probe() {
         let right_alpha = data[(32 * 64 + 40) * 4 + 3];
         assert_eq!(right_alpha, 0, "texture alpha must be 0 on the right half");
     }
-    app.world_mut()
-        .spawn((Mesh3d(mesh), MeshMaterial3d(material), Transform::IDENTITY));
     let target = {
         let mut images = app.world_mut().resource_mut::<Assets<Image>>();
         capture::create_capture_target(&mut images, 256, 256)
     };
-    app.world_mut().spawn((
-        Camera3d::default(),
-        capture::capture_target_bundle(&target),
-        Tonemapping::None,
-        Transform::from_xyz(0.0, 0.0, 3.0).looking_at(Vec3::ZERO, Vec3::Y),
-    ));
-    for _ in 0..24 {
-        app.update();
+    let camera = app
+        .world_mut()
+        .spawn((
+            Camera3d::default(),
+            capture::capture_target_bundle(&target),
+            Tonemapping::None,
+            Transform::from_xyz(0.0, 0.0, 3.0).looking_at(Vec3::ZERO, Vec3::Y),
+        ))
+        .id();
+    if prepass == 1 {
+        app.world_mut()
+            .entity_mut(camera)
+            .insert(bevy::core_pipeline::prepass::DepthPrepass);
     }
+    if prepass == 2 {
+        app.world_mut().entity_mut(camera).insert((
+            bevy::core_pipeline::prepass::DepthPrepass,
+            bevy::core_pipeline::prepass::NormalPrepass,
+        ));
+    }
+    golden_harness::readiness::wait(&mut app, 24);
     let request = capture::request_capture(app.world_mut(), target);
     let mut frame = None;
     for _ in 0..600 {
@@ -129,10 +213,11 @@ fn alpha_mask_cutout_probe() {
     let right = px(180, 128);
     assert!(
         left[0] > 150 && left[1] < 150,
-        "left half shows texture: {left:?}"
+        "class {class}, prepass {prepass}: left half shows texture: {left:?}"
     );
     assert!(
-        right[0] < 80 && right[1] < 80,
-        "right half discarded to background: {right:?}"
+        right[0] < 80 && right[1] > 150,
+        "class {class}, prepass {prepass}: right half must reveal the green surface behind it: {right:?}"
     );
+    frame
 }

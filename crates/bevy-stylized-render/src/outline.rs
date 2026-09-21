@@ -280,12 +280,33 @@ impl Material for StylizedOutlineMaterial {
         _key: MaterialPipelineKey<Self>,
     ) -> Result<(), SpecializedMeshPipelineError> {
         crate::skinning::specialize_secondary_skin(descriptor, layout)?;
+        if layout.0.contains(ATTRIBUTE_OUTLINE_SOURCE_POSITION) {
+            let extra = layout
+                .0
+                .get_layout(&[ATTRIBUTE_OUTLINE_SOURCE_POSITION.at_shader_location(10)])?;
+            descriptor.vertex.buffers[0]
+                .attributes
+                .extend(extra.attributes);
+            descriptor
+                .vertex
+                .shader_defs
+                .push("NPR_OUTLINE_SOURCE_POSITION".into());
+        }
         // Inverted hull：剔除正面。
         descriptor.primitive.cull_mode = Some(Face::Front);
         descriptor.label = Some("stylized opaque hull".into());
         Ok(())
     }
 }
+
+/// CONTROL0 is a static glTF-local hull target only when explicitly requested
+/// by source_params.z. Its generic control-vector meaning is unchanged otherwise.
+pub const ATTRIBUTE_OUTLINE_SOURCE_POSITION: bevy::mesh::MeshVertexAttribute =
+    bevy::mesh::MeshVertexAttribute::new(
+        "_NPR_CONTROL0",
+        0x4E50_5200_0000_000A,
+        bevy::render::render_resource::VertexFormat::Float32x3,
+    );
 
 /// 挂在带 `Mesh3d` 实体上：为其生成一个轮廓副本实体。
 ///
@@ -333,6 +354,7 @@ pub fn sync_outline_replicas(
             Option<Ref<StylizedOutline>>,
             Option<Ref<crate::host_material::HostOutline>>,
             Option<Ref<crate::host_material::HostInstanceInput>>,
+            Option<Ref<crate::instance::StylizedInstanceData>>,
             Option<Ref<SkinnedMesh>>,
             Option<Ref<MorphWeights>>,
             Option<Ref<MeshMorphWeights>>,
@@ -352,14 +374,18 @@ pub fn sync_outline_replicas(
         Entity,
         &StylizedOutlineReplica,
         Option<&StylizedOutlineSourceBounds>,
+        Option<&bevy::mesh::MeshTag>,
     )>,
 ) {
     let mut existing = std::collections::HashMap::new();
-    for (entity, replica, bounds) in &replicas {
+    for (entity, replica, bounds, tag) in &replicas {
         if sources.get(replica.source).is_err() {
             commands.entity(entity).despawn();
         } else {
-            existing.insert(replica.source, (entity, bounds.is_some()));
+            existing.insert(
+                replica.source,
+                (entity, bounds.is_some(), tag.map(|tag| tag.0)),
+            );
         }
     }
     for (
@@ -368,6 +394,7 @@ pub fn sync_outline_replicas(
         outline,
         host_outline,
         host_input,
+        instance,
         skin,
         morph,
         morph_reference,
@@ -382,7 +409,7 @@ pub fn sync_outline_replicas(
         }
         let current = existing.get(&entity).copied();
         let new = current.is_none();
-        let mut target = if let Some((replica, _)) = current {
+        let mut target = if let Some((replica, _, _)) = current {
             commands.entity(replica)
         } else {
             commands.spawn((
@@ -417,7 +444,7 @@ pub fn sync_outline_replicas(
             if new || mesh.is_changed() || bounds.is_changed() {
                 target.insert((*bounds, StylizedOutlineSourceBounds));
             }
-        } else if current.is_some_and(|(_, mirrored)| mirrored) {
+        } else if current.is_some_and(|(_, mirrored, _)| mirrored) {
             target.remove::<(bevy::camera::primitives::Aabb, StylizedOutlineSourceBounds)>();
         }
         if let Some(outline) = outline
@@ -425,6 +452,22 @@ pub fn sync_outline_replicas(
         {
             target.remove::<MeshMaterial3d<crate::host_material::HostMaterial<StylizedOutlineMaterial>>>();
             target.insert(MeshMaterial3d(outline.material.clone()));
+        }
+        if host_outline.is_none() {
+            // A hull has its own draw instance. Never copy a source table slot:
+            // this material has no table binding. Zero retains exact unit width
+            // for existing authored shells; non-default scale uses the same
+            // seven-bit quantization as the native instance contract.
+            let scale = instance.as_ref().map_or(1.0, |data| data.outline_scale);
+            let tag = if scale == 1.0 {
+                0
+            } else {
+                0x8000_0000 | ((scale.clamp(0.0, 2.0) * 63.5).round() as u32)
+            };
+            if current.and_then(|(_, _, old)| old) != Some(tag) {
+                target.insert(bevy::mesh::MeshTag(tag));
+            }
+            target.remove::<crate::host_material::HostInstanceInput>();
         }
         if let Some(outline) = host_outline {
             if new || outline.is_changed() {

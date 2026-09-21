@@ -72,6 +72,55 @@ def make_project(directory):
 
 
 class RunLifecycle(unittest.TestCase):
+    def test_build_and_isolation_default_to_complete_recipe_and_record_overrides(self):
+        import hashlib
+        from assets.build import DEFAULT_RECIPE
+        from checks.isolated import recipe_path
+        root = pathlib.Path(__file__).resolve().parents[2]
+        alternate = pathlib.Path('assets/recipes/genshin-static-normals-v1.json')
+        recipe = json.loads((root/DEFAULT_RECIPE).read_text())
+        self.assertTrue(recipe['outlines'])
+        self.assertEqual(recipe['material_overrides'], {})
+        self.assertEqual(set(recipe['excluded_effect_meshes']), {'Eff_001', 'Eff_002'})
+        self.assertTrue(set(recipe['meshes']).isdisjoint(recipe['excluded_effect_meshes']))
+        for isolation in [False, True]:
+            for explicit in [False, True]:
+                with self.subTest(isolation=isolation, explicit=explicit), tempfile.TemporaryDirectory() as tmp:
+                    project = make_project(tmp)
+                    for source in [DEFAULT_RECIPE, alternate]:
+                        dest = project.root/source
+                        dest.parent.mkdir(parents=True, exist_ok=True)
+                        dest.write_bytes((root/source).read_bytes())
+                    selected = alternate if explicit else DEFAULT_RECIPE
+                    self.assertEqual(recipe_path(project, None), DEFAULT_RECIPE)
+                    argv = ['dev.py', '--root', str(project.root), '--run-id', 'selection']
+                    argv += ['check', '--lane', 'independence'] if isolation else ['assets', 'build', '--pack', 'genshin-odette']
+                    if explicit:argv += ['--recipe', str(selected)]
+                    target = 'checks.isolated.validate' if isolation else 'assets.build.build'
+                    with patch.object(sys, 'argv', argv), patch(target, return_value=project.root/'candidate') as call, contextlib.redirect_stdout(io.StringIO()):
+                        self.assertEqual(dev.main(), 0)
+                    chosen = call.call_args.kwargs['recipe'] if isolation else call.call_args.args[3]
+                    self.assertEqual(chosen, str(selected))
+                    lane = 'independence' if isolation else 'assets-build'
+                    report = project.read_report(lane, 'selection', project.source_identity())
+                    self.assertEqual(report['inputs']['recipe']['sha256'], hashlib.sha256((root/selected).read_bytes()).hexdigest())
+
+    def test_isolation_recipe_stays_inside_repository_authoring_inputs(self):
+        from checks.isolated import recipe_path
+        with tempfile.TemporaryDirectory() as tmp:
+            project = make_project(tmp)
+            folder = project.root/'assets/recipes'
+            folder.mkdir(parents=True)
+            selected = folder/'selected.json'
+            selected.write_text('{"id":"selected"}')
+            self.assertEqual(recipe_path(project, selected), pathlib.Path('assets/recipes/selected.json'))
+            outside = project.root/'generated.json'
+            outside.write_text('{}')
+            for invalid in [outside, folder/'missing.json']:
+                with self.assertRaises(ValueError):recipe_path(project, invalid)
+            (folder/'escape.json').symlink_to(outside)
+            with self.assertRaises(ValueError):recipe_path(project, folder/'escape.json')
+
     def test_success_followed_by_failure_block_or_interrupt_replaces_summary(self):
         for error, expected, status in [(CheckFailed('broken'), 1, 'FAIL'),
                                         (ResourceBlocked('GPU'), 2, 'BLOCKED'),

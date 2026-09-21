@@ -226,7 +226,9 @@ fn complete_skin_and_morph_match_baked_surface_and_outline() {
             );
             let visible = actual
                 .data
-                .chunks_exact(4)
+                .as_chunks::<4>()
+                .0
+                .iter()
                 .filter(|p| p[0] > 100 && p[1] < 50 && p[2] < 50)
                 .count();
             assert!(
@@ -289,7 +291,9 @@ fn authored_outline_selects_all_five_alpha_classes_and_disabled_class_falls_back
         );
         let count = frame
             .data
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .filter(|p| (0..3).all(|i| p[i].abs_diff(expected[i]) <= 2))
             .count();
         assert!(

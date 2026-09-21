@@ -50,6 +50,54 @@ pub struct GenshinFaceTints {
     pub night: [[f32; 4]; 3],
 }
 
+/// Source-unit hull settings evaluated from the supported static outline graph.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GenshinOutlineInput {
+    pub width: f32,
+    pub colors: [[f32; 4]; 5],
+    pub enabled_mask: u32,
+    pub force_first: bool,
+    pub gamma: f32,
+    pub class_texture: Option<String>,
+    #[serde(default)]
+    pub prepared_position: bool,
+}
+
+/// Authored Genshin metal tint and highlight inputs, before source gamma nodes.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GenshinMetalInput {
+    pub matcap: String,
+    pub specular_ramp: Option<String>,
+    pub brightness: f32,
+    pub tile_scale: f32,
+    pub dark: [f32; 4],
+    pub light: [f32; 4],
+    pub shadow: [f32; 4],
+    pub specular: [f32; 4],
+    pub specular_color: [f32; 4],
+    pub sharp_color: [f32; 4],
+}
+
+/// Normal-map reconstruction is a source policy, not an ordinary tangent XYZ map.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GenshinNormalInput {
+    pub texture: String,
+    pub method: String,
+    pub strength: f32,
+}
+
+/// Enabled source Alpha emission closure; zero strength still mixes toward black.
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct GenshinEmissionInput {
+    pub method: String,
+    pub tint: [f32; 4],
+    pub strength: f32,
+}
+
 /// One exported material with explicit source texture semantics.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -69,6 +117,14 @@ pub struct GenshinMaterialInput {
     pub highlight: Option<GenshinHighlightInput>,
     #[serde(default)]
     pub face_tints: Option<GenshinFaceTints>,
+    #[serde(default)]
+    pub outline: Option<GenshinOutlineInput>,
+    #[serde(default)]
+    pub metal: Option<GenshinMetalInput>,
+    #[serde(default)]
+    pub normal: Option<GenshinNormalInput>,
+    #[serde(default)]
+    pub emission: Option<GenshinEmissionInput>,
     pub ramp: Option<String>,
     pub shadow_position: f32,
     pub ramp_width: f32,
@@ -119,9 +175,18 @@ pub fn map_bundle(
         if m.name.is_empty() || result.contains_key(&m.name) {
             return Err("empty/duplicate material name".into());
         }
-        if m.metallic || m.specular_ramp || m.packed_normal {
+        if m.packed_normal != m.normal.is_some()
+            || (m.packed_normal
+                && (m.lighting.is_none() || matches!(m.role, GenshinMaterialRole::Face)))
+        {
             return Err(format!(
-                "{}: unsupported active feature in static recipe",
+                "{}: enabled normals require complete body-shader normal inputs",
+                m.name
+            ));
+        }
+        if m.metallic != m.metal.is_some() || (m.metallic && m.lighting.is_none()) {
+            return Err(format!(
+                "{}: enabled metal requires complete source lighting/metal inputs",
                 m.name
             ));
         }
@@ -306,6 +371,129 @@ pub fn map_bundle(
                 }
             }
         }
+        if let Some(emission) = &m.emission {
+            if emission.method != "genshin-alpha-emission/v1"
+                || !m.cubic_base_color
+                || m.lighting.is_none()
+                || matches!(m.role, GenshinMaterialRole::Face)
+                || emission
+                    .tint
+                    .iter()
+                    .chain([&emission.strength])
+                    .any(|v| !v.is_finite() || *v < 0.0)
+            {
+                return Err(format!("{}: unsupported source emission inputs", m.name));
+            }
+            for (i, tint) in emission.tint.iter().take(3).enumerate() {
+                let value = tint.powf(2.2) * emission.strength;
+                if !value.is_finite() {
+                    return Err("source emission radiance overflow".into());
+                }
+                descriptor
+                    .static_params
+                    .insert(format!("source_emission_{i}"), value);
+            }
+            descriptor
+                .static_params
+                .insert("source_emission_3".into(), 1.0);
+        }
+        if let Some(normal) = &m.normal {
+            if normal.method != "genshin-optimized-bump/v1"
+                || !normal.strength.is_finite()
+                || normal.strength <= 0.0
+                || normal.strength > 1.0
+            {
+                return Err(format!(
+                    "{}: unsupported normal reconstruction or strength",
+                    m.name
+                ));
+            }
+            texture(&normal.texture, StylizedTextureSemantic::Normal)?;
+            descriptor
+                .static_params
+                .insert("source_conventions_0".into(), normal.strength);
+        }
+        if let Some(metal) = &m.metal {
+            let mut fields = vec![
+                ("metal_controls_0".to_owned(), 1.0),
+                ("metal_controls_1".to_owned(), metal.brightness),
+                ("metal_controls_2".to_owned(), metal.tile_scale),
+                ("metal_controls_3".to_owned(), f32::from(m.specular_ramp)),
+            ];
+            for (key, values) in [
+                ("metal_dark", metal.dark),
+                ("metal_light", metal.light),
+                ("metal_shadow", metal.shadow),
+                ("metal_specular", metal.specular),
+                ("metal_specular_color", metal.specular_color),
+                ("metal_sharp_color", metal.sharp_color),
+            ] {
+                for (i, value) in values.into_iter().enumerate() {
+                    fields.push((format!("{key}_{i}"), value));
+                }
+            }
+            if fields.iter().any(|(_, v)| !v.is_finite() || *v < 0.0) || metal.specular[0] <= 0.0 {
+                return Err(format!("{}: invalid source metal parameters", m.name));
+            }
+            texture(&metal.matcap, StylizedTextureSemantic::MatCap)?;
+            if m.specular_ramp {
+                let index = texture(
+                    metal
+                        .specular_ramp
+                        .as_deref()
+                        .ok_or("enabled metal ramp requires its source texture")?,
+                    StylizedTextureSemantic::Ramp,
+                )?;
+                descriptor
+                    .static_params
+                    .insert("specular_ramp_index".into(), index as f32);
+                descriptor
+                    .static_params
+                    .insert("specular_ramp_linear".into(), 1.0);
+            } else if metal.specular_ramp.is_some() {
+                return Err("inactive metal ramp must not bind a texture".into());
+            }
+            descriptor.static_params.extend(fields);
+        }
+        if let Some(outline) = &m.outline {
+            if !outline.width.is_finite()
+                || outline.width <= 0.0
+                || !outline.gamma.is_finite()
+                || outline.gamma <= 0.0
+                || outline.enabled_mask > 15
+                || outline
+                    .colors
+                    .iter()
+                    .flatten()
+                    .any(|v| !v.is_finite() || *v < 0.0)
+                || (!outline.force_first && outline.class_texture.is_none())
+            {
+                return Err(format!("{}: invalid or incomplete outline input", m.name));
+            }
+            if let Some(uri) = &outline.class_texture {
+                let index = texture(uri, StylizedTextureSemantic::DiscreteClassification)?;
+                descriptor
+                    .static_params
+                    .insert("outline_class_texture_index".into(), index as f32);
+            }
+            descriptor.static_params.extend([
+                ("outline_source_width".into(), outline.width),
+                ("outline_gamma".into(), outline.gamma),
+                ("outline_enabled_mask".into(), outline.enabled_mask as f32),
+                ("outline_force_first".into(), f32::from(outline.force_first)),
+                (
+                    "outline_source_position".into(),
+                    f32::from(outline.prepared_position),
+                ),
+            ]);
+            for (row, color) in outline.colors.iter().enumerate() {
+                for (channel, value) in color.iter().take(3).enumerate() {
+                    descriptor
+                        .static_params
+                        .insert(format!("outline_color_{row}_{channel}"), *value);
+                }
+            }
+        }
         descriptor.static_params.extend([
             ("shadow_position".into(), m.shadow_position),
             ("ramp_width".into(), m.ramp_width),
@@ -389,6 +577,10 @@ mod tests {
                 lighting: None,
                 highlight: None,
                 face_tints: None,
+                outline: None,
+                metal: None,
+                normal: None,
+                emission: None,
                 face_sdf: Some("textures/sdf.png".into()),
                 shadow_position: 0.55,
                 ramp_width: 1.,
@@ -407,6 +599,142 @@ mod tests {
         i.materials[0].face_sdf = None;
         assert!(map_bundle(&i).is_err());
     }
+    #[test]
+    fn source_outline_colors_width_and_disabled_classes_are_preserved() {
+        let mut i = input();
+        i.materials[0].outline = Some(GenshinOutlineInput {
+            width: 0.0025,
+            colors: [[0.2, 0.3, 0.4, 1.0]; 5],
+            enabled_mask: 14,
+            force_first: false,
+            gamma: 2.2,
+            class_texture: Some("textures/outline.png".into()),
+            prepared_position: true,
+        });
+        let mapped = map_bundle(&i).unwrap();
+        let d = &mapped["face"];
+        assert_eq!(d.static_params["outline_source_width"], 0.0025);
+        assert_eq!(d.static_params["outline_enabled_mask"], 14.0);
+        assert_eq!(d.static_params["outline_color_4_2"], 0.4);
+        let index = d.static_params["outline_class_texture_index"] as usize;
+        assert_eq!(
+            d.textures[index].semantic,
+            StylizedTextureSemantic::DiscreteClassification
+        );
+        i.materials[0].outline.as_mut().unwrap().class_texture = Some("../outside.png".into());
+        assert!(map_bundle(&i).is_err());
+        i.materials[0].outline.as_mut().unwrap().class_texture = None;
+        assert!(map_bundle(&i).is_err());
+    }
+
+    fn body_input() -> GenshinBundleInput {
+        let mut input = input();
+        let material = &mut input.materials[0];
+        material.name = "body".into();
+        material.role = GenshinMaterialRole::Body;
+        material.ilm = Some("ilm.png".into());
+        material.ramp = Some("shadow.png".into());
+        material.lighting = Some(GenshinLightingInput {
+            use_lightmap_ao: 1.,
+            use_vertex_ao: 0.,
+            use_shadow_ramp: 1.,
+            lightmap_constant: [0., 0., 0., 1.],
+            specular_color: [1.; 4],
+            specular_rows: [[4., 0.1, 1., 0.]; 5],
+            shadow_rows: [[0.01, 0.5, 0., 0.]; 5],
+            metal_params: [4., 1.2, 0.2, 0.95],
+            metal_color: [1.; 4],
+            metal_sharp_color: [1.; 4],
+        });
+        input
+    }
+
+    #[test]
+    fn active_metal_and_ramp_require_complete_traceable_inputs() {
+        let mut input = body_input();
+        input.materials[0].metallic = true;
+        assert!(map_bundle(&input).is_err());
+        input.materials[0].metal = Some(GenshinMetalInput {
+            matcap: "metal.png".into(),
+            specular_ramp: None,
+            brightness: 3.,
+            tile_scale: 1.,
+            dark: [0.2; 4],
+            light: [1.; 4],
+            shadow: [1.; 4],
+            specular: [4., 1.2, 0.2, 0.95],
+            specular_color: [1.; 4],
+            sharp_color: [1.; 4],
+        });
+        let mapped = map_bundle(&input).unwrap();
+        assert_eq!(mapped["body"].static_params["metal_controls_0"], 1.);
+        assert_eq!(mapped["body"].static_params["metal_controls_3"], 0.);
+        assert!(
+            !mapped["body"]
+                .static_params
+                .contains_key("specular_ramp_index")
+        );
+        input.materials[0].specular_ramp = true;
+        assert!(map_bundle(&input).is_err());
+        input.materials[0].metal.as_mut().unwrap().specular_ramp = Some("specular.png".into());
+        let mapped = map_bundle(&input).unwrap();
+        assert_eq!(mapped["body"].static_params["metal_controls_3"], 1.);
+        assert_eq!(mapped["body"].static_params["specular_ramp_linear"], 1.);
+        input.materials[0].metal.as_mut().unwrap().matcap = "../outside.png".into();
+        assert!(map_bundle(&input).is_err());
+    }
+    #[test]
+    fn source_emission_requires_raw_alpha_and_preserves_zero_strength() {
+        let mut input = body_input();
+        input.materials[0].emission = Some(GenshinEmissionInput {
+            method: "genshin-alpha-emission/v1".into(),
+            tint: [0.5, 0.7, 0.9, 1.],
+            strength: 2.,
+        });
+        assert!(map_bundle(&input).is_err());
+        input.materials[0].cubic_base_color = true;
+        let mapped = map_bundle(&input).unwrap();
+        assert!((mapped["body"].static_params["source_emission_0"] - 0.4352753).abs() < 1e-6);
+        assert!(!mapped["body"].static_flags.alpha_test);
+        input.materials[0].emission.as_mut().unwrap().strength = 0.;
+        let mapped = map_bundle(&input).unwrap();
+        assert_eq!(mapped["body"].static_params["source_emission_0"], 0.);
+        assert_eq!(mapped["body"].static_params["source_emission_3"], 1.);
+        input.materials[0].emission.as_mut().unwrap().strength = -1.;
+        assert!(map_bundle(&input).is_err());
+        input.materials[0].emission.as_mut().unwrap().strength = 2.;
+        input.materials[0].emission.as_mut().unwrap().method = "additive".into();
+        assert!(map_bundle(&input).is_err());
+    }
+
+    #[test]
+    fn normals_require_the_verified_method_texture_and_strength() {
+        let mut input = body_input();
+        input.materials[0].packed_normal = true;
+        assert!(map_bundle(&input).is_err());
+        input.materials[0].normal = Some(GenshinNormalInput {
+            texture: "normal.png".into(),
+            method: "genshin-optimized-bump/v1".into(),
+            strength: 1.,
+        });
+        let mapped = map_bundle(&input).unwrap();
+        assert_eq!(mapped["body"].static_params["source_conventions_0"], 1.);
+        assert!(
+            mapped["body"]
+                .textures
+                .iter()
+                .any(|t| t.uri == "normal.png" && t.semantic == StylizedTextureSemantic::Normal)
+        );
+        input.materials[0].normal.as_mut().unwrap().method = "ordinary-xyz".into();
+        assert!(map_bundle(&input).is_err());
+        input.materials[0].normal.as_mut().unwrap().method = "genshin-optimized-bump/v1".into();
+        input.materials[0].normal.as_mut().unwrap().strength = f32::NAN;
+        assert!(map_bundle(&input).is_err());
+        input.materials[0].normal.as_mut().unwrap().strength = 1.;
+        input.materials[0].packed_normal = false;
+        assert!(map_bundle(&input).is_err());
+    }
+
     #[test]
     fn roles_preserve_typed_channels_and_reject_unmapped_features() {
         let mut i = input();

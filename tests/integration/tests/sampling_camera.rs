@@ -107,3 +107,88 @@ fn orthographic_specular_uses_constant_camera_basis() {
     );
     assert_eq!(values[0], values[1]);
 }
+
+#[test]
+#[ignore = "requires GPU; run the explicit GPU lane"]
+fn authored_normals_keep_uv0_basis_for_backfaces_and_normalize_lighting() {
+    use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+    let mut app =
+        headless_app(golden_harness::probe_render_resources().expect("required GPU unavailable"));
+    app.world_mut()
+        .resource_mut::<StylizedViewSettings>()
+        .0
+        .key_light_direction = Vec3::new(1., 1., -1.).normalize();
+    let mut pixels = Vec::new();
+    for _ in 0..4 {
+        for x in 0..16 {
+            pixels.extend_from_slice(&[if x < 8 { 179 } else { 77 }, 153, 255, 255]);
+        }
+    }
+    let mut image = Image::new(
+        Extent3d {
+            width: 16,
+            height: 4,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        pixels,
+        TextureFormat::Rgba8Unorm,
+        bevy::asset::RenderAssetUsages::default(),
+    );
+    image.sampler = bevy::image::ImageSampler::linear();
+    let normal = app.world_mut().resource_mut::<Assets<Image>>().add(image);
+    for (x, back) in [(-0.9, false), (0.9, true)] {
+        let mut mesh = quad_mesh();
+        // Exported V is top-down. Basis uses UV0 even when the backface
+        // selects the negative-X normal encoded in the UV1 image region.
+        mesh.insert_attribute(
+            Mesh::ATTRIBUTE_UV_0,
+            vec![[0., 1.], [0.4, 1.], [0.4, 0.], [0., 0.]],
+        );
+        mesh.insert_attribute(
+            Mesh::ATTRIBUTE_UV_1,
+            vec![[0.6, 1.], [0.8, 1.], [0.8, 0.], [0.6, 0.]],
+        );
+        if back {
+            mesh.insert_indices(bevy::mesh::Indices::U32(vec![0, 2, 1, 0, 3, 2]));
+        }
+        let mesh = app.world_mut().resource_mut::<Assets<Mesh>>().add(mesh);
+        let mut material = StylizedHeroMaterial {
+            debug_view: StylizedHeroDebugView::NormalHalfDot,
+            double_sided: true,
+            ..Default::default()
+        };
+        material.packed_normal_texture = Some(normal.clone());
+        material.params.source_conventions.x = 1.;
+        material.params.genshin.controls.z = 1.;
+        let material = app
+            .world_mut()
+            .resource_mut::<Assets<StylizedHeroMaterial>>()
+            .add(material);
+        app.world_mut().spawn((
+            Mesh3d(mesh),
+            MeshMaterial3d(material),
+            Transform::from_xyz(x, 0., 0.),
+        ));
+    }
+    let image = capture_frame_with_projection(
+        &mut app,
+        Projection::Orthographic(OrthographicProjection {
+            scaling_mode: bevy::camera::ScalingMode::FixedVertical {
+                viewport_height: 3.8,
+            },
+            ..OrthographicProjection::default_3d()
+        }),
+    );
+    let values = [70, 186].map(|x| image.data[(128 * SIZE as usize + x) * 4]);
+    // Source bump distances 1/1000 give gradients .25/.625 on this mesh.
+    // Normalized NdotH is .59227/.53600, displayed as sRGB 202/193.
+    assert!(
+        (200..=204).contains(&values[0]),
+        "authored front normal basis: {values:?}"
+    );
+    assert!(
+        (191..=195).contains(&values[1]),
+        "backface UV selection/basis must remain distinct: {values:?}"
+    );
+}

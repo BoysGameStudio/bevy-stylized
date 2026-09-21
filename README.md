@@ -32,10 +32,16 @@ No sibling game checkout or personal agent setup is required.
 
 ## Current qualification scope
 
-Gacha Setup support uses one source-locked release (currently qualified v3.6.4),
+Gacha Setup support uses one source-locked release (currently qualified v3.6.9),
 recorded in [the source lock](assets/sources/gacha-authoring.json). The external
-recipe covers an explicitly restricted static body/face variant. Raw and derived
-third-party art stays under ignored `assets/local`.
+default recipe includes source outlines, metal, specular ramps, optimized normals
+and emission for the static body/face scope. Build it with
+`python3 tools/dev.py assets build --pack genshin-odette --blender blender`, then
+open the returned `BUILD/compiled/character.glb` in the character inspector.
+The two transparent effect meshes (`Eff_001`, `Eff_002`) are explicitly excluded.
+Raw and derived third-party art stays under ignored `assets/local`; the
+[export contract](docs/reference/03-blender-export-contract.md) defines the
+material semantics and reduced-feature regression recipes.
 
 This is a development release. Public API/profile decisions, broader upstream
 parity and publication gates remain open. Current checks do not qualify every

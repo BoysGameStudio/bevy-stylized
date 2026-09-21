@@ -14,6 +14,12 @@ out.mkdir(parents=True);shutil.copytree(build/'compiled',out/'runtime')
 for name in ['authoring.json','audit.json']:shutil.copy2(build/'authoring'/name,out/name)
 scene=bpy.context.scene;scene.frame_set(recipe['frame']);bpy.context.view_layer.update()
 objects=[bpy.data.objects[n] for n in recipe['meshes']]
+# Camera fitting and shader-factor audits use the base surface. Render visibility
+# stays enabled for the authored hulls in the beauty reference.
+from blender.outline_handoff import modifiers
+outline_modifiers=[m for _,m in modifiers(objects)]
+for modifier in outline_modifiers:modifier.show_viewport=False
+bpy.context.view_layer.update()
 for obj in scene.objects:
     if obj.type=='MESH':obj.hide_render=obj not in objects
 # Assert the locked upstream light construction, including signs and rotation mode.
@@ -78,7 +84,10 @@ for label,yaw in [('front',0),('left',-.65),('right',.65)]:
             originals=[(o,list(o.data.materials)) for o in objects]
             for obj,mats in originals:
                 for index in range(len(mats)):obj.data.materials[index]=white
+            outline_states=[(m,m.show_render) for m in outline_modifiers]
+            for modifier,_ in outline_states:modifier.show_render=False
             scene.render.filepath=str(out/silhouette_name);bpy.ops.render.render(write_still=True)
+            for modifier,state in outline_states:modifier.show_render=state
             for obj,mats in originals:
                 for index,mat in enumerate(mats):obj.data.materials[index]=mat
         physical_probe = None

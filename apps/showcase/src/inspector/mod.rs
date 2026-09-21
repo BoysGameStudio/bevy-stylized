@@ -5,7 +5,7 @@ mod options;
 mod panel;
 mod runtime;
 mod state;
-mod validation;
+pub(crate) mod validation;
 use asset::Input;
 use bevy::{
     asset::AssetMetaCheck,
@@ -90,6 +90,12 @@ pub fn run(args: &[String]) -> Result<(), String> {
     gpu::install(&mut app);
     readiness::install(&mut app);
     if !headless {
+        // The two offscreen cameras are not UI contexts. A dedicated Camera2d
+        // below owns the single primary context; automatic creation races it.
+        app.insert_resource(bevy_egui::EguiGlobalSettings {
+            auto_create_primary_context: false,
+            ..default()
+        });
         app.add_plugins(bevy_egui::EguiPlugin::default())
             .add_systems(bevy_egui::EguiPrimaryContextPass, panel::ui);
     }

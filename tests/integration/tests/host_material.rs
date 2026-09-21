@@ -98,12 +98,16 @@ fn verify_material<M: HostMaterialSource + Default>(
     let first = capture_image(&mut app);
     let red = first
         .data
-        .chunks_exact(4)
+        .as_chunks::<4>()
+        .0
+        .iter()
         .filter(|p| p[0] > 100 && p[1] < 60 && p[2] < 60)
         .count();
     let green = first
         .data
-        .chunks_exact(4)
+        .as_chunks::<4>()
+        .0
+        .iter()
         .filter(|p| p[1] > 100 && p[0] < 60 && p[2] < 60)
         .count();
     assert!(
@@ -120,8 +124,10 @@ fn verify_material<M: HostMaterialSource + Default>(
     let mut right_diff = 0;
     for (i, (x, y)) in first
         .data
-        .chunks_exact(4)
-        .zip(second.data.chunks_exact(4))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .zip(second.data.as_chunks::<4>().0.iter())
         .enumerate()
     {
         if x != y {
@@ -165,7 +171,9 @@ fn verify_material<M: HostMaterialSource + Default>(
     let transparent = capture_image(&mut app);
     let blue = transparent
         .data
-        .chunks_exact(4)
+        .as_chunks::<4>()
+        .0
+        .iter()
         .filter(|p| p[2] > 100 && p[0] < 60 && p[1] < 60)
         .count();
     assert_eq!(blue, 0, "zero-alpha subject remained visible");
@@ -259,7 +267,9 @@ fn hero_blend_uses_diffuse_alpha_while_opaque_keeps_it_as_control_data() {
     assert!(
         visible
             .data
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .filter(|p| p[0] > 100 && p[1] < 20)
             .count()
             > 100

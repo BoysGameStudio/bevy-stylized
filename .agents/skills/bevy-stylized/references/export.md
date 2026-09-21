@@ -10,7 +10,8 @@ existing GLB, inspect that exact file and its provenance.
 The maintained workspace uses:
 
 - `assets/sources/gacha-authoring.json` and the character source manifest for qualified identities;
-- `assets/recipes/genshin-static-v4.json` for the current restricted static scope;
+- `assets/recipes/genshin-static-emission-v1.json` for the default static body/face scope
+  with outlines, metal/ramp, normals and emission; the two Aura effects are excluded;
 - `tools/assets/build.py` for the full pipeline and completion marker;
 - `tools/blender/export_character.py` for the runtime export stage;
 - `schemas/authoring/npr-attributes.v1.json` for the generated attribute contract;

@@ -2,7 +2,9 @@
 
 The one qualified authoring source is locked in
 [assets/sources/gacha-authoring.json](../../assets/sources/gacha-authoring.json).
-The current recipe is [genshin-static-v4.json](../../assets/recipes/genshin-static-v4.json).
+The default recipe is [genshin-static-emission-v1.json](../../assets/recipes/genshin-static-emission-v1.json),
+including source outlines, metal/ramp, optimized normals and emission. Reduced-feature
+recipes use the same source lock and remain explicit regression controls.
 There is no older synthetic-reference toolchain or version-compatibility matrix.
 
 Record the exact Blender build, addon release/archive hash, source/model scope,

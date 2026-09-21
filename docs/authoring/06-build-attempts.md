@@ -1,7 +1,9 @@
 # Asset build attempts and recovery
 
 `python3 tools/dev.py assets build --pack genshin-odette --blender blender` continues
-to use the exact prepared source packs and static recipe. It prints the actual
+to use the exact prepared source packs and the default `genshin-static-emission-v1`
+recipe (outlines, metal/ramp, normals and emission; `Eff_001`/`Eff_002` excluded).
+It prints the actual
 build directory. A failed build can be retried with the same command and inputs;
 no recipe edit, manual cache deletion or baseline acceptance is needed.
 
@@ -30,14 +32,20 @@ Environment variables are not dumped. The authoring setup uses its own copied
 add-on and Blender configuration, preserving the original source pack and normal
 preferences.
 
+Gacha Setup v3.6.9 defaults to an asynchronous UI-managed import worker. The
+project runner sets `GACHA_SETUP_ISOLATED_WORKER=1` only in its private child
+environment: the existing background Blender process performs setup synchronously
+before audit/export. It does not launch a second UI worker or change the user's
+saved add-on preferences. `authoring.json` records this execution mode.
+
 A running attempt or stage is not a success. Handled errors retain FAIL or BLOCKED
 and partial outputs; uncatchable termination may leave RUNNING. Missing required
 resources remain BLOCKED through the existing developer task contract. A new
 attempt starts the complete workflow, rather than trusting partial Blender state.
 There is no cross-stage resume engine.
 
-The current `genshin-odette` path and historical opt-in `reference` path keep their
-existing steps and scopes. Authoring/import, audit, capture, export, compile and
+The current `genshin-odette` build retains its declared stages and scope.
+Authoring/import, audit, capture, export, compile and
 matched comparison preparation do not imply full rig/effect support. Build success,
 asset integration and upstream parity require their separate validation lanes.
 

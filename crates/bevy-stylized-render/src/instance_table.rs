@@ -191,7 +191,10 @@ pub fn sync_instance_table(
             Option<&MeshMaterial3d<StylizedCharacterTableMaterial>>,
         ),
         (
-            Or<(With<StylizedInstanceSlot>, With<InstanceTableCapacityExceeded>)>,
+            Or<(
+                With<StylizedInstanceSlot>,
+                With<InstanceTableCapacityExceeded>,
+            )>,
             Without<StylizedInstanceTableEntry>,
         ),
     >,

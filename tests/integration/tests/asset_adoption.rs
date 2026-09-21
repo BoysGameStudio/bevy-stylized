@@ -60,6 +60,45 @@ fn frame(app: &mut App, target: &capture::CaptureTarget) -> CapturedImage {
     panic!("GPU capture timed out");
 }
 
+fn check_hulls(app: &mut App, materials: &StylizedMaterialSet) -> usize {
+    use bevy_stylized::prelude::StylizedOutline;
+    use bevy_stylized_render::outline::StylizedOutlineReplica;
+    for _ in 0..3 {
+        app.update();
+    }
+    let mut q = app
+        .world_mut()
+        .query::<(&StylizedMaterialAdoption, Option<&StylizedOutline>)>();
+    let mut expected = 0;
+    let mut shared = std::collections::HashMap::new();
+    for (adoption, outline) in q.iter(app.world()) {
+        let descriptor = &materials.materials[&adoption.material_name];
+        if descriptor
+            .static_params
+            .contains_key("outline_source_width")
+        {
+            expected += 1;
+            let handle = &outline.expect("declared outline was not adopted").material;
+            if let Some(previous) = shared.insert(adoption.material_name.clone(), handle.id()) {
+                assert_eq!(
+                    previous,
+                    handle.id(),
+                    "equivalent outline materials must be shared"
+                );
+            }
+        } else {
+            assert!(outline.is_none(), "unrequested outline was created");
+        }
+    }
+    let mut replicas = app.world_mut().query::<&StylizedOutlineReplica>();
+    assert_eq!(
+        replicas.iter(app.world()).count(),
+        expected,
+        "missing or stale hull replica"
+    );
+    expected
+}
+
 fn check_asset(asset: PathBuf, textured: bool) {
     let asset = asset.canonicalize().unwrap();
     let sidecar = bevy_stylized_gltf::load_sidecar(asset.with_extension("npr.json"))
@@ -141,6 +180,7 @@ fn check_asset(asset: PathBuf, textured: bool) {
         Transform::default(),
     ));
     wait_adoption(&mut app, count * 2);
+    let duplicated_hulls = check_hulls(&mut app, &materials);
     if !textured {
         let mut skins = app
             .world_mut()
@@ -206,6 +246,8 @@ fn check_asset(asset: PathBuf, textured: bool) {
     app.world_mut().despawn(second);
     wait_adoption(&mut app, count);
     let captured = frame(&mut app, &target);
+    let hulls = check_hulls(&mut app, &materials);
+    assert_eq!(duplicated_hulls, hulls * 2);
     let colors: HashSet<_> = captured
         .data
         .as_chunks::<4>()
@@ -272,6 +314,7 @@ fn check_asset(asset: PathBuf, textured: bool) {
         record["input_asset_sha256"] =
             format!("{:x}", Sha256::digest(std::fs::read(&asset).unwrap())).into();
         record["asset_ownership"] = if textured { "external" } else { "first-party" }.into();
+        record["outline_primitives"] = hulls.into();
         record["view_settings"] =
             serde_json::to_value(&app.world().resource::<StylizedViewSettings>().0).unwrap();
         record["camera"] = serde_json::json!({"look_at":center.to_array(),"position":(center+Vec3::Z*radius*3.0).to_array(),"projection":"perspective default"});
@@ -284,9 +327,14 @@ fn check_asset(asset: PathBuf, textured: bool) {
     }
     app.world_mut().despawn(root);
     wait_adoption(&mut app, 0);
-    app.world_mut()
-        .spawn((WorldAssetRoot(scene), materials, Transform::default()));
+    assert_eq!(check_hulls(&mut app, &materials), 0);
+    app.world_mut().spawn((
+        WorldAssetRoot(scene),
+        materials.clone(),
+        Transform::default(),
+    ));
     wait_adoption(&mut app, count);
+    assert_eq!(check_hulls(&mut app, &materials), hulls);
     eprintln!(
         "ASSET_INTEGRATION_PASS primitives={count} shared_materials={} reload=passed",
         ids.len()

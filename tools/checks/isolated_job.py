@@ -1,5 +1,7 @@
 """Inner independence job. This file runs only in the restricted source copy."""
 from pathlib import Path
+import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -10,7 +12,7 @@ import uuid
 root=Path.cwd();sys.path.insert(0,str(root/'tools'))
 from project import Project
 from task_runner import ResourceBlocked
-from assets.build import build
+from assets.build import build, DEFAULT_RECIPE
 project=Project(root)
 # Check the mounted namespace, not merely an unset environment variable.
 if (Path.home()/'Projects').exists():raise RuntimeError('sibling project directory visible')
@@ -42,6 +44,11 @@ def run(name,args,expected=0,env=None):
     if result.returncode!=expected:raise RuntimeError(f'{name}: got {result.returncode}, expected {expected}')
 
 def main():
+    parser=argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--recipe',default=str(DEFAULT_RECIPE))
+    args=parser.parse_args()
+    from checks.isolated import recipe_path
+    recipe=recipe_path(project,args.recipe)
     for pack in ['genshin-odette','gacha-authoring']:
         run('prepare-'+pack,['python3','tools/dev.py','assets','prepare','--pack',pack,'--mirror','/inputs/'+pack])
     run('synthetic-rebuild',['python3','tools/dev.py','assets','prepare','--pack','synthetic'])
@@ -56,7 +63,9 @@ def main():
         baseline.rmdir();shutil.move(str(backup),str(baseline))
     run('gpu',['python3','tools/dev.py','check','--lane','gpu','--required'])
     qualification['image_regression_status']='PASS'
-    character=build(project,'genshin-odette','/opt/blender/blender')
+    character=build(project,'genshin-odette','/opt/blender/blender',recipe)
+    qualification['recipe']=str(recipe)
+    qualification['recipe_sha256']=hashlib.sha256((root/recipe).read_bytes()).hexdigest()
     run('asset-integration',['python3','tools/dev.py','check','--lane','asset-integration','--required','--asset',str(character/'compiled/character.glb')])
     run('inspector-unit',['python3','tools/dev.py','check','--lane','inspector-cpu'])
     run('inspector',['python3','tools/dev.py','check','--lane','inspector','--required','--asset',str(character/'compiled/character.glb'),'--out',str(project.output/'inspector')])

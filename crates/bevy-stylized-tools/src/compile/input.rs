@@ -186,10 +186,27 @@ fn load_profile_materials(
         let data = std::fs::read(&source).map_err(|e| format!("{}: {e}", source.display()))?;
         let input: bevy_stylized_profile_genshin::GenshinBundleInput =
             serde_json::from_slice(&data).map_err(|e| e.to_string())?;
-        Ok((
-            bevy_stylized_profile_genshin::map_bundle(&input)?,
-            bevy_stylized_profile_genshin::map_view(&input)?,
-        ))
+        let materials = bevy_stylized_profile_genshin::map_bundle(&input)?;
+        let scene = gltf::Gltf::open(path).map_err(|e| e.to_string())?;
+        for primitive in scene.meshes().flat_map(|m| m.primitives()) {
+            let Some(material) = primitive.material().name().and_then(|n| materials.get(n)) else {
+                continue;
+            };
+            if material.static_params.get("outline_source_position") == Some(&1.0) {
+                if scene.skins().next().is_some() || primitive.morph_targets().next().is_some() {
+                    return Err("prepared source outline positions require a static asset".into());
+                }
+                let present = primitive.attributes().any(|(semantic, accessor)| {
+                    matches!(semantic,gltf::Semantic::Extras(ref name) if name=="NPR_CONTROL0")
+                        && accessor.dimensions() == gltf::accessor::Dimensions::Vec3
+                        && accessor.data_type() == gltf::accessor::DataType::F32
+                });
+                if !present {
+                    return Err("prepared source outline requires Float32 VEC3 _NPR_CONTROL0 on every outlined primitive".into());
+                }
+            }
+        }
+        Ok((materials, bevy_stylized_profile_genshin::map_view(&input)?))
     }
     #[cfg(not(feature = "profile-genshin"))]
     {

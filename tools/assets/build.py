@@ -10,6 +10,8 @@ import shutil
 from .prepare import verify, unpack_archive, digest
 from .attempt import completed_or_new
 
+DEFAULT_RECIPE = Path('assets/recipes/genshin-static-emission-v1.json')
+
 
 def prepared(project, name):
     manifest=json.loads((project.root/'assets/sources'/f'{name}.json').read_text())
@@ -61,7 +63,7 @@ def finish(path, inputs):
     return verify_run(path)
 
 
-def build(project, pack, blender='blender'):
+def build(project, pack, blender='blender', recipe=None):
     if pack != 'genshin-odette':
         raise ValueError('supported build pack: genshin-odette')
     raw=prepared(project,'genshin-odette')
@@ -73,7 +75,7 @@ def build(project, pack, blender='blender'):
             'source_manifest':digest(project.root/'assets/sources/genshin-odette.json'),
             'scripts':{p.name:digest(p) for p in scripts}}
     inputs['authoring_schemas']={p.name:digest(p) for p in sorted((project.root/'schemas/authoring').glob('*.json'))}
-    recipe=project.root/'assets/recipes/genshin-static-v4.json'
+    recipe=project.resolve(recipe or DEFAULT_RECIPE)
     addon=prepared(project,'gacha-authoring')
     inputs['recipe']=digest(recipe)
     inputs['addon_manifest']=digest(project.root/'assets/sources/gacha-authoring.json')
@@ -98,7 +100,10 @@ def execute_build(project, pack, blender, raw, addon, recipe, out, inputs, attem
     config.mkdir()
     runtime_addon=out/'tooling/gacha'
     shutil.copytree(addon,runtime_addon,ignore=shutil.ignore_patterns('__pycache__','*.pyc','unpacked-manifest.json'))
-    env.update(BLENDER_USER_CONFIG=str(config),STYLIZED_ADDON_ROOT=str(runtime_addon))
+    # This process is already an isolated worker. Gacha 3.6.9 otherwise starts
+    # its asynchronous UI worker and returns before the character is imported.
+    env.update(BLENDER_USER_CONFIG=str(config),STYLIZED_ADDON_ROOT=str(runtime_addon),
+               GACHA_SETUP_ISOLATED_WORKER='1')
     prefix=[blender,'--background','--python-exit-code','1','--python',tools/'bootstrap.py']
     attempt.run(project,prefix+['--python',tools/'import_character.py','--','--source',raw,'--manifest',manifest,'--recipe',recipe,'--out',out/'authoring'],out/'import.log',env)
     for script,arguments in [

@@ -74,6 +74,7 @@ struct HeroParams {
     authored_energy: vec4<f32>,
     metal: StylizedMetalParams,
     source_conventions:vec4<f32>,
+    source_emission:vec4<f32>,
 }
 
 const CEL_FLAG_ALPHA_MASK: u32 = 8u;
@@ -149,6 +150,13 @@ fn source_safe_normal(v:vec3<f32>,fallback:vec3<f32>)->vec3<f32> {
     if dot(fallback,fallback)>0.00001 {return fallback*inverseSqrt(dot(fallback,fallback));}
     return vec3<f32>(1.0,0.0,0.0);
 }
+// Bump vectors scale with pixel area. A fixed world-space epsilon would erase
+// the authored UV gradients at high resolution. Blender's zero stays zero.
+fn source_normalize(v:vec3<f32>) -> vec3<f32> {
+    let squared=dot(v,v);
+    if squared>0.0 {return v*inverseSqrt(squared);}
+    return vec3<f32>(0.0);
+}
 fn hero_view_direction(position: vec3<f32>) -> vec3<f32> {
     if view.clip_from_view[3].w == 1.0 {
         // Camera-local +Z points towards the viewer. Projection depth rows
@@ -203,33 +211,7 @@ fn vertex(vertex_in: Vertex,
     return out;
 }
 
-// Cubic B-spline reconstruction of level-zero authored control data.
-// Positive weights let each adjacent pair share one bilinear lookup.
-fn cubic_weights(t: vec2<f32>) -> array<vec2<f32>,4> {
-    let t2=t*t;
-    let t3=t2*t;
-    return array<vec2<f32>,4>(
-        (vec2<f32>(1.0)-t)*(vec2<f32>(1.0)-t)*(vec2<f32>(1.0)-t)/6.0,
-        (3.0*t3-6.0*t2+vec2<f32>(4.0))/6.0,
-        (-3.0*t3+3.0*t2+3.0*t+vec2<f32>(1.0))/6.0,
-        t3/6.0,
-    );
-}
-fn sample_cubic(tex: texture_2d<f32>, smp: sampler, uv: vec2<f32>) -> vec4<f32> {
-    let dimensions=vec2<f32>(textureDimensions(tex));
-    let pixel=uv*dimensions-0.5;
-    let weights=cubic_weights(fract(pixel));
-    var result=vec4<f32>(0.0);
-    for(var y=0u;y<2u;y+=1u) {
-        for(var x=0u;x<2u;x+=1u) {
-            let weight=vec2<f32>(weights[2u*x].x+weights[2u*x+1u].x,weights[2u*y].y+weights[2u*y+1u].y);
-            let offset=vec2<f32>(weights[2u*x+1u].x,weights[2u*y+1u].y)/weight;
-            let coordinate=(floor(pixel)+vec2<f32>(f32(2u*x),f32(2u*y))-0.5+offset)/dimensions;
-            result+=textureSampleLevel(tex,smp,coordinate,0.0)*weight.x*weight.y;
-        }
-    }
-    return result;
-}
+#import bevy_stylized_render::common::npr_common::sample_cubic
 
 @fragment
 fn fragment(vertex: VertexOutput, @builtin(front_facing) front_facing: bool) -> FragmentOutput {
@@ -261,6 +243,17 @@ fn fragment(vertex: VertexOutput, @builtin(front_facing) front_facing: bool) -> 
     let char_flags = bitcast<u32>(material.character.face_misc.y);
     let hero_flags = bitcast<u32>(material.hero_b.w);
 
+#ifdef VERTEX_UVS_A
+    // Capture derivatives before alpha discard or per-instance quality branches.
+    // Texture coordinates may vary; derivative evaluation must be quad-uniform.
+    let surface_uv_dx=dpdx(in.uv);
+    let surface_uv_dy=dpdy(in.uv);
+    let basis_uv_dx=dpdx(vertex.uv);
+    let basis_uv_dy=dpdy(vertex.uv);
+    let surface_position_dx=dpdx(in.world_position.xyz);
+    let surface_position_dy=dpdy(in.world_position.xyz);
+#endif
+
     // Per-instance LOD（V2-b）：MeshTag flags 逐实例削减，材质资产不动。
     var tag: u32 = 0u;
 #ifdef VERTEX_OUTPUT_INSTANCE_INDEX
@@ -270,7 +263,10 @@ fn fragment(vertex: VertexOutput, @builtin(front_facing) front_facing: bool) -> 
 #endif
 #endif
     let instance_flags = (tag >> TAG_FLAGS_SHIFT) & 0xFFu;
-    let drop_hero_extras = (instance_flags & INSTANCE_FLAG_DROP_HERO_EXTRAS) != 0u;
+    // Material fallback must also gate source-specific paths and survive texture
+    // flag synchronization, which records texture presence rather than quality.
+    let drop_hero_extras = (instance_flags & INSTANCE_FLAG_DROP_HERO_EXTRAS) != 0u
+        || (hero_flags & HERO_FLAG_PORTABLE_FALLBACK) != 0u;
     let instance_face_hard_step = (instance_flags & INSTANCE_FLAG_FACE_HARD_STEP) != 0u;
     let hair_specular_off = (instance_flags & INSTANCE_FLAG_HAIR_SPECULAR_OFF) != 0u;
 
@@ -310,31 +306,38 @@ fn fragment(vertex: VertexOutput, @builtin(front_facing) front_facing: bool) -> 
     light_color=host_view.key_color.rgb;
 #endif
 
-    // Packed normal（xy 存储，z 重建；通用解码，未锁定上游的非常规
-    // 重建式——profile 特化属 profile crate）。
     var normal = normalize(in.world_normal);
+    var matcap_normal = normal;
 #ifdef VERTEX_UVS_A
     if (hero_flags & HERO_FLAG_PACKED_NORMAL) != 0u && !drop_hero_extras {
-        let packed = textureSample(packed_normal_texture, packed_normal_sampler, in.uv).rg;
-        let tangent_xy = packed * 2.0 - vec2<f32>(1.0);
-        let tangent_z = sqrt(max(1.0 - dot(tangent_xy, tangent_xy), 0.0));
-        // 无切线基时的保守近似：把解码法线视作物体空间扰动叠加到几何法线。
-        let perturb = vec3<f32>(tangent_xy.x, tangent_xy.y, tangent_z);
-        normal = normalize(normal + (perturb - vec3<f32>(0.0, 0.0, 1.0)) * 0.5);
         if material.source_conventions.x>0.0 {
-            var tangent=vec3<f32>(tangent_xy,sqrt(max(1.0-tangent_xy.x*tangent_xy.x+tangent_xy.y*tangent_xy.y,0.0)));
-            if !front_facing {tangent=-tangent;}
-            let dx=dpdx(in.world_position.xyz);
-            let dy=dpdy(in.world_position.xyz);
-            let r1=cross(dy,in.world_normal);
-            let r2=cross(in.world_normal,dx);
+            // Source textures select UV0/UV1 by face, while both bump basis
+            // nodes use the active UV0. glTF has inverted its V coordinate.
+            let packed=sample_cubic(packed_normal_texture,packed_normal_sampler,in.uv).rg;
+            let xy=(packed*2.0-vec2<f32>(1.0))*material.source_conventions.x;
+            let decoded=vec3<f32>(xy,sqrt(max(1.0-xy.x*xy.x+xy.y*xy.y,0.0)));
+            let dx=surface_position_dx;
+            let dy=surface_position_dy;
+            let r1=cross(dy,normal);
+            let r2=cross(normal,dx);
             let determinant=dot(dx,r1);
             let sign=select(-1.0,1.0,determinant>=0.0);
-            let n=abs(determinant)*in.world_normal;
-            let scale=max(material.source_conventions.x,1.0)*sign;
-            let du=scale*(dpdx(in.uv.x)*r1+dpdy(in.uv.x)*r2);
-            let dv=scale*(dpdx(in.uv.y)*r1+dpdy(in.uv.y)*r2);
-            normal=tangent.x*source_safe_normal(n+du,in.world_normal)+tangent.y*source_safe_normal(n+dv*1000.0,in.world_normal)+tangent.z*in.world_normal;
+            let n=abs(determinant)*normal;
+            let du=sign*(basis_uv_dx.x*r1+basis_uv_dy.x*r2);
+            let dv=-sign*(basis_uv_dx.y*r1+basis_uv_dy.y*r2);
+            // Inverted bump nodes, distances 1 and 1000. The source's final
+            // backface correction restores this same unflipped world basis.
+            matcap_normal=decoded.x*source_normalize(n+du)
+                +decoded.y*source_normalize(n+dv*1000.0)+decoded.z*normal;
+            // Dot Creation normalizes for NdotL/NdotH, but its Normal output
+            // passed to the metal map retains the reconstructed magnitude.
+            normal=source_normalize(matcap_normal);
+        } else {
+            let packed=textureSampleGrad(packed_normal_texture,packed_normal_sampler,in.uv,surface_uv_dx,surface_uv_dy).rg;
+            let xy=packed*2.0-vec2<f32>(1.0);
+            let z=sqrt(max(1.0-dot(xy,xy),0.0));
+            normal=normalize(normal+(vec3<f32>(xy,z)-vec3<f32>(0.0,0.0,1.0))*0.5);
+            matcap_normal=normal;
         }
     }
 #endif
@@ -562,14 +565,16 @@ fn fragment(vertex: VertexOutput, @builtin(front_facing) front_facing: bool) -> 
         let camera_up=source_safe_normal(view.world_from_view[1].xyz,vec3<f32>(0.0,1.0,0.0));
         let axis_x=cross(v,-camera_up);
         let axis_y=-cross(v,axis_x);
-        let uv=vec2<f32>(dot(normal,axis_x)*m.controls.z,dot(normal,axis_y))*0.5+vec2<f32>(0.5);
-        let sampled=textureSampleLevel(matcap_texture,matcap_sampler,uv,0.0).rgb;
-        let tint=mix(pow(m.dark.rgb,vec3<f32>(2.2)),pow(m.light.rgb,vec3<f32>(2.2)),clamp(sampled*m.controls.y,vec3<f32>(0.0),vec3<f32>(1.0)));
+        let uv=vec2<f32>(dot(matcap_normal,axis_x)*m.controls.z,dot(matcap_normal,axis_y))*0.5+vec2<f32>(0.5);
+        let sampled=sample_cubic(matcap_texture,matcap_sampler,uv).rgb;
+        let matcap_factor=clamp(dot(sampled*m.controls.y,vec3<f32>(0.2126,0.7152,0.0722)),0.0,1.0);
+        let tint=mix(pow(m.dark.rgb,vec3<f32>(2.2)),pow(m.light.rgb,vec3<f32>(2.2)),matcap_factor);
         let shadow=mix(vec3<f32>(1.0),pow(m.shadow.rgb,vec3<f32>(2.2)),1.0-lit_factor);
-        let half_vector=source_safe_normal(v-light_direction,normal);
+        let half_vector=source_normalize(v+light_direction);
         let response=m.specular.y*pow(max(dot(normal,half_vector),0.001),max(m.specular.x,0.001));
-        let ramp=textureSampleLevel(spec_ramp_texture,spec_ramp_sampler,vec2<f32>(response,0.5),0.0).rgb;
-        let spec=select(ramp*pow(m.specular_color.rgb,vec3<f32>(2.2))*response,pow(m.sharp_color.rgb,vec3<f32>(2.2)),response>m.specular.w);
+        var highlight=vec3<f32>(response);
+        if m.controls.w>0.5 {highlight=textureSampleLevel(spec_ramp_texture,spec_ramp_sampler,vec2<f32>(response,0.5),0.0).rgb;}
+        let spec=select(highlight*pow(m.specular_color.rgb,vec3<f32>(2.2))*packed.b,pow(m.sharp_color.rgb,vec3<f32>(2.2)),response>m.specular.w);
         shaded_base=authored_base.rgb*tint*shadow+spec*(m.specular.z+(1.0-m.specular.z)*lit_factor);
     } else if genshin_lighting {
         let row=material.genshin.specular_rows[u32(band)-1u];
@@ -577,8 +582,7 @@ fn fragment(vertex: VertexOutput, @builtin(front_facing) front_facing: bool) -> 
         if material.source_conventions.y>0.5 {half_vector=source_safe_normal(hero_view_direction(in.world_position.xyz)+light_direction,normal);}
         let ndoth=max(dot(normal,half_vector),0.001);
         let nonmetal=material.genshin.specular_color.rgb*row.y*packed.r*select(0.0,1.0,pow(ndoth,max(row.x,0.001))>1.03-packed.b);
-        // The qualified source recipe disables metallics for both the
-        // matcap and specular branches. Do not infer metal from ILM.R alone.
+        // An authored switch and the ILM classification jointly select metal.
         shaded_base+=nonmetal;
     }
 #ifdef STYLIZED_PRE_PALETTE
@@ -602,23 +606,34 @@ fn fragment(vertex: VertexOutput, @builtin(front_facing) front_facing: bool) -> 
 
     // Spec ramp（半角高光 × ILM.B 抑制；material fallback 或 per-instance
     // LOD（drop_hero_extras）下关闭）。
-    if (hero_flags & HERO_FLAG_SPEC_RAMP) != 0u && !drop_hero_extras && !source_metal {
+    if (hero_flags & HERO_FLAG_SPEC_RAMP) != 0u {
         let view_direction = hero_view_direction(in.world_position.xyz);
         let half_vector = normalize(light_direction + view_direction);
         let spec_coord = clamp(dot(normal, half_vector), 0.0, 1.0);
-        let spec = textureSample(spec_ramp_texture, spec_ramp_sampler, vec2<f32>(spec_coord, 0.5)).rgb;
-        color += spec * material.hero_a.y * spec_suppress * light_color;
+        let spec_uv=vec2<f32>(spec_coord,0.5);
+        let spec_dx=dpdx(spec_uv);
+        let spec_dy=dpdy(spec_uv);
+        // ILM classification is per-pixel. Compute gradients before entering
+        // that nonuniform branch; preserve implicit mip selection explicitly.
+        if !drop_hero_extras && !source_metal {
+            let spec = textureSampleGrad(spec_ramp_texture, spec_ramp_sampler, spec_uv, spec_dx, spec_dy).rgb;
+            color += spec * material.hero_a.y * spec_suppress * light_color;
+        }
     }
 
     // Metal matcap（view-space normal 查找 × ILM.R metal mask（>0.9）；
     // material fallback 或 per-instance LOD 关闭）。
-    if (hero_flags & HERO_FLAG_MATCAP) != 0u && !drop_hero_extras && !source_metal {
+    if (hero_flags & HERO_FLAG_MATCAP) != 0u {
         let view_normal = normalize(
             (view.view_from_world * vec4<f32>(normal, 0.0)).xyz
         );
         let matcap_uv = view_normal.xy * 0.5 + vec2<f32>(0.5);
-        let matcap = textureSample(matcap_texture, matcap_sampler, matcap_uv).rgb;
-        color = mix(color, color * material.hero_b.rgb + matcap * material.hero_a.x, metal_mask);
+        let matcap_dx=dpdx(matcap_uv);
+        let matcap_dy=dpdy(matcap_uv);
+        if !drop_hero_extras && !source_metal {
+            let matcap = textureSampleGrad(matcap_texture, matcap_sampler, matcap_uv, matcap_dx, matcap_dy).rgb;
+            color = mix(color, color * material.hero_b.rgb + matcap * material.hero_a.x, metal_mask);
+        }
     }
 
     // Rim。
@@ -632,6 +647,13 @@ fn fragment(vertex: VertexOutput, @builtin(front_facing) front_facing: bool) -> 
     // provisional pending ADR-0023）。
     if (char_flags & CHAR_FLAG_EMISSION) != 0u {
         color += material.character.emission.rgb * material.character.emission.w * base.a;
+    }
+
+    // Gacha Alpha mixes the lit closure with masked emission. Diffuse alpha
+    // remains control data; even zero emission strength attenuates the base.
+    if material.source_emission.w > 0.5 {
+        let mask=clamp(authored_base.a-0.03,0.0,1.0);
+        color=mix(color,authored_base.rgb*material.source_emission.rgb*mask,mask);
     }
 
     var output_alpha=1.0;

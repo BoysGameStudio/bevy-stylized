@@ -340,4 +340,133 @@ fn external_head_pose_drives_face_shading_without_material_clones() {
         left.face_side_flip, right.face_side_flip,
         "symmetric head yaw must select opposite SDF halves"
     );
+    let shared_mesh = app.world().get::<Mesh3d>(face).unwrap().clone();
+    let shared_material = app
+        .world()
+        .get::<MeshMaterial3d<StylizedHeroMaterial>>(face)
+        .unwrap()
+        .clone();
+    *app.world_mut().get_mut::<Transform>(face).unwrap() =
+        Transform::from_xyz(-0.8, 0., 0.).with_scale(Vec3::splat(0.4));
+    app.world_mut().get_mut::<Transform>(head).unwrap().rotation = Quat::IDENTITY;
+    let other_head = app
+        .world_mut()
+        .spawn(Transform::from_rotation(Quat::from_rotation_y(
+            std::f32::consts::PI,
+        )))
+        .id();
+    app.world_mut().spawn((
+        shared_mesh,
+        shared_material,
+        Transform::from_xyz(0.8, 0., 0.).with_scale(Vec3::splat(0.4)),
+        StylizedFaceInput {
+            head: other_head,
+            forward: Vec3::Z,
+            up: Vec3::Y,
+        },
+    ));
+    let projection = || {
+        Projection::Orthographic(OrthographicProjection {
+            scaling_mode: bevy::camera::ScalingMode::FixedVertical {
+                viewport_height: 3.8,
+            },
+            ..OrthographicProjection::default_3d()
+        })
+    };
+    let independent = capture_frame_with_projection(&mut app, projection());
+    let pixel = |image: &CapturedImage, x: usize| image.data[(128 * SIZE as usize + x) * 4];
+    assert!(pixel(&independent, 74) > 250 && pixel(&independent, 182) < 5);
+    app.world_mut().get_mut::<Transform>(head).unwrap().rotation =
+        Quat::from_rotation_y(std::f32::consts::PI);
+    app.world_mut()
+        .get_mut::<Transform>(other_head)
+        .unwrap()
+        .rotation = Quat::IDENTITY;
+    let swapped = capture_frame_with_projection(&mut app, projection());
+    assert!(
+        pixel(&swapped, 74) < 5 && pixel(&swapped, 182) > 250,
+        "two head inputs must remain independent on one shared material"
+    );
+    assert_eq!(
+        app.world().resource::<Assets<StylizedHeroMaterial>>().len(),
+        1
+    );
+}
+
+#[test]
+#[ignore = "requires GPU; run the explicit GPU lane"]
+fn native_outline_instance_width_changes_and_restores_shared_material() {
+    let mut app =
+        headless_app(capture::probe_render_resources().expect("required GPU unavailable"));
+    let mesh = app
+        .world_mut()
+        .resource_mut::<Assets<Mesh>>()
+        .add(Sphere::new(0.7));
+    let surface = app
+        .world_mut()
+        .resource_mut::<Assets<StylizedCelMaterial>>()
+        .add(StylizedCelMaterial::default());
+    let mut hull = StylizedOutlineMaterial::default();
+    hull.params = hull
+        .params
+        .with_width(8.)
+        .with_color(LinearRgba::new(1., 0., 0., 1.));
+    let outline = app
+        .world_mut()
+        .resource_mut::<Assets<StylizedOutlineMaterial>>()
+        .add(hull);
+    let entity = app
+        .world_mut()
+        .spawn((
+            Mesh3d(mesh),
+            MeshMaterial3d(surface),
+            Transform::IDENTITY,
+            StylizedOutline::new(outline),
+        ))
+        .id();
+    let original = capture_frame(&mut app);
+    app.world_mut()
+        .entity_mut(entity)
+        .insert(StylizedInstanceData {
+            outline_scale: 0.,
+            ..default()
+        });
+    let zero = capture_frame(&mut app);
+    let red = |image: &CapturedImage| {
+        image
+            .data
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .filter(|p| p[0] > 200 && p[1] < 30 && p[2] < 30)
+            .count()
+    };
+    assert!(red(&original) > 300, "visible reference outline required");
+    assert!(
+        red(&zero) < red(&original) / 10,
+        "zero instance width must remove extrusion"
+    );
+    app.world_mut()
+        .get_mut::<StylizedInstanceData>(entity)
+        .unwrap()
+        .outline_scale = 2.;
+    let wide = capture_frame(&mut app);
+    assert!(
+        red(&wide) > red(&original) * 3 / 2,
+        "instance width must reach hull vertices"
+    );
+    app.world_mut()
+        .entity_mut(entity)
+        .remove::<StylizedInstanceData>();
+    assert_eq!(
+        original.data,
+        capture_frame(&mut app).data,
+        "removal must restore exact unit width"
+    );
+    assert_eq!(
+        app.world()
+            .resource::<Assets<StylizedOutlineMaterial>>()
+            .len(),
+        1
+    );
 }

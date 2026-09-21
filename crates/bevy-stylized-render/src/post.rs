@@ -19,7 +19,7 @@ use bevy::{
         tonemapping::tonemapping,
     },
     ecs::schedule::{IntoScheduleConfigs, ScheduleConfigs},
-    prelude::{App, Camera3d, Component, Query, Reflect, Res, With},
+    prelude::{App, Camera3d, Commands, Component, Entity, Or, Query, Reflect, Res, With, Without},
     render::{extract_component::ExtractComponent, render_resource::ShaderType},
     shader::ShaderRef,
 };
@@ -120,19 +120,63 @@ impl FullscreenMaterial for StylizedFullscreenEffect {
     }
 }
 
-/// 把 View 层 `camera.post_enabled` 写回相机：关闭时清空 effect（空强度 =
-/// shader 直通但仍有 pass 成本；后续迭代可改为移除组件）。
+#[derive(Component)]
+struct ManagedPostEffect {
+    previous: Option<StylizedFullscreenEffect>,
+}
+
+/// The high-level controller owns its native pass while attached. Disabled/zero
+/// settings remove that pass; removing the controller restores any prior manual
+/// effect, without touching unrelated cameras or material assets.
 fn sync_post_process_enabled(
+    mut commands: Commands,
     settings: Option<Res<StylizedViewSettings>>,
-    mut cameras: Query<(&StylizedPostProcess, &mut StylizedFullscreenEffect), With<Camera3d>>,
+    mut cameras: Query<
+        (
+            Entity,
+            &StylizedPostProcess,
+            Option<&mut StylizedFullscreenEffect>,
+            Option<&ManagedPostEffect>,
+        ),
+        With<Camera3d>,
+    >,
+    removed: Query<
+        (Entity, &ManagedPostEffect),
+        Or<(Without<StylizedPostProcess>, Without<Camera3d>)>,
+    >,
 ) {
     let descriptor = settings.map(|s| s.0.clone()).unwrap_or_default();
     let enabled = descriptor.camera.post_enabled;
-    for (settings, mut effect) in &mut cameras {
-        if enabled {
-            *effect = StylizedFullscreenEffect::from(settings);
+    for (entity, owned) in &removed {
+        let mut target = commands.entity(entity);
+        if let Some(previous) = owned.previous {
+            target.insert(previous);
         } else {
-            *effect = StylizedFullscreenEffect::default();
+            target.remove::<StylizedFullscreenEffect>();
+        }
+        target.remove::<ManagedPostEffect>();
+    }
+    for (entity, settings, effect, owned) in &mut cameras {
+        if owned.is_none() {
+            commands.entity(entity).insert(ManagedPostEffect {
+                previous: effect.as_deref().copied(),
+            });
+        }
+        let active = enabled
+            && (settings.vignette_strength != 0.
+                || settings.chromatic_aberration != 0.
+                || settings.display_transform != StylizedDisplayTransform::None);
+        if active {
+            let next = StylizedFullscreenEffect::from(settings);
+            if let Some(mut effect) = effect {
+                if *effect != next {
+                    *effect = next;
+                }
+            } else {
+                commands.entity(entity).insert(next);
+            }
+        } else if effect.is_some() {
+            commands.entity(entity).remove::<StylizedFullscreenEffect>();
         }
     }
 }
@@ -178,7 +222,7 @@ mod tests {
     }
 
     #[test]
-    fn disabled_view_state_produces_passthrough_effect() {
+    fn disabled_view_state_removes_owned_pass_and_restores_manual_effect() {
         let mut app = App::new();
         app.init_resource::<StylizedViewSettings>();
         app.world_mut().resource_mut::<StylizedViewSettings>().0 = StylizedViewDescriptor {
@@ -188,18 +232,81 @@ mod tests {
             },
             ..StylizedViewDescriptor::default()
         };
-        app.world_mut().spawn((
-            Camera3d::default(),
-            StylizedPostProcess::default(),
-            StylizedFullscreenEffect {
-                strengths: bevy::math::Vec4::ONE,
-                vignette: bevy::math::Vec4::ONE,
-            },
-        ));
+        let camera = app
+            .world_mut()
+            .spawn((
+                Camera3d::default(),
+                StylizedPostProcess::default(),
+                StylizedFullscreenEffect {
+                    strengths: bevy::math::Vec4::ONE,
+                    vignette: bevy::math::Vec4::ONE,
+                },
+            ))
+            .id();
         app.add_systems(PostUpdate, sync_post_process_enabled);
         app.update();
-        let mut query = app.world_mut().query::<&StylizedFullscreenEffect>();
-        let effect = query.single(app.world()).unwrap();
-        assert_eq!(*effect, StylizedFullscreenEffect::default());
+        assert!(
+            app.world()
+                .get::<StylizedFullscreenEffect>(camera)
+                .is_none()
+        );
+        app.world_mut()
+            .entity_mut(camera)
+            .remove::<StylizedPostProcess>();
+        app.update();
+        assert_eq!(
+            app.world()
+                .get::<StylizedFullscreenEffect>(camera)
+                .unwrap()
+                .strengths,
+            bevy::math::Vec4::ONE
+        );
+    }
+
+    #[test]
+    fn controller_creates_pass_then_zero_and_removal_reclaim_it() {
+        let mut app = App::new();
+        app.init_resource::<StylizedViewSettings>();
+        app.add_systems(PostUpdate, sync_post_process_enabled);
+        let camera = app
+            .world_mut()
+            .spawn((Camera3d::default(), StylizedPostProcess::default()))
+            .id();
+        app.update();
+        assert!(
+            app.world()
+                .get::<StylizedFullscreenEffect>(camera)
+                .is_some()
+        );
+        app.world_mut()
+            .get_mut::<StylizedPostProcess>(camera)
+            .unwrap()
+            .vignette_strength = 0.;
+        app.update();
+        assert!(
+            app.world()
+                .get::<StylizedFullscreenEffect>(camera)
+                .is_none()
+        );
+        app.world_mut()
+            .get_mut::<StylizedPostProcess>(camera)
+            .unwrap()
+            .vignette_strength = 0.3;
+        app.update();
+        assert!(
+            app.world()
+                .get::<StylizedFullscreenEffect>(camera)
+                .is_some()
+        );
+        app.world_mut()
+            .entity_mut(camera)
+            .remove::<StylizedPostProcess>();
+        app.update();
+        assert!(
+            app.world()
+                .get::<StylizedFullscreenEffect>(camera)
+                .is_none()
+        );
+        assert!(app.world().get::<ManagedPostEffect>(camera).is_none());
     }
 }

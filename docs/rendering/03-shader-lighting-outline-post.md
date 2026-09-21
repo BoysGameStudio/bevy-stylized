@@ -335,12 +335,12 @@ Bevy 0.19 Material 支持 Opaque、Mask、Blend、Premultiplied、AlphaToCoverag
 
 | Surface | Main NPR | Shadow | Depth/Normal Prepass | Hull Outline | Internal Edge |
 |---|---|---|---|---|---|
-| Opaque | 🚧 ADR-0023 | 🚧 ADR-0023 | 🚧 ADR-0023 | 🚧 ADR-0023 | 🚧 ADR-0023 |
-| Mask | 🚧 ADR-0023 | 🚧 ADR-0023 | 🚧 ADR-0023 | 🚧 ADR-0023 | 🚧 ADR-0023 |
-| AlphaToCoverage | 🚧 ADR-0023 | 🚧 ADR-0023 | 🚧 ADR-0023 | 🚧 ADR-0023 | 🚧 ADR-0023 |
-| Blend | 🚧 ADR-0023 | 🚧 ADR-0023 | N/A by Bevy prepass default | 🚧 ADR-0023 | N/A or explicit alternative |
-| Premultiplied | 🚧 ADR-0023 | 🚧 ADR-0023 | N/A by Bevy prepass default | 🚧 ADR-0023 | N/A or explicit alternative |
-| Add/Multiply | 🚧 ADR-0023 | 🚧 ADR-0023 | N/A by Bevy prepass default | Profile-specific contract | N/A or explicit alternative |
+| Opaque | Native Cel/Character/Hero; GPU covered | Off by default; casting opt-in, receiving absent in authored shaders | Camera opt-in; geometric normals, complete skin vertex path | Native/host hull; GPU covered | Standard+ depth/normal screen effect; native GPU covered |
+| Mask | Native Cel/Character/Hero; texture × factor alpha cutoff | Opt-in path shares cutout shader; runtime shadow qualification pending | Native depth-only and depth+normal cutout regression; host shader composition covered | Opaque hull extrusion; alpha-cutout hull matching not supported | Uses corrected prepass cutout; dedicated masked edge appearance pending |
+| AlphaToCoverage | No native/host selector | Not qualified | Not qualified | Not qualified | Not qualified |
+| Blend | Explicit HostMaterial or pupil-highlight Hero path; scoped GPU cases | Not qualified | Excluded by engine's transparent prepass routing | Host opaque shell is not general transparency matching | No transparent depth/normal evidence |
+| Premultiplied | No current selector | Not qualified | N/A by engine routing | Not qualified | Not qualified |
+| Add/Multiply | No current selector | Not qualified | N/A by engine routing | Not qualified | Not qualified |
 
 Hair cards、半透明眼睛/饰品、特效材质必须通过这张 Contract 表声明真实能力。
 
@@ -363,3 +363,42 @@ Outline replicas follow producer AABB changes even when the mesh handle is stabl
 When source bounds are removed, mirrored replica bounds are removed so automatic
 calculation can resume. The external deformation producer owns source-bound
 correctness; this synchronization does not implement deformation or physics.
+
+### Native instance width and post ownership (2026-09-21)
+
+Native hull replicas consume `StylizedInstanceData.outline_scale` independently of
+the source's face/profile/table tag. Non-default width is clamped to [0,2] and uses
+the native seven-bit scale precision; absent data and exactly 1 retain exact unit
+width, including baked source shell positions. Removing the component restores
+unit width. The replica's internal tag is not a public ABI or a StorageTable slot.
+Host outlines continue to use the host record. Shared outline material assets are
+not mutated by either path. The required `morph_skinning` suite checks zero/double
+width, removal and exact restoration, plus two independent head poses sharing a
+Hero material.
+
+Attaching `StylizedPostProcess` to a native Camera3d creates its single fullscreen
+effect. Global disable or all-zero effects remove the effect component and its
+pass; removal of the controller restores a pre-existing manual effect, if any.
+`ExternalPostProcess` still prevents native registration. The required
+`post_lifecycle` GPU test checks rendered enable/disable/removal and exact pixel
+restoration. The implemented effects are vignette, chromatic aberration and the
+display-transform hook; lens distortion in the design list is not implemented.
+
+
+### Mask prepass regression (2026-09-21)
+
+The old type-level prepass enable flag did not preserve alpha cutouts: its default
+fragment path wrote depth for transparent texels, hiding objects behind the mask.
+The shared complete-skin prepass now imports each class's actual material prefix
+and diffuse bindings and reuses alpha factor/cutoff and Hero cubic/backface-UV
+rules. A depth-only mask has a fragment entrypoint without color outputs; normal
+prepass keeps the original geometric-normal encoding. Shader imports are retained
+as app-owned handles and released at app teardown.
+
+`alpha_probe` is now registered in the required GPU lane. It places a green surface
+behind the mask and compares main-pass RGBA with depth-only and depth+normal enabled
+for all three native classes. Both it and `outline_advanced` wait for consecutive
+ready render frames and fail on pipeline errors/timeouts; a fixed update count
+could otherwise capture before an imported prepass shader was available. CPU Naga
+coverage also composes native/host class variants. This does not qualify every
+shadow, transparency or masked-outline combination in the table above.

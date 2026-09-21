@@ -12,7 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from assets.build import prepared
+from assets.build import DEFAULT_RECIPE
 
 
 def source_snapshot(project, destination):
@@ -36,8 +36,17 @@ def source_snapshot(project, destination):
     return revision.hexdigest()
 
 
-def validate(project, asset=None, case=None):
+def recipe_path(project, recipe):
+    path = project.resolve(recipe or DEFAULT_RECIPE)
+    recipes = project.root/'assets/recipes'
+    if not path.is_relative_to(recipes) or not path.is_file() or path.suffix != '.json':
+        raise ValueError('independence recipe must be a JSON file under assets/recipes')
+    return path.relative_to(project.root)
+
+
+def validate(project, asset=None, case=None, recipe=None):
     if asset or case:raise ValueError('independence rebuilds inputs; do not provide generated --asset/--case')
+    selected_recipe = recipe_path(project, recipe)
     if not shutil.which('bwrap'):raise ResourceBlocked('Bubblewrap required for isolated execution on this qualified Linux backend')
     raw={}
     for name in ['genshin-odette','gacha-authoring']:
@@ -52,6 +61,21 @@ def validate(project, asset=None, case=None):
     work=Path(tempfile.mkdtemp(prefix='stylized-independent-'))
     source=work/'source with spaces';source.mkdir()
     source_hash=source_snapshot(project,source)
+    if not (source/selected_recipe).is_file():
+        raise ValueError('selected recipe is excluded from the source snapshot')
+    # The checkout may carry an enclosing-workbench lock. Resolve only this
+    # standalone snapshot before locked builds, using the existing local cache.
+    from checks.dependencies import check as check_dependencies
+    try:
+        dependencies = check_dependencies(source, locked=False)
+    except RuntimeError as error:
+        if any(marker in str(error) for marker in
+               ['attempting to make an HTTP request', 'no matching package named', 'failed to download']):
+            raise ResourceBlocked(f'isolated dependency cache incomplete: {error}') from error
+        raise
+    if dependencies['errors']:
+        raise CheckFailed('isolated dependency graph: '+ '; '.join(dependencies['errors']))
+    standalone_lock_hash = hashlib.sha256((source/'Cargo.lock').read_bytes()).hexdigest()
     inside='/work/project with spaces'
     home=Path.home()
     # Cargo may reuse workspace binaries containing compile-time manifest paths.
@@ -68,17 +92,20 @@ def validate(project, asset=None, case=None):
              '--ro-bind',str(blender),'/opt/blender',
              '--bind',str(source),inside,'--chdir',inside,
              '--setenv','CARGO_TARGET_DIR','/cargo-target','--setenv','STYLIZED_SOURCE_REVISION','worktree-sha256:'+source_hash,
+             '--setenv','CARGO_NET_OFFLINE','true',
              '--unsetenv','DISPLAY','--unsetenv','WAYLAND_DISPLAY']
     for device in sorted(Path('/dev').glob('nvidia*')):
         command+=['--dev-bind',str(device),str(device)]
     if Path('/dev/dri').exists():command+=['--dev-bind','/dev/dri','/dev/dri']
     for name,folder in raw.items():command+=['--ro-bind',str(folder),'/inputs/'+name]
-    command+=['python3','tools/checks/isolated_job.py']
+    command+=['python3','tools/checks/isolated_job.py','--recipe',str(selected_recipe)]
     log=project.run_output/'isolated.log';log.parent.mkdir(parents=True,exist_ok=True)
     with log.open('w') as output:result=subprocess.run(command,stdout=output,stderr=subprocess.STDOUT)
     summary=source/'target/stylized/isolated-result.json'
     report=json.loads(summary.read_text()) if summary.exists() else {'status':'FAIL','reason':'isolated job did not finish'}
     report.update(snapshot_sha256=source_hash,source_copy=str(source),log=str(log),exit_code=result.returncode,
+                  recipe=str(selected_recipe),recipe_sha256=hashlib.sha256((source/selected_recipe).read_bytes()).hexdigest(),
+                  standalone_lock_sha256=standalone_lock_hash,checkout_lock_mutated=False,
                   network='disabled during all build/test jobs',input_scope='verified raw sources and toolchains only')
     project.report('independence-execution',report)
     print(json.dumps(report,indent=2))

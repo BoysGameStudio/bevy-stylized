@@ -278,8 +278,6 @@ mod tests {
                 "loader key must be the authored semantic minus the leading underscore"
             );
         }
-
-
     }
 
     #[test]

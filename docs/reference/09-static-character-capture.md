@@ -6,6 +6,11 @@ retired synthetic reference. These revisions identify current pipeline stages:
 initial cases, lighting diagnostics, then matched samples. The current recipe uses
 the source-locked Gacha release.
 
+Ordinary builds select `genshin-static-emission-v1`, combining source outlines,
+metal/specular ramps, optimized normals and emission. `Eff_001` and `Eff_002`
+are excluded. Earlier same-release recipes remain explicit reduced-feature
+regression controls; the v4 discussion below records the shared ramp-binding policy.
+
 Build prepared original sources with the existing asset workflow. The build now
 also emits `character-cases/case.json`, six two-repeat Blender captures, evaluated
 light/camera records, two geometry coverage images, and a first-party calibration

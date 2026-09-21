@@ -7,6 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 from project import Project
+from assets.build import DEFAULT_RECIPE
 
 from task_runner import CheckFailed, ResourceBlocked, run_tests, require_suites, invoke, validate_gpu_suites, select_gpu_suites
 
@@ -42,17 +43,26 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--run-id');parser.add_argument('--root');parser.add_argument('--config');parser.add_argument('--cache')
     sub=parser.add_subparsers(dest='command',required=True);sub.add_parser('paths')
-    check=sub.add_parser('check');check.add_argument('--lane',choices=['docs','architecture','schema','cpu','gpu','asset-integration','character-reference','inspector','realtime','independence','consumers','inspector-cpu'],required=True)
+    check=sub.add_parser('check');check.add_argument('--lane',choices=['docs','architecture','schema','cpu','gpu','asset-integration','character-reference','inspector','realtime','performance','workloads','webgpu','independence','consumers','inspector-cpu'],required=True)
     check.add_argument('--fetch',action='store_true',help='prepare independent consumer dependencies online');check.add_argument('--required',action='store_true');check.add_argument('--asset');check.add_argument('--case');check.add_argument('--pack',default='synthetic');check.add_argument('--out')
     check.add_argument('--suite', action='append', help='GPU lane only: select an exact registered test binary; reports partial coverage')
+    check.add_argument('--recipe', help='independence lane only: rebuild this repository authoring recipe')
+    check.add_argument('--baseline', help='performance lane only: compatible accepted relative-performance baseline')
     assets=sub.add_parser('assets');asset_sub=assets.add_subparsers(dest='action',required=True)
     for action in ['prepare','build']:
         p=asset_sub.add_parser(action);p.add_argument('--pack',required=True);p.add_argument('--manifest');p.add_argument('--mirror');p.add_argument('--blender',default='blender')
+        if action == 'build':p.add_argument('--recipe', default=str(DEFAULT_RECIPE), help=f'authoring recipe (default: {DEFAULT_RECIPE})')
     golden=sub.add_parser('golden');g=golden.add_subparsers(dest='action',required=True)
     for action in ['compare','accept']:
         p=g.add_parser(action);p.add_argument('--candidate',required=True);p.add_argument('--baseline',required=True);p.add_argument('--blender',default='blender')
     capture=g.add_parser('capture');capture.add_argument('--asset',required=True);capture.add_argument('--out',required=True)
     args = parser.parse_args()
+    if args.command == 'check' and args.recipe and args.lane != 'independence':
+        parser.error('check --recipe is supported only by the independence lane')
+    if args.command == 'check' and args.baseline and args.lane != 'performance':
+        parser.error('check --baseline is supported only by the performance lane')
+    if args.command == 'check' and args.lane == 'independence' and not args.recipe:
+        args.recipe = str(DEFAULT_RECIPE)
     project = Project(args.root, args.config, args.cache)
     if args.command == 'paths':
         return execute(project, args)
@@ -61,7 +71,7 @@ def main():
         lane = 'gpu-selected'
     try:
         project.begin_run(lane, {key: getattr(args, key, None) for key in
-                                ['asset', 'case', 'manifest', 'candidate', 'baseline']}, args.run_id)
+                                ['asset', 'case', 'manifest', 'candidate', 'baseline', 'recipe']}, args.run_id)
         if getattr(args, 'suite', None):
             project.identity['options'] = {'gpu_suites': args.suite}
         print(f'RUN {project.run_id}', flush=True)
@@ -97,7 +107,7 @@ def execute(project, args):
     if args.command=='assets':
         if args.action=='build':
             from assets.build import build
-            output=build(project,args.pack,args.blender)
+            output=build(project,args.pack,args.blender,args.recipe)
             print(json.dumps({'status':'PASS','build':str(output)},indent=2));return 0
         if args.pack=='synthetic':
             from assets.synthetic import generate
@@ -179,6 +189,18 @@ def execute(project, args):
         env=dict(os.environ,STYLIZED_REQUIRE_GPU='1',STYLIZED_TEST_ASSET=str(project.resolve(args.asset)),STYLIZED_CAPTURE_OUT=str(project.run_output/'asset-integration.png'))
         require_suites([run_tests(project,'asset-integration-required',['cargo','test','--locked','-p','stylized-integration-tests','--test','asset_adoption','declared_asset'],json.loads((project.root/'tests/suites.json').read_text())['asset-integration'],env)])
         project.report('asset-integration',{'status':'PASS','asset':str(project.resolve(args.asset)),'scope':'adoption/shared materials/reload; not upstream parity'})
+    elif lane=='performance':
+        if not args.out or args.asset or args.case:raise CheckFailed('performance requires a new --out directory, without --asset/--case')
+        from checks.performance import run as performance
+        print(json.dumps(performance(project,args.out,args.baseline),indent=2))
+    elif lane=='workloads':
+        if not args.out or args.asset or args.case:raise CheckFailed('workloads requires a new --out, without --asset/--case')
+        from checks.workloads import run as workloads
+        print(json.dumps(workloads(project,args.out),indent=2))
+    elif lane=='webgpu':
+        if not args.asset or not args.out or args.case:raise CheckFailed('webgpu requires --asset and a new --out, without --case')
+        from checks.browser import run as browser
+        print(json.dumps(browser(project,args.asset,args.out),indent=2))
     elif lane=='realtime':
         if not args.asset or not args.out or args.case:raise CheckFailed('realtime requires --asset and a new --out, without --case')
         from checks.realtime import run as realtime
@@ -226,7 +248,7 @@ def execute(project, args):
         print(json.dumps(validate(project, fetch=args.fetch),indent=2))
     elif lane=='independence':
         from checks.isolated import validate
-        validate(project,asset=project.resolve(args.asset) if args.asset else None,case=project.resolve(args.case) if args.case else None)
+        validate(project,asset=project.resolve(args.asset) if args.asset else None,case=project.resolve(args.case) if args.case else None,recipe=args.recipe)
     return 0
 
 

@@ -234,6 +234,31 @@ mod tests {
     }
 
     #[test]
+    fn face_precision_bound_and_monotonicity_over_dense_sweep() {
+        let mut previous = -1.0_f32;
+        let mut maximum = 0.0_f32;
+        for i in 0..=100_000 {
+            let expected = i as f32 / 100_000.0;
+            let encoded = StylizedInstanceData {
+                face_threshold: Some(expected),
+                ..Default::default()
+            };
+            let actual = StylizedInstanceData::from_tag(encoded.to_tag())
+                .face_threshold
+                .unwrap();
+            assert!(
+                actual >= previous,
+                "quantization must not reverse a head turn"
+            );
+            maximum = maximum.max((actual - expected).abs());
+            assert!((actual - expected).abs() <= 1.0 / 508.0 + f32::EPSILON);
+            previous = actual;
+        }
+        // This is a quantified limitation, not a claim of full precision.
+        assert!(maximum > 0.00196);
+    }
+
+    #[test]
     fn unset_threshold_encodes_as_reserved_zero() {
         let data = StylizedInstanceData::default();
         assert_eq!(data.face_threshold, None);

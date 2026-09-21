@@ -26,7 +26,8 @@ def direct_diffuse(material, group, path):
     node=socket.links[0].from_node
     if node.type=='TEX_IMAGE':nodes=[node]
     elif node.type=='GROUP' and node.node_tree.name.split('.')[0]=='UV Lerp':
-        nodes=[link.from_node for item in node.inputs for link in item.links]
+        # Each image feeds Color and Alpha; count image nodes, not socket links.
+        nodes=list({link.from_node.as_pointer():link.from_node for item in node.inputs for link in item.links}.values())
         if len(nodes)!=2:return None
     else:return None
     if any(n.type!='TEX_IMAGE' or not n.image or n.interpolation!='Cubic' or n.extension!='REPEAT' for n in nodes):return None
@@ -78,6 +79,16 @@ def main():
     source_objects=[bpy.data.objects[name] for name in recipe['meshes']]
     source_materials={s.material for o in source_objects for s in o.material_slots if s.material}
     mapped={};inputs=[];evidence={}
+    outlines = {}
+    outline_positions = {}
+    if recipe['outlines']:
+        from blender.outline_handoff import extract, modifiers, source_positions
+        outlines, evidence['source_outlines'] = extract(source_objects, recipe, textures)
+        outline_positions = source_positions(source_objects)
+        # The upstream modifier outputs instances. Read face basis/control data
+        # from the evaluated base mesh, before those instances are introduced.
+        for _, modifier in modifiers(source_objects):modifier.show_viewport=False
+        bpy.context.view_layer.update()
     for mat in sorted(source_materials,key=lambda m:m.name):
         role=recipe['material_roles'][mat.name]
         group=next(n for n in mat.node_tree.nodes if n.type=='GROUP' and n.node_tree and n.node_tree.name.split('.')[0] in {'HoYoverse - GI Body','HoYoverse - GI Face'})
@@ -109,6 +120,19 @@ def main():
               'face_forward':[0,0,1],'face_up':[0,1,0],
               'metallic':False,'specular_ramp':False,'packed_normal':False}
         if group.node_tree.name.split('.')[0]=='HoYoverse - GI Body':
+            from blender.metal_handoff import switch, extract as extract_metal
+            from blender.emission_handoff import extract as extract_emission
+            item['emission'] = extract_emission(group, direct)
+            item['metallic'] = switch(group, 'Enable Metallics?')
+            item['specular_ramp'] = switch(group, 'Use Specular Ramp')
+            item['packed_normal'] = switch(group, 'Use Normal Map')
+            if item['packed_normal']:
+                from blender.normal_handoff import extract as extract_normal
+                item['normal'], normal_evidence = extract_normal(mat, group, source_objects, safe, textures)
+                evidence.update(normal_evidence)
+            if item['metallic']:
+                item['metal'], metal_evidence = extract_metal(group, safe, textures, item['specular_ramp'])
+                evidence.update(metal_evidence)
             def scalar(name,default):
                 socket=group.inputs.get(name)
                 if socket is None:return default
@@ -160,6 +184,8 @@ def main():
         if role=='pupil':
             from blender.highlight_handoff import extract_highlight
             item['highlight']=extract_highlight(mat,textures)
+        if mat.name in outlines:
+            item['outline'] = outlines[mat.name]
         inputs.append(item)
     # Preserve other packed upstream inputs as traceable artifacts, not runtime slot guesses.
     for name,out in [('Avatar_Tex_Face_Shadow.png','face_shadow.png')]:
@@ -167,13 +193,36 @@ def main():
         if not image:raise RuntimeError(f'missing packed upstream image: {name}')
         image.save(filepath=str(textures/out));evidence[out]={'method':'locked-upstream-packed-image','source_image':name,'sha256':sha(textures/out)}
     runtime_scene=bpy.data.scenes.new('Runtime')
+    # A material may be shared by a surface with a GN hull and another without
+    # one (Odette's Face and EyeStar). Preserve that source selection explicitly.
+    unoutlined = {}
+    for original in source_objects:
+        for mat in original.data.materials:
+            owners = evidence.get('source_outlines', {}).get(mat.name, [])
+            if owners and original.name not in {row['object'] for row in owners}:
+                if mat not in unoutlined:
+                    copy = mapped[mat].copy();copy.name = mapped[mat].name+'_without_outline'
+                    item = json.loads(json.dumps(next(i for i in inputs if i['name']==mapped[mat].name)))
+                    item['name']=copy.name;item.pop('outline');inputs.append(item)
+                    unoutlined[mat]=copy
     for original in source_objects:
         for modifier in list(original.modifiers):
             if modifier.type=='NODES' and modifier.node_group and 'Outlines' in modifier.node_group.name:original.modifiers.remove(modifier)
     bpy.context.view_layer.update();depsgraph=bpy.context.evaluated_depsgraph_get()
     for original in source_objects:
         mesh=bpy.data.meshes.new_from_object(original.evaluated_get(depsgraph),preserve_all_data_layers=True,depsgraph=depsgraph)
-        for index,mat in enumerate(list(mesh.materials)):mesh.materials[index]=mapped[mat]
+        if original.name in outline_positions:
+            position_data = outline_positions[original.name]
+            if len(mesh.vertices) != len(position_data['base']) or any(
+                    any(abs(a-b)>1e-7 for a,b in zip(v.co,p))
+                    for v,p in zip(mesh.vertices,position_data['base'])):
+                raise RuntimeError('surface topology changed after outline extraction')
+            attr = mesh.attributes.new('_NPR_CONTROL0', 'FLOAT_VECTOR', 'POINT')
+            attr.data.foreach_set('vector', [v for p in position_data['targets'] for v in p])
+        for index,mat in enumerate(list(mesh.materials)):
+            owners = evidence.get('source_outlines', {}).get(mat.name, [])
+            without = owners and original.name not in {row['object'] for row in owners}
+            mesh.materials[index]=unoutlined[mat] if without else mapped[mat]
         mesh.transform(original.matrix_world)
         while len(mesh.uv_layers)>2:mesh.uv_layers.remove(mesh.uv_layers[-1])
         obj=bpy.data.objects.new('runtime_'+original.name,mesh);runtime_scene.collection.objects.link(obj)
@@ -192,7 +241,7 @@ def main():
     (stage/'runtime-manifest.json').write_text(json.dumps({'schema':'bevy_stylized.runtime-export/v1','scope':authoring['scope'],
        'authoring_sha256':sha(args.authoring),'recipe':recipe,'mesh_names':['runtime_'+n for n in recipe['meshes']],
        'textures':evidence,'glb_sha256':sha(stage/'character.glb'),'export_script_sha256':sha(__file__),
-       'limitations':['static pose only','metallic/specular-ramp/normal/emission disabled by explicit upstream recipe','effect meshes and upstream outlines excluded by declared scope']},indent=2)+'\n')
+       'limitations':['static pose only','effect meshes and source transparency remain outside this exporter; normal/metal/ramp/emission inputs follow authored switches','upstream hull geometry removed and runtime hulls explicitly mapped when requested']},indent=2)+'\n')
     shutil.move(str(stage),str(args.out));print('RUNTIME_CANDIDATE',args.out)
 
 

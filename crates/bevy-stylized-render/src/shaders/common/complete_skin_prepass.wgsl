@@ -203,10 +203,71 @@ fn vertex(vertex_no_morph: Vertex,
     return out;
 }
 
+#ifdef MAY_DISCARD
+#ifdef NPR_PREPASS_HERO
+#import bevy_stylized_render::hero::hero_forward::{material_params,base_color_texture,base_color_sampler}
+#import bevy_stylized_render::common::npr_common::sample_cubic
+#ifdef NPR_HOST_INPUTS
+#import bevy_stylized_render::hero::hero_forward::host_instance
+#endif
+#else
+#ifdef NPR_PREPASS_CHARACTER
+#import bevy_stylized_render::character::portable_forward::{material_params,base_color_texture,base_color_sampler}
+#ifdef NPR_HOST_INPUTS
+#import bevy_stylized_render::character::portable_forward::host_instance
+#endif
+#else
+#import bevy_stylized_render::cel::portable_forward::{material_params,base_color_texture,base_color_sampler}
+#ifdef NPR_HOST_INPUTS
+#import bevy_stylized_render::cel::portable_forward::host_instance
+#endif
+#endif
+#endif
+#endif
+#ifdef MAY_DISCARD
+fn discard_mask(in:VertexOutput,front_facing:bool) {
+    let material=material_params();
+#ifdef NPR_PREPASS_HERO
+    let cel=material.character.cel;
+#else
+#ifdef NPR_PREPASS_CHARACTER
+    let cel=material.cel;
+#else
+    let cel=material;
+#endif
+#endif
+    var alpha=cel.base_color_factor.a;
+#ifdef NPR_HOST_INPUTS
+    alpha=host_instance(in.instance_index).tint.a;
+#endif
+#ifdef VERTEX_UVS_A
+    var uv=in.uv;
+#ifdef NPR_PREPASS_HERO
+    let hero_flags=bitcast<u32>(material.hero_b.w);
+#ifdef VERTEX_UVS_B
+    if !front_facing && (material.genshin.controls.z>0.5 || (hero_flags & 512u)!=0u) {uv=in.uv_b;}
+#endif
+    if (hero_flags & 256u)!=0u {alpha*=sample_cubic(base_color_texture,base_color_sampler,uv).a;}
+    else {alpha*=textureSample(base_color_texture,base_color_sampler,uv).a;}
+#else
+    alpha*=textureSample(base_color_texture,base_color_sampler,uv).a;
+#endif
+#endif
+    if alpha<cel.rim.w {discard;}
+}
+#endif
+
 #ifdef PREPASS_FRAGMENT
 @fragment
-fn fragment(in: VertexOutput) -> FragmentOutput {
+fn fragment(in: VertexOutput,
+#ifdef MAY_DISCARD
+    @builtin(front_facing) front_facing:bool,
+#endif
+) -> FragmentOutput {
     var out: FragmentOutput;
+#ifdef MAY_DISCARD
+    discard_mask(in,front_facing);
+#endif
 
 #ifdef NORMAL_PREPASS
     out.normal = vec4(in.world_normal * 0.5 + vec3(0.5), 1.0);
@@ -241,4 +302,12 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
 
     return out;
 }
+#else
+#ifdef MAY_DISCARD
+// A depth-only mask still needs a fragment stage, but no color outputs.
+@fragment
+fn fragment(in:VertexOutput,@builtin(front_facing) front_facing:bool) {
+    discard_mask(in,front_facing);
+}
+#endif
 #endif // PREPASS_FRAGMENT

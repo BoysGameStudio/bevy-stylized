@@ -41,7 +41,8 @@ remains explicitly qualified.
 
 ## Rendering semantics
 - [x] Opaque/Mask/Blend/etc. support matrix published.
-- [x] Shadow/prepass/outline behavior tested.
+- [x] Native opaque/mask prepass and hull/screen outline regressions tested.
+- [ ] Optional runtime shadows and remaining masked/transparent outline combinations qualified.
 - [x] Skinning/morph semantics tested.
 - [x] Cull inheritance tested.
 
@@ -62,7 +63,22 @@ remains explicitly qualified.
 - [x] ADR-0016 Package Naming closed: `bevy-stylized`.
 - [ ] License/provenance ADR closed.
 - [x] Bevy compatibility matrix published.
-- [ ] Selected local feature matrix passes for the release candidate.
+- [x] Selected Linux local feature matrix passes (seven standalone consumers, schema, inspector and scoped WebGPU).
 - [x] Showcase suite complete.
 - [x] CLI validate/inspect shipped.
 - [x] Migration notes / changelog complete.
+
+
+## Current local qualification record, 2026-09-21
+
+`target/stylized/hardening-completion.json` records the exact required-item reports,
+source identities and remaining dependencies. Final offline empty-cache isolation
+passed engineering independence, approved image regression and all six strict
+static character cases using Gacha Setup 3.6.9 and the default emission recipe.
+The same runtime source passed 41 registered GPU cases, 205 Rust CPU tests,
+53 Python tests, seven standalone consumers and the browser/native capture check.
+
+This scoped result does not check off broader family parity, pending ADR approval,
+other devices or publication. Only the two separated-crowd PNGs and their provenance
+were explicitly accepted. Timing collections remain candidates and the absolute
+budget is intentionally undefined. The support matrix retains Experimental status.

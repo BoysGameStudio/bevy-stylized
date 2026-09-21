@@ -7,12 +7,15 @@ is a Blender reference or an accepted regression baseline.
 
 ## Run
 
-Build assets using the independent authoring workflow, then use the printed build
-path. A compiled GLB must have matching `.npr.json` and `.view.json` sidecars.
+Build assets using the independent authoring workflow, then use the printed `build`
+path as `BUILD` below. The default includes source outlines, metal/specular ramps,
+optimized normals and emission, excluding `Eff_001` and `Eff_002`.
+A compiled GLB must have matching `.npr.json` and `.view.json` sidecars.
 All declared texture/buffer dependencies must be present within that bundle.
 
 ```sh
-cargo run -p showcase --features inspector -- inspect --asset BUILD/compiled/character.glb
+python3 tools/dev.py assets build --pack genshin-odette --blender blender
+CARGO_INCREMENTAL=0 cargo run --locked -p showcase --features inspector -- inspect --asset BUILD/compiled/character.glb
 ```
 
 The `inspector` feature enables the development UI and X11/Wayland window support;
@@ -27,6 +30,8 @@ processed game asset, Blender process or AI tool is required at runtime.
 - Shared lighting controls azimuth, elevation and exposure. Each view independently
   selects Beauty, Lighting factors, Base color, Before palette or Normal/half-vector.
   Diagnostics require Hero descriptors; other surface classes retain Beauty.
+  Source hulls are visible in Beauty and hidden independently in diagnostic
+  views so their colors do not contaminate lighting-factor output.
 - Reset light and Reset inspection restore launch settings; double-click resets
   the selected camera (and its linked peer).
 - Save A/B + recipe creates a new take under `target/stylized/inspector`, or `--out`.

@@ -126,8 +126,10 @@ struct Frame {{ prefix: array<vec4<f32>, {prefix_lanes}>,
         .unwrap();
     let mapped = slice.get_mapped_range();
     let values = mapped
-        .chunks_exact(4)
-        .map(|b| u32::from_le_bytes(b.try_into().unwrap()))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|b| u32::from_le_bytes(*b))
         .collect::<Vec<_>>();
     assert_eq!(
         values,

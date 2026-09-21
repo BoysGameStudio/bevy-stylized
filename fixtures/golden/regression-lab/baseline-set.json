@@ -2,11 +2,48 @@
   "schema": "bevy_stylized.baseline-set/v1",
   "asset_ownership": "first-party",
   "source_record": "docs/performance/baselines/sweep-nvidia-geforce-rtx-5090--vulkan-2026-09-12.json",
-  "migration": "image bytes preserved; not rebaselined",
+  "migration": "Original strip images preserved; two crowd images explicitly accepted after spacing correction on 2026-09-21",
   "files": {
     "strip_bind_512x512_standard_night.png": "19513e9d4a79b3558672fb1f597404cef07b8425bb81e518f51d72e64adf9c41",
-    "crowd_n100_512x512_standard_night.png": "5d789b942775ef108396be91a24521139ea8919b7cf28843ecf01f31e3487048",
-    "crowd_n1000_1280x720_portable_day.png": "ee24a773a3514ef869cb18be1623f2d31c3997ba5dd3b6cd6f6718a96d462e4b",
+    "crowd_n100_512x512_standard_night.png": "c1df1c76cdadf6870e608b7e9e9c16929526c2d6dab547777b89cc3253e2f70e",
+    "crowd_n1000_1280x720_portable_day.png": "586af3b9f76a181fa0592f4b88a88f6c324b93b48a2696e0c8ba94749fcecde9",
     "strip_animated_1280x720_portable_day.png": "cb277dcf18b576181339b2e7516e599276324bf43cda01d8b5dc8fffe901808a"
-  }
+  },
+  "acceptances": [
+    {
+      "date": "2026-09-21T06:55:55.591395+00:00",
+      "authorization": "User explicitly approved only the two separated-crowd images and their provenance",
+      "change": "sphere row spacing 0.5 -> 0.65 (diameter 0.6); camera, count, shader and comparison thresholds unchanged",
+      "reason": "Identical old binary produced different pixels at intersecting sphere boundaries; two independent corrected captures are byte-identical",
+      "device": "NVIDIA GeForce RTX 5090 (Vulkan)",
+      "driver": "NVIDIA 615.71.09",
+      "metric": "app-update-wall-ms/v1",
+      "optimized": true,
+      "files": {
+        "crowd_n100_512x512_standard_night.png": {
+          "previous_sha256": "5d789b942775ef108396be91a24521139ea8919b7cf28843ecf01f31e3487048",
+          "sha256": "c1df1c76cdadf6870e608b7e9e9c16929526c2d6dab547777b89cc3253e2f70e",
+          "workload_fnv1a64": "a87cd0752e28d88d",
+          "resolution": [
+            512,
+            512
+          ]
+        },
+        "crowd_n1000_1280x720_portable_day.png": {
+          "previous_sha256": "ee24a773a3514ef869cb18be1623f2d31c3997ba5dd3b6cd6f6718a96d462e4b",
+          "sha256": "586af3b9f76a181fa0592f4b88a88f6c324b93b48a2696e0c8ba94749fcecde9",
+          "workload_fnv1a64": "a87cd0752e28d88d",
+          "resolution": [
+            1280,
+            720
+          ]
+        }
+      },
+      "capture_reports": [
+        "target/stylized/hardening-crowd-spacing-candidate/report.json",
+        "target/stylized/hardening-crowd-spacing-repeat/report.json"
+      ],
+      "performance_acceptance": "not implied; only these Golden images approved"
+    }
+  ]
 }

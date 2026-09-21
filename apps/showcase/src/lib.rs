@@ -51,6 +51,15 @@ fn headless_app(
     asset_root: &str,
     tier: Option<StylizedExecutionTier>,
 ) -> App {
+    configured_headless_app(resources, asset_root, tier, |_| {})
+}
+
+fn configured_headless_app(
+    resources: RenderResources,
+    asset_root: &str,
+    tier: Option<StylizedExecutionTier>,
+    configure: impl FnOnce(&mut App),
+) -> App {
     let mut app = App::new();
     if let Some(tier) = tier {
         // 必须在 StylizedPlugin 之前（Stage B 在 finish 时读该配置）。
@@ -59,26 +68,29 @@ fn headless_app(
             ..StylizedCapabilityConfig::default()
         });
     }
-    app.add_plugins(
-        DefaultPlugins
-            .set(AssetPlugin {
-                file_path: asset_root.to_string(),
-                meta_check: bevy::asset::AssetMetaCheck::Never,
-                ..Default::default()
-            })
-            .set(RenderPlugin {
-                render_creation: RenderCreation::Manual(resources),
-                synchronous_pipeline_compilation: true,
-                ..Default::default()
-            })
-            .set(WindowPlugin {
-                primary_window: None,
-                exit_condition: ExitCondition::DontExit,
-                ..Default::default()
-            }),
-    );
+    let plugins = DefaultPlugins
+        .build()
+        .set(AssetPlugin {
+            file_path: asset_root.to_string(),
+            meta_check: bevy::asset::AssetMetaCheck::Never,
+            ..Default::default()
+        })
+        .set(RenderPlugin {
+            render_creation: RenderCreation::Manual(resources),
+            synchronous_pipeline_compilation: true,
+            ..Default::default()
+        })
+        .set(WindowPlugin {
+            primary_window: None,
+            exit_condition: ExitCondition::DontExit,
+            ..Default::default()
+        });
+    #[cfg(feature = "interactive")]
+    let plugins = plugins.disable::<bevy::winit::WinitPlugin>();
+    app.add_plugins(plugins);
     app.add_plugins(StylizedPlugin::default());
     capture::install(&mut app);
+    configure(&mut app);
     app.finish();
     app.cleanup();
     app
@@ -340,3 +352,6 @@ pub fn case_camera(app: &mut App, eye: Vec3, look: Vec3) {
 
 #[cfg(feature = "inspector")]
 pub mod inspector;
+
+#[cfg(feature = "inspector")]
+pub mod workloads;

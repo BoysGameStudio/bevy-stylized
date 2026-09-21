@@ -165,6 +165,21 @@ impl Runtime {
                 if world.get::<RenderLayers>(entity) != Some(&layer) {
                     world.entity_mut(entity).insert(layer);
                 }
+                // Hull colors are not lighting-factor data. Keep visibility
+                // local to this view rather than mutating shared materials.
+                if world
+                    .get::<bevy_stylized::stylized_render::outline::StylizedOutlineReplica>(entity)
+                    .is_some()
+                {
+                    let visibility = if state.recipe.debug[side] == DebugMode::Beauty {
+                        Visibility::Inherited
+                    } else {
+                        Visibility::Hidden
+                    };
+                    if world.get::<Visibility>(entity) != Some(&visibility) {
+                        world.entity_mut(entity).insert(visibility);
+                    }
+                }
             }
         }
         let mut q = world.query::<(

@@ -34,8 +34,9 @@ def main():
         raise RuntimeError('current importer requires the explicit v4 render-connected ramp policy; older recipes are historical')
     schema=json.loads((TOOLS.parent/'schemas/authoring/static-recipe.schema.json').read_text())
     if any(key not in recipe for key in schema['required']):raise RuntimeError('recipe required fields missing')
+    if type(recipe['outlines']) is not bool:raise RuntimeError('outline selection must be boolean')
     for key,rule in schema['properties'].items():
-        if 'const' in rule and recipe.get(key)!=rule['const']:raise RuntimeError(f'unsupported recipe setting: {key}')
+        if 'const' in rule and key in recipe and recipe[key]!=rule['const']:raise RuntimeError(f'unsupported recipe setting: {key}')
     if not recipe['id'] or not recipe['meshes'] or len(set(recipe['meshes']))!=len(recipe['meshes']):raise RuntimeError('empty/duplicate recipe selection')
     verify(args.source,manifest)
     if bpy.app.version_string != recipe['blender'] or list(setup_wizard.bl_info['version']) != recipe['gacha_version']:
@@ -69,6 +70,9 @@ def main():
         for modifier in obj.modifiers:
             if modifier.type=='NODES' and modifier.node_group and 'Outlines' in modifier.node_group.name:
                 modifier.show_render=recipe['outlines'];modifier.show_viewport=recipe['outlines']
+    if recipe['outlines']:
+        from blender.outline_handoff import configure
+        configure(selected, recipe)
     # This is a named, restricted portable-reference variant, not the full
     # original material. Apply exactly the same declared restrictions upstream.
     materials={slot.material for obj in selected for slot in obj.material_slots if slot.material}
@@ -103,7 +107,8 @@ def main():
                 'recipe':recipe,'recipe_sha256':hashlib.sha256(args.recipe.read_bytes()).hexdigest(),
                 'import_script_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                 'blender':bpy.app.version_string,'gacha_version':list(setup_wizard.bl_info['version']),
-                'scope':'static-body-face; full original source retained, no full-rig/effect qualification',
+                'scope':'static-body-face'+('-source-outlines' if recipe['outlines'] else '')+'; full original source retained, no full-rig/effect qualification',
+                'execution':'synchronous setup in project-owned isolated background worker',
                 'compatibility_shims':['material-applier-private-method-v1'],
                 'ramp_bindings':binding_evidence,
                 'blend_sha256':hashlib.sha256((stage/'character.blend').read_bytes()).hexdigest()}

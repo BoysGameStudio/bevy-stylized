@@ -61,6 +61,7 @@ fn headless_app(resources: RenderResources) -> (App, capture::CaptureTarget) {
     });
     app.add_plugins(StylizedPlugin::default());
     capture::install(&mut app);
+    golden_harness::readiness::install(&mut app);
     let target = {
         let mut images = app.world_mut().resource_mut::<Assets<Image>>();
         capture::create_capture_target(&mut images, SIZE, SIZE)
@@ -136,9 +137,7 @@ fn build_scene(app: &mut App, hull: bool, screen: bool) {
 struct TargetHolder(capture::CaptureTarget);
 
 fn capture_frame(app: &mut App, target: &capture::CaptureTarget) -> CapturedImage {
-    for _ in 0..24 {
-        app.update();
-    }
+    golden_harness::readiness::wait(app, 24);
     let request = capture::request_capture(app.world_mut(), target.clone());
     for _ in 0..600 {
         app.update();
@@ -181,6 +180,16 @@ fn outline_advanced_hull_screen_hybrid() {
         // screen 开启时必须有 overlay；关闭时必须没有。
         assert_eq!(overlays > 0, screen, "{name}: overlay presence");
         let frame = capture_frame(&mut app, &target);
+        let diagnostics = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../target/stylized/outline-advanced")
+            .join(std::process::id().to_string());
+        std::fs::create_dir_all(&diagnostics).unwrap();
+        std::fs::write(
+            diagnostics.join(format!("{name}.png")),
+            golden_harness::encode_png(&frame).unwrap(),
+        )
+        .unwrap();
+        eprintln!("OUTLINE_CAPTURE {}", diagnostics.display());
         captures.push((name, frame));
     }
 

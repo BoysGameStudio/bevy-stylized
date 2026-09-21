@@ -14,6 +14,8 @@ use bevy_stylized_render::{
 };
 use std::collections::{BTreeMap, HashMap, HashSet};
 
+mod outline;
+
 /// Attach to the application-owned scene root before loading its descendants.
 /// This is a one-time adoption configuration, not a live material editor.
 /// Use `rebind_stylized_material` for an explicit generation-checked retry/rebind;
@@ -71,6 +73,7 @@ pub fn rebind_stylized_material(
     {
         return Err("original material is unavailable");
     }
+    outline::clear(world, entity);
     world
         .entity_mut(entity)
         .remove::<(
@@ -104,7 +107,17 @@ pub struct StylizedAssetIntegrationPlugin;
 impl Plugin for StylizedAssetIntegrationPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<MaterialCache>()
-            .add_systems(Update, (adopt, release_unused).chain());
+            .init_resource::<outline::OutlineCache>()
+            .add_systems(
+                Update,
+                (
+                    adopt,
+                    outline::adopt,
+                    release_unused,
+                    outline::release_unused,
+                )
+                    .chain(),
+            );
     }
 }
 
@@ -195,12 +208,20 @@ fn adopt(
                         .find(|t| t.uri == uri)
                         .map(|t| t.semantic)
                         .unwrap_or_default();
-                    let srgb = matches!(
-                        semantic,
-                        StylizedTextureSemantic::Color
-                            | StylizedTextureSemantic::Ramp
-                            | StylizedTextureSemantic::MatCap
-                    );
+                    let source_linear_ramp = descriptor.static_params.get("specular_ramp_linear")
+                        == Some(&1.0)
+                        && descriptor
+                            .static_params
+                            .get("specular_ramp_index")
+                            .and_then(|i| descriptor.textures.get(*i as usize))
+                            .is_some_and(|t| t.uri == uri);
+                    let srgb = !source_linear_ramp
+                        && matches!(
+                            semantic,
+                            StylizedTextureSemantic::Color
+                                | StylizedTextureSemantic::Ramp
+                                | StylizedTextureSemantic::MatCap
+                        );
                     let authored_sampling =
                         ["genshin_lighting", "genshin_face", "cubic_base_color"]
                             .iter()

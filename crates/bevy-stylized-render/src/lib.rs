@@ -115,6 +115,12 @@ use bevy::{
 #[derive(Default)]
 pub struct StylizedRenderPlugin;
 
+#[derive(bevy::prelude::Resource)]
+struct ShaderLibraries {
+    // Retain import-only modules for this app, then release them on teardown.
+    _handles: Vec<bevy::prelude::Handle<bevy::shader::Shader>>,
+}
+
 impl Plugin for StylizedRenderPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<presentation::PresentationSchedule>()
@@ -205,16 +211,31 @@ impl Plugin for StylizedRenderPlugin {
             .world()
             .contains_resource::<Assets<bevy::shader::Shader>>()
         {
+            let mut handles = Vec::new();
             let handle: bevy::prelude::Handle<bevy::shader::Shader> = bevy::asset::load_embedded_asset!(
                 app.world_mut(),
                 "shaders/common/npr_common.wgsl"
             );
-            core::mem::forget(handle);
+            handles.push(handle);
+            // The shared mask prepass imports each class's authoritative
+            // bindings. AssetServer does not load shader imports transitively.
+            for path in [
+                "embedded://bevy_stylized_render/shaders/cel/portable_forward.wgsl",
+                "embedded://bevy_stylized_render/shaders/character/character_forward.wgsl",
+                "embedded://bevy_stylized_render/shaders/hero/hero_forward.wgsl",
+            ] {
+                let handle: bevy::prelude::Handle<bevy::shader::Shader> = app
+                    .world()
+                    .resource::<bevy::asset::AssetServer>()
+                    .load(path);
+                handles.push(handle);
+            }
             let handle: bevy::prelude::Handle<bevy::shader::Shader> = bevy::asset::load_embedded_asset!(
                 app.world_mut(),
                 "shaders/common/host_inputs.wgsl"
             );
-            core::mem::forget(handle);
+            handles.push(handle);
+            app.insert_resource(ShaderLibraries { _handles: handles });
         }
     }
 }

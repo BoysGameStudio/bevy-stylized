@@ -13,10 +13,26 @@ use std::{
     time::{Duration, Instant},
 };
 
+fn suspend_outlines(app: &mut App) -> Vec<(Entity, StylizedOutline)> {
+    let mut q = app.world_mut().query::<(Entity, &StylizedOutline)>();
+    let saved: Vec<_> = q.iter(app.world()).map(|(e, m)| (e, m.clone())).collect();
+    for (e, _) in &saved {
+        app.world_mut().entity_mut(*e).remove::<StylizedOutline>();
+    }
+    saved
+}
+
+fn restore_outlines(app: &mut App, saved: Vec<(Entity, StylizedOutline)>) {
+    for (e, m) in saved {
+        app.world_mut().entity_mut(e).insert(m);
+    }
+}
+
 pub(super) fn coverage(
     app: &mut App,
     target: &capture::CaptureTarget,
 ) -> Result<CapturedImage, String> {
+    let outlines = suspend_outlines(app);
     let mut q = app.world_mut().query::<(
         Entity,
         Option<&MeshMaterial3d<StylizedCelMaterial>>,
@@ -102,6 +118,7 @@ pub(super) fn coverage(
     for (entity, mesh) in meshes {
         app.world_mut().entity_mut(entity).insert(Mesh3d(mesh));
     }
+    restore_outlines(app, outlines);
     Ok(image)
 }
 #[allow(clippy::too_many_arguments)]
@@ -115,6 +132,7 @@ pub(super) fn lighting_diagnostics(
     factor: &str,
     center: &str,
 ) -> Result<Value, String> {
+    let outlines = suspend_outlines(app);
     let background = app.world().resource::<ClearColor>().clone();
     let msaa = *app.world().get::<Msaa>(camera).ok_or("camera MSAA")?;
     app.world_mut().insert_resource(ClearColor(Color::BLACK));
@@ -184,6 +202,7 @@ pub(super) fn lighting_diagnostics(
     }
     app.world_mut().entity_mut(camera).insert(msaa);
     app.world_mut().insert_resource(background);
+    restore_outlines(app, outlines);
     if rendered.width != reference.width || rendered.height != reference.height {
         return Err("factor dimensions mismatch".into());
     }

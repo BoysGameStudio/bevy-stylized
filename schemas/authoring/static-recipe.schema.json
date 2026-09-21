@@ -96,7 +96,10 @@
       "const": false
     },
     "outlines": {
-      "const": false
+      "type": "boolean"
+    },
+    "outline_policy": {
+      "const": "genshin-source-hull-v1"
     },
     "ramp_policy": {
       "enum": [

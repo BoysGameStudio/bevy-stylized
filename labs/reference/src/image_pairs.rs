@@ -1,7 +1,5 @@
 //! Read-only comparison of externally captured images using the shared criteria.
-use golden_harness::{
-    Tier2Thresholds, decode_png, evaluate_tier2, evaluate_tier2_region,
-};
+use golden_harness::{Tier2Thresholds, decode_png, evaluate_tier2, evaluate_tier2_region};
 use serde::Deserialize;
 use std::{collections::HashSet, path::Path};
 

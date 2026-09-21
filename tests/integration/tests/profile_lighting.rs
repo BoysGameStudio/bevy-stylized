@@ -8,6 +8,71 @@ use render_scene::*;
 
 #[test]
 #[ignore = "requires GPU; run the explicit GPU lane"]
+fn source_emission_mixes_tinted_radiance_and_zero_strength_stays_enabled() {
+    let mut app =
+        headless_app(capture::probe_render_resources().expect("required GPU unavailable"));
+    {
+        let mut view = app.world_mut().resource_mut::<StylizedViewSettings>();
+        view.0.key_light_direction = Vec3::Z;
+        view.0.ambient_override = Some(LinearRgba::WHITE);
+    }
+    for (x, alpha, strength, enabled) in [(-1.2, 1., 2., 0.), (0., 0.5, 2., 1.), (1.2, 1., 0., 1.)]
+    {
+        let mut m = StylizedHeroMaterial::default();
+        m.params.character.cel.base_color_factor = Vec4::new(0.6, 0.4, 0.2, alpha);
+        m.params.character.palette_soft_lit = Vec4::ONE;
+        m.params.character.palette_soft_shadow = Vec4::ONE;
+        m.params.character.palette_sharp_lit = Vec4::ONE;
+        m.params.character.palette_sharp_shadow = Vec4::ONE;
+        m.params.source_emission = Vec4::new(
+            0.5_f32.powf(2.2) * strength,
+            0.7_f32.powf(2.2) * strength,
+            0.9_f32.powf(2.2) * strength,
+            enabled,
+        );
+        let material = app
+            .world_mut()
+            .resource_mut::<Assets<StylizedHeroMaterial>>()
+            .add(m);
+        let mesh = app
+            .world_mut()
+            .resource_mut::<Assets<Mesh>>()
+            .add(quad_mesh());
+        app.world_mut().spawn((
+            Mesh3d(mesh),
+            MeshMaterial3d(material),
+            Transform::from_xyz(x, 0., 0.).with_scale(Vec3::new(0.4, 1., 1.)),
+        ));
+    }
+    let image = capture_frame_with_projection(
+        &mut app,
+        Projection::Orthographic(OrthographicProjection {
+            scaling_mode: bevy::camera::ScalingMode::FixedVertical {
+                viewport_height: 3.8,
+            },
+            ..OrthographicProjection::default_3d()
+        }),
+    );
+    // Native source Alpha closure: C*(1-m) + base*tint^2.2*strength*m^2.
+    // The third panel proves that zero gain must still attenuate the lit closure.
+    for (x, mask, gain) in [(47, 0., 2.), (128, 0.47, 2.), (209, 0.97, 0.)] {
+        let rgb = &image.data[(128 * SIZE as usize + x) * 4..][..3];
+        for (channel, (base, tint)) in [(0.6_f32, 0.5_f32), (0.4, 0.7), (0.2, 0.9)]
+            .into_iter()
+            .enumerate()
+        {
+            let linear = base * (1. - mask) + base * tint.powf(2.2) * gain * mask * mask;
+            let expected = (linear.powf(1. / 2.4) * 1.055 - 0.055) * 255.;
+            assert!(
+                (f32::from(rgb[channel]) - expected).abs() <= 2.,
+                "source emission x={x} channel={channel}: {rgb:?}, expected {expected}"
+            );
+        }
+    }
+}
+
+#[test]
+#[ignore = "requires GPU; run the explicit GPU lane"]
 fn genshin_ilm_zero_ao_preserves_shadow_gate() {
     use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
     let resources = capture::probe_render_resources().expect("required GPU unavailable");
@@ -127,7 +192,10 @@ fn genshin_ramp_day_night_uses_image_row_orientation() {
         app.world_mut().spawn((
             Mesh3d(mesh),
             MeshMaterial3d(material),
-            Transform::from_xyz(x, 0., 0.),
+            // Three coplanar 1.6-wide quads spaced by 0.9 overlap at the
+            // sampled pixels. Narrow them so depth ties cannot select the
+            // center blend material instead of the day/night material.
+            Transform::from_xyz(x, 0., 0.).with_scale(Vec3::new(0.4, 1.0, 1.0)),
         ));
     }
     let image = capture_frame(&mut app);
@@ -466,10 +534,12 @@ fn source_metal_requires_explicit_enable_and_uses_authored_color() {
             .world_mut()
             .resource_mut::<Assets<Mesh>>()
             .add(quad_mesh());
-        let mut m = StylizedHeroMaterial::default();
-        m.ilm_texture = Some(ilm.clone());
-        m.matcap_texture = Some(matcap.clone());
-        m.spec_ramp_texture = Some(spec.clone());
+        let mut m = StylizedHeroMaterial {
+            ilm_texture: Some(ilm.clone()),
+            matcap_texture: Some(matcap.clone()),
+            spec_ramp_texture: Some(spec.clone()),
+            ..Default::default()
+        };
         m.params.genshin.controls = Vec4::new(1., 1., 1., 0.);
         for row in &mut m.params.genshin.specular_rows {
             row.y = 0.;
@@ -503,4 +573,211 @@ fn source_metal_requires_explicit_enable_and_uses_authored_color() {
         "authored matcap tint missing: {:?}",
         at(176)
     );
+}
+
+#[test]
+#[ignore = "requires GPU; run the explicit GPU lane"]
+fn source_metal_ramp_uses_linear_data_blue_mask_and_zero_half_vector() {
+    use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+    let mut app =
+        headless_app(capture::probe_render_resources().expect("required GPU unavailable"));
+    {
+        let mut view = app.world_mut().resource_mut::<StylizedViewSettings>();
+        view.0.key_light_direction = -Vec3::Z;
+        view.0.ambient_override = Some(LinearRgba::WHITE);
+    }
+    let mut tex = |color: &[u8]| {
+        app.world_mut()
+            .resource_mut::<Assets<Image>>()
+            .add(Image::new_fill(
+                Extent3d {
+                    width: 1,
+                    height: 1,
+                    depth_or_array_layers: 1,
+                },
+                TextureDimension::D2,
+                color,
+                TextureFormat::Rgba8Unorm,
+                bevy::asset::RenderAssetUsages::default(),
+            ))
+    };
+    let ilm = tex(&[255, 255, 128, 0]);
+    let matcap = tex(&[0, 0, 0, 255]);
+    let ramp = tex(&[0, 0, 255, 255]);
+    for (x, enabled) in [(-0.9, false), (0.9, true)] {
+        let mut material = StylizedHeroMaterial {
+            ilm_texture: Some(ilm.clone()),
+            matcap_texture: Some(matcap.clone()),
+            spec_ramp_texture: Some(ramp.clone()),
+            ..Default::default()
+        };
+        material.params.genshin.controls = Vec4::new(1., 0., 1., 0.);
+        material.params.character.palette_soft_lit = Vec4::ONE;
+        material.params.character.palette_soft_shadow = Vec4::ONE;
+        material.params.character.palette_sharp_lit = Vec4::ONE;
+        material.params.character.palette_sharp_shadow = Vec4::ONE;
+        material.params.metal.controls = Vec4::new(1., 1., 1., f32::from(enabled));
+        material.params.metal.dark = Vec4::ZERO;
+        material.params.metal.light = Vec4::ZERO;
+        material.params.metal.specular = Vec4::new(4., 1.2, 1., 0.95);
+        let material = app
+            .world_mut()
+            .resource_mut::<Assets<StylizedHeroMaterial>>()
+            .add(material);
+        let mesh = app
+            .world_mut()
+            .resource_mut::<Assets<Mesh>>()
+            .add(quad_mesh());
+        app.world_mut().spawn((
+            Mesh3d(mesh),
+            MeshMaterial3d(material),
+            Transform::from_xyz(x, 0., 0.),
+        ));
+    }
+    let image = capture_frame_with_projection(
+        &mut app,
+        Projection::Orthographic(OrthographicProjection {
+            scaling_mode: bevy::camera::ScalingMode::FixedVertical {
+                viewport_height: 3.8,
+            },
+            ..OrthographicProjection::default_3d()
+        }),
+    );
+    let at = |x: usize| &image.data[(128 * SIZE as usize + x) * 4..][..3];
+    assert!(
+        at(70).iter().all(|v| *v <= 2),
+        "zero half-vector must not create a sharp highlight: {:?}",
+        at(70)
+    );
+    assert!(
+        at(186)[0] <= 2 && at(186)[1] <= 2 && (186..=189).contains(&at(186)[2]),
+        "ramp replaces scalar response and is multiplied by linear ILM blue 128/255: {:?}",
+        at(186)
+    );
+}
+
+#[test]
+#[ignore = "requires GPU; run the explicit GPU lane"]
+fn hero_material_and_instance_fallback_disable_source_extras_after_sync() {
+    use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+    use bevy_stylized_render::{
+        hero::apply_hero_portable_fallback, lod::INSTANCE_FLAG_DROP_HERO_EXTRAS,
+    };
+    let mut app =
+        headless_app(capture::probe_render_resources().expect("required GPU unavailable"));
+    // Hold explicit quality inputs; the distance-policy system owns these same
+    // bits and is exercised independently by the LOD tests.
+    app.world_mut()
+        .remove_resource::<bevy_stylized_render::lod::StylizedLodPolicyResource>();
+    {
+        let mut view = app.world_mut().resource_mut::<StylizedViewSettings>();
+        view.0.key_light_direction = Vec3::Z;
+        view.0.ambient_override = Some(LinearRgba::WHITE);
+    }
+    let mut texture = |rgba: &[u8]| {
+        app.world_mut()
+            .resource_mut::<Assets<Image>>()
+            .add(Image::new_fill(
+                Extent3d {
+                    width: 1,
+                    height: 1,
+                    depth_or_array_layers: 1,
+                },
+                TextureDimension::D2,
+                rgba,
+                TextureFormat::Rgba8Unorm,
+                bevy::asset::RenderAssetUsages::default(),
+            ))
+    };
+    let ilm = texture(&[255, 255, 255, 0]);
+    let matcap = texture(&[255; 4]);
+    let ramp = texture(&[0, 0, 255, 255]);
+    let normal = texture(&[255, 128, 0, 255]);
+    for row in 0..3 {
+        for column in 0..3 {
+            let mut m = StylizedHeroMaterial {
+                ilm_texture: Some(ilm.clone()),
+                matcap_texture: Some(matcap.clone()),
+                spec_ramp_texture: Some(ramp.clone()),
+                ..Default::default()
+            };
+            m.params.genshin.controls = Vec4::new(1., 1., 1., 0.);
+            for band in &mut m.params.genshin.specular_rows {
+                band.y = 0.;
+            }
+            m.params.character.palette_soft_lit = Vec4::ONE;
+            m.params.character.palette_soft_shadow = Vec4::ONE;
+            m.params.character.palette_sharp_lit = Vec4::ONE;
+            m.params.character.palette_sharp_shadow = Vec4::ONE;
+            m.params.metal.controls = Vec4::new(1., 1., 1., f32::from(row == 1));
+            m.params.metal.light = Vec4::new(1., 0., 0., 1.);
+            m.params.metal.specular = Vec4::new(4., 0., 1., 2.);
+            if row == 2 {
+                m.packed_normal_texture = Some(normal.clone());
+                m.params.source_conventions.x = 1.;
+                m.debug_view = StylizedHeroDebugView::NormalHalfDot;
+            }
+            if column == 1 {
+                m.params = apply_hero_portable_fallback(m.params);
+            }
+            // Asset event synchronization must not accidentally restore expensive paths.
+            m.sync_flags();
+            let material = app
+                .world_mut()
+                .resource_mut::<Assets<StylizedHeroMaterial>>()
+                .add(m);
+            let mesh = app
+                .world_mut()
+                .resource_mut::<Assets<Mesh>>()
+                .add(quad_mesh());
+            app.world_mut().spawn((
+                Mesh3d(mesh),
+                MeshMaterial3d(material),
+                StylizedInstanceData {
+                    flags: if column == 2 {
+                        INSTANCE_FLAG_DROP_HERO_EXTRAS
+                    } else {
+                        0
+                    },
+                    ..default()
+                },
+                Transform::from_xyz((column as f32 - 1.) * 1.2, 1. - row as f32, 0.)
+                    .with_scale(Vec3::splat(0.35)),
+            ));
+        }
+    }
+    let image = capture_frame_with_projection(
+        &mut app,
+        Projection::Orthographic(OrthographicProjection {
+            scaling_mode: bevy::camera::ScalingMode::FixedVertical {
+                viewport_height: 4.8,
+            },
+            ..OrthographicProjection::default_3d()
+        }),
+    );
+    let at = |x: usize, y: usize| &image.data[(y * SIZE as usize + x) * 4..][..3];
+    assert!(
+        at(64, 75)[0] > 240 && at(64, 75)[1] < 5 && at(64, 75)[2] < 5,
+        "full source metal control: {:?}",
+        at(64, 75)
+    );
+    assert!(
+        at(64, 128)[0] > 240 && at(64, 128)[1] < 5 && at(64, 128)[2] > 240,
+        "full source ramp control: {:?}",
+        at(64, 128)
+    );
+    assert!(
+        (60..240).contains(&at(64, 181)[0]),
+        "full authored normal control: {:?}",
+        at(64, 181)
+    );
+    for x in [128, 192] {
+        for y in [75, 128, 181] {
+            assert!(
+                at(x, y).iter().all(|v| *v >= 250),
+                "fallback must retain neutral base/geometric normal, x={x} y={y}: {:?}",
+                at(x, y)
+            );
+        }
+    }
 }

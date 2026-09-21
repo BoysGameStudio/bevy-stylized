@@ -1,0 +1,100 @@
+{
+  "schema": "bevy_stylized.recipe/v1",
+  "id": "genshin-static-outlines-v1",
+  "blender": "5.2.2 LTS",
+  "gacha_version": [
+    3,
+    6,
+    9
+  ],
+  "gacha_release_url": "https://github.com/PaoloESAN/gacha-setup/releases/tag/v3.6.9",
+  "gacha_archive_sha256": "e3d8b6d85214ec1dc1d9bd4510d643b4ee5da3305f7ffc89eafc67404838a074",
+  "addon_files": {
+    "material_data_import_setup/material_data_applier.py": "77319d9d9212cfae2f84b62dd28ddc378a2eea23a7731808cb41cb2e91e481fe",
+    "shaders/gi/HoYoverse - Genshin Impact v3.4.blend": "a49420725f6732f82cccb4f814ee08cdcba785b494f7084c9fc6a6b99853f01e",
+    "shaders/gi/HoYoverse - Genshin Impact Outlines v3.blend": "110c66f0fdf22861047a4f198753aaf29aeffdf24f938d2eeea4bd592bb9bd1f",
+    "shaders/gi/HoYoverse - Genshin Impact Post-Processing.blend": "54a5cd86941981d298f4ff184e9fe52f289e6d1193433640a236d5d42254f3cf"
+  },
+  "meshes": [
+    "Bang",
+    "Body",
+    "Face",
+    "EyeStar",
+    "Pupil"
+  ],
+  "excluded_effect_meshes": [
+    "Eff_001",
+    "Eff_002"
+  ],
+  "frame": 1,
+  "up": "+Z",
+  "forward": "-Y",
+  "units": "metres",
+  "rigging": "preserve-source-rest-skeleton",
+  "secondary_physics": false,
+  "material_overrides": {
+    "Enable Metallics?": 0.0,
+    "Use Specular Ramp": 0.0,
+    "Use Normal Map": 0.0,
+    "Use Alpha": 0.0,
+    "Emission Strength": 0.0
+  },
+  "palette": {
+    "Ambient Colour": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "Soft Lit Colour": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "Sharp Lit Colour": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "Soft Shadow Color": [
+      0.55,
+      0.55,
+      0.62,
+      1
+    ],
+    "Sharp Shadow Color": [
+      0.7,
+      0.7,
+      0.75,
+      1
+    ]
+  },
+  "lighting_overrides": {
+    "Shadow Position": 0.55,
+    "Day/Night": 0.0,
+    "Use Catch Shadows": 0.0,
+    "Use Fresnel": 0.0
+  },
+  "material_roles": {
+    "HoYoverse - Odette Body": "body",
+    "HoYoverse - Odette Body01": "body",
+    "HoYoverse - Odette Hair": "hair",
+    "HoYoverse - Odette Dress": "hair",
+    "HoYoverse - Odette Dress01": "hair",
+    "HoYoverse - Odette Face": "face",
+    "HoYoverse - Odette Brow": "brow",
+    "HoYoverse - Odette New Pupil": "pupil"
+  },
+  "outlines": true,
+  "ramp_policy": "material-json-shader-closure-v1",
+  "material_sources": {
+    "HoYoverse - Odette Body": "Materials/Avatar_Girl_Sword_Odette_Mat_Body.json",
+    "HoYoverse - Odette Body01": "Materials/Avatar_Girl_Sword_Odette_Mat_Body01.json",
+    "HoYoverse - Odette Hair": "Materials/Avatar_Girl_Sword_Odette_Mat_Hair.json",
+    "HoYoverse - Odette Dress": "Materials/Avatar_Girl_Sword_Odette_Mat_Dress.json",
+    "HoYoverse - Odette Dress01": "Materials/Avatar_Girl_Sword_Odette_Mat_Dress01.json"
+  },
+  "outline_policy": "genshin-source-hull-v1"
+}

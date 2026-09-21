@@ -83,7 +83,7 @@ fn load_crate_shader(app: &mut App, path: &'static str) -> AssetId<Shader> {
 
 struct Case {
     path: &'static str,
-    defs: &'static [&'static str],
+    defs: Vec<&'static str>,
 }
 
 fn cases() -> Vec<Case> {
@@ -116,7 +116,10 @@ fn cases() -> Vec<Case> {
         HERO_FORWARD_SHADER_PATH,
     ] {
         for defs in [BASE, SKINNED, MINIMAL, MORPHED, SKINNED_MORPHED] {
-            cases.push(Case { path, defs });
+            cases.push(Case {
+                path,
+                defs: defs.to_vec(),
+            });
         }
     }
     // 环境 NPR（V2-d）：DISTANCE_FOG def 打开时 fog uniform binding 才存在
@@ -132,14 +135,17 @@ fn cases() -> Vec<Case> {
         CEL_PORTABLE_FORWARD_SHADER_PATH,
         HERO_FORWARD_SHADER_PATH,
     ] {
-        cases.push(Case { path, defs: FOGGED });
+        cases.push(Case {
+            path,
+            defs: FOGGED.to_vec(),
+        });
     }
     // GPU Instance Database（V2-e）：StorageTable 变体（binding 7 =
     // instance_table storage buffer，由 StylizedCharacterTableMaterial 的
     // specialize 注入 def）。
     cases.push(Case {
         path: CHARACTER_PORTABLE_FORWARD_SHADER_PATH,
-        defs: &[
+        defs: vec![
             "VERTEX_POSITIONS",
             "VERTEX_NORMALS",
             "VERTEX_UVS_A",
@@ -148,13 +154,46 @@ fn cases() -> Vec<Case> {
     });
     // 全屏后处理 shader：无 mesh def（guard 在 compose 循环里）。
     for path in FULLSCREEN_CASES {
-        cases.push(Case { path, defs: &[] });
+        cases.push(Case { path, defs: vec![] });
     }
     // screen-space 描边 overlay：mesh material + prepass defs。
     cases.push(Case {
         path: SCREEN_OUTLINE_SHADER_PATH,
-        defs: &["VERTEX_POSITIONS", "DEPTH_PREPASS", "NORMAL_PREPASS"],
+        defs: vec!["VERTEX_POSITIONS", "DEPTH_PREPASS", "NORMAL_PREPASS"],
     });
+    for class in [
+        "NPR_PREPASS_CEL",
+        "NPR_PREPASS_CHARACTER",
+        "NPR_PREPASS_HERO",
+    ] {
+        for normal in [false, true] {
+            for host in [false, true] {
+                let mut defs = vec![
+                    "VERTEX_POSITIONS",
+                    "VERTEX_NORMALS",
+                    "VERTEX_UVS_A",
+                    "VERTEX_UVS_B",
+                    "DEPTH_PREPASS",
+                    "MAY_DISCARD",
+                    class,
+                ];
+                if normal {
+                    defs.extend([
+                        "PREPASS_FRAGMENT",
+                        "NORMAL_PREPASS",
+                        "NORMAL_PREPASS_OR_DEFERRED_PREPASS",
+                    ]);
+                }
+                if host {
+                    defs.push("NPR_HOST_INPUTS");
+                }
+                cases.push(Case {
+                    path: bevy_stylized_render::skinning::COMPLETE_SKIN_PREPASS_SHADER,
+                    defs,
+                });
+            }
+        }
+    }
     cases
 }
 

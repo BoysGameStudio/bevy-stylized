@@ -19,9 +19,10 @@ The result directory is content-addressed and contains the packed source blend,
 audit, runtime GLB/maps, profile input, compiled descriptors/sidecar and hashes.
 Existing or incomplete candidates are not silently overwritten.
 
-The current recipe explicitly chooses static original-rest geometry without
-Rigify/secondary physics, excludes named effect meshes, and disables named
-metallic/specular-ramp/normal/emission features in the upstream material variant.
+The default `genshin-static-emission-v1` recipe chooses static original-rest
+geometry without Rigify/secondary physics, includes source outlines, metal,
+specular ramps, optimized normals and emission, and excludes `Eff_001`/`Eff_002`.
+Reduced-feature recipes are explicit regression controls.
 It records those choices and the authoring-only private-method compatibility shim.
 It does not claim complete original-rig/effect or pixel-parity support. Pupil
 composition is rasterized from the upstream color node output in EEVEE, not copied
@@ -73,7 +74,8 @@ python3 tools/dev.py check --lane asset-integration --required --asset BUILD/com
 
 Opaque/mask and capability-resolved Cel/Character/Hero paths are explicit. Primary
 materials enable prepass at the type level, with cost controlled by camera opt-in;
-shadow rendering remains disabled. The older prepass-disabled description was
+shadow casting is disabled by default and separately opt-in with `shadow-casting`;
+this feature does not enable receiving shadows in the authored-light shader. The older prepass-disabled description was
 superseded by the implementation. Blend/effect support and Genshin-specific
 Metallic equivalence must not be inferred from a material name or a bound texture.
 

@@ -261,10 +261,14 @@ impl Material for StylizedCelMaterial {
 
     // Cel prepass 由相机选择，shadow 路径关闭；完整语义矩阵仍 pending
     // ADR-0023，类型级可参与不等于所有组合已资格化。
-    // prepass 参与在类型级开启（默认 prepass shader 即可）；**成本门控在
+    // prepass 参与在类型级开启（共享裁切/完整蒙皮 shader）；**成本门控在
     // 相机**：只有带 DepthPrepass/NormalPrepass 组件的相机才产生 prepass
     // 开销（StylizedScreenOutline 的 per-camera opt-in），默认相机零成本。
     fn prepass_vertex_shader() -> ShaderRef {
+        crate::skinning::COMPLETE_SKIN_PREPASS_SHADER.into()
+    }
+
+    fn prepass_fragment_shader() -> ShaderRef {
         crate::skinning::COMPLETE_SKIN_PREPASS_SHADER.into()
     }
 
@@ -283,6 +287,9 @@ impl Material for StylizedCelMaterial {
         key: bevy::pbr::MaterialPipelineKey<Self>,
     ) -> Result<(), bevy::render::render_resource::SpecializedMeshPipelineError> {
         crate::skinning::specialize_secondary_skin(descriptor, layout)?;
+        if let Some(fragment) = descriptor.fragment.as_mut() {
+            fragment.shader_defs.push("NPR_PREPASS_CEL".into());
+        }
         // 双面渲染经 bind_group_data 特化（cull 继承 = 默认背面剔除）。
         if key.bind_group_data.double_sided {
             descriptor.primitive.cull_mode = None;

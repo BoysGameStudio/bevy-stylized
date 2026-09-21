@@ -17,7 +17,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub(super) fn install_measurement(app: &mut App) {
+pub(crate) fn install_measurement(app: &mut App) {
     app.add_plugins(RenderDiagnosticsPlugin);
     app.sub_app_mut(RenderApp).add_systems(
         RenderGraph,
@@ -270,7 +270,7 @@ fn scan(app: &mut App, out: &Path, base: Recipe, frames: usize) -> Result<Value,
         json!({"schema":"bevy_stylized.realtime-scan/v1","status":if passed{"PASS"}else{"FAIL"},"scope":"frame-indexed replay equality and review frames; repeatability alone does not qualify absence of temporal artifacts","msaa":4,"frames_per_phase":frames,"virtual_fps":60,"pipelined_rendering":false,"phases":["orbit","light","zoom"],"repeats":2,"loop_closure":closures,"readback_perturbs_wall_clock":true,"rows":rows}),
     )
 }
-fn stats(values: &[f64]) -> Value {
+pub(crate) fn stats(values: &[f64]) -> Value {
     if values.is_empty() {
         return Value::Null;
     }

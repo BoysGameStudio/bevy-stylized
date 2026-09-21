@@ -420,7 +420,6 @@ impl Plugin for HostMaterialPlugin {
     }
 }
 
-
 fn collect_priorities(
     cel: Res<Assets<HostMaterial<StylizedCelMaterial>>>,
     character: Res<Assets<HostMaterial<StylizedCharacterMaterial>>>,

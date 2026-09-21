@@ -9,10 +9,12 @@ import tempfile
 
 def validate(project, fetch=False):
     cases=[('core-min','bevy-stylized-core',False,[],'let _ = bevy_stylized_core::StylizedSurfaceClass::Cel;'),
+           ('core-schema','bevy-stylized-core',False,['schema'],'let _ = bevy_stylized_core::StylizedSurfaceClass::Cel;'),
            ('gltf-pure','bevy-stylized-gltf',False,[],'let _ = bevy_stylized_gltf::NPR_ATTRIBUTE_SPECS.len();'),
            ('facade-min','bevy-stylized',False,[],'let _ = bevy_stylized::StylizedPlugin::default();'),
            ('facade-default','bevy-stylized',True,[],'let _ = bevy_stylized::StylizedPlugin::default();'),
-           ('facade-profile','bevy-stylized',False,['render','gltf','profile-genshin'],'let _ = bevy_stylized::StylizedAssetIntegrationPlugin;')]
+           ('facade-profile','bevy-stylized',False,['render','gltf','profile-genshin'],'let _ = bevy_stylized::StylizedAssetIntegrationPlugin;'),
+           ('facade-shadow','bevy-stylized',False,['render','shadow-casting'],'let _ = bevy_stylized::StylizedPlugin::default();')]
     outcomes=[]
     for name,package,default,features,code in cases:
         with tempfile.TemporaryDirectory(prefix='stylized-consumer-') as tmp:
@@ -22,6 +24,7 @@ def validate(project, fetch=False):
             manifest+=f'{package} = {{ path = {json.dumps(str(dependency))}, default-features = {str(default).lower()}, features = {json.dumps(features)} }}\n'
             (root/'Cargo.toml').write_text(manifest);(root/'src/main.rs').write_text('fn main() { '+code+' }\n')
             shutil.copyfile(project.root/'Cargo.lock',root/'Cargo.lock')
+            shutil.copyfile(project.root/'rust-toolchain.toml',root/'rust-toolchain.toml')
             if fetch:
                 invoke(['cargo','fetch','--manifest-path',str(root/'Cargo.toml')],check=True,cwd=root)
             command=['cargo','check','--offline','--manifest-path',str(root/'Cargo.toml'),'--target-dir',str(project.root/'target')]

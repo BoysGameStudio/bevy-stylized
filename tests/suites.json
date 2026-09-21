@@ -16,7 +16,8 @@
       "morph_target_deformation_renders",
       "skinned_deformation_renders",
       "live_morph_outline_tracks_surface_and_returns_to_rest",
-      "external_head_pose_drives_face_shading_without_material_clones"
+      "external_head_pose_drives_face_shading_without_material_clones",
+      "native_outline_instance_width_changes_and_restores_shared_material"
     ],
     "profile_lighting": [
       "genshin_ilm_zero_ao_preserves_shadow_gate",
@@ -25,11 +26,15 @@
       "genshin_material_bands_follow_authored_nonsequential_order",
       "genshin_zero_vertex_ramp_width_uses_authored_safe_divide",
       "prepared_ramp_zero_vertex_width_uses_explicit_denominator_floor",
-      "source_metal_requires_explicit_enable_and_uses_authored_color"
+      "source_metal_requires_explicit_enable_and_uses_authored_color",
+      "source_metal_ramp_uses_linear_data_blue_mask_and_zero_half_vector",
+      "source_emission_mixes_tinted_radiance_and_zero_strength_stays_enabled",
+      "hero_material_and_instance_fallback_disable_source_extras_after_sync"
     ],
     "sampling_camera": [
       "authored_cubic_diffuse_reconstructs_texel_neighborhood",
-      "orthographic_specular_uses_constant_camera_basis"
+      "orthographic_specular_uses_constant_camera_basis",
+      "authored_normals_keep_uv0_basis_for_backfaces_and_normalize_lighting"
     ],
     "instance_table": [
       "table_golden_full_precision_face_thresholds",
@@ -57,6 +62,16 @@
       "physical_extension_preserves_standard_lighting_and_host_binding",
       "physical_ramp_remaps_light_without_erasing_emission",
       "physical_host_resource_layout_is_measured"
+    ],
+    "post_lifecycle": [
+      "post_controller_renders_and_disable_remove_restore_pixels"
+    ],
+    "hero_precision": [
+      "hero_table_precision_prototype_preserves_batching"
+    ],
+    "alpha_probe": [
+      "alpha_mask_cutout_probe",
+      "native_mask_prepass_preserves_cutouts_for_all_classes"
     ]
   },
   "asset-integration": [

@@ -15,8 +15,8 @@ use std::{
 };
 
 use bevy_stylized_gltf::{
-    MATERIAL_EXTRAS_KEY, NPR_ATTRIBUTE_SPECS, NprAttributeSpec,
-    StylizedImportError, extract_materials_from_document, load_sidecar, sidecar_path_for_gltf,
+    MATERIAL_EXTRAS_KEY, NPR_ATTRIBUTE_SPECS, NprAttributeSpec, StylizedImportError,
+    extract_materials_from_document, load_sidecar, sidecar_path_for_gltf,
 };
 
 const HELP: &str = "bevy-stylized - bevy-stylized asset tooling\n\n\

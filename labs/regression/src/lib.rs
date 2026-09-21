@@ -18,7 +18,7 @@
 //! ```
 //!
 //! Golden 子集：4 个代表 cell 在测量尾帧捕获，与
-//! `fixtures/golden/regression-lab/` 基线 diff（首跑写基线）。
+//! `fixtures/golden/regression-lab/` 基线 diff（只读已接受基线）。
 //!
 //! 输出：单个 JSON 报告（docs/performance/targets.md 的 target record
 //! 扩展 sweep 轴字段）+ 可选 `--gate` 回归门禁（mean 帧时回归 >10% 即
@@ -46,7 +46,9 @@ use bevy_stylized::prelude::*;
 use golden_harness::capture;
 
 /// sweep 报告 schema 标识。
-pub const SWEEP_SCHEMA: &str = "bevy_stylized.sweep/v1";
+pub const SWEEP_SCHEMA: &str = "bevy_stylized.sweep/v2";
+/// Measurement domain; this is not GPU elapsed time.
+pub const SWEEP_METRIC: &str = "app-update-wall-ms/v1";
 /// warm-up 帧数（子采样：benchmarks 为 20）。
 pub const WARMUP_FRAMES: usize = 15;
 /// 测量帧数（子采样：benchmarks 为 60）。
@@ -189,6 +191,10 @@ pub struct GateOutcome {
 pub struct SweepReport {
     /// schema 标识。
     pub schema: &'static str,
+    pub metric: &'static str,
+    pub optimized: bool,
+    /// Includes scene builders and collectors, excluding the renderer under test.
+    pub workload_fnv1a64: String,
     /// ADR-0029 证据声明。
     pub evidence_policy: &'static str,
     /// 采集时间（Unix 秒）。
@@ -425,6 +431,7 @@ pub fn measure_cell(
     );
     app.add_plugins(StylizedPlugin::default());
     capture::install(&mut app);
+    golden_harness::readiness::install(&mut app);
     app.finish();
     app.cleanup();
 
@@ -453,6 +460,11 @@ pub fn measure_cell(
         other => panic!("unknown scene {other}"),
     }
 
+    golden_harness::readiness::wait(&mut app, 24);
+    // Readiness must not move the accepted animated Golden's frame sequence.
+    if let Some(mut frame) = app.world_mut().get_resource_mut::<StripAnimFrame>() {
+        frame.0 = 0;
+    }
     for _ in 0..WARMUP_FRAMES {
         app.update();
     }
@@ -463,7 +475,7 @@ pub fn measure_cell(
         samples.push(start.elapsed().as_secs_f64() * 1000.0);
     }
 
-    // golden 子集：尾帧捕获 + 基线 diff（首跑写基线）。
+    // golden 子集：尾帧捕获 + 只读已接受基线 diff。
     let (golden, png) = if GOLDEN_SUBSET.contains(&target_id.as_str()) {
         let request = capture::request_capture(app.world_mut(), target);
         let mut frame = None;
@@ -494,7 +506,7 @@ pub fn measure_cell(
 
 /// 运行完整 sweep。返回 `None` = 无 GPU（graceful skip）。
 ///
-/// `golden_dir`：golden 子集基线目录（存在则 diff，不存在则写基线）。
+/// `golden_dir`：已接受基线目录；缺失基线不能通过。
 pub fn run_sweep(golden_dir: &std::path::Path) -> Option<(SweepReport, Vec<(String, Vec<u8>)>)> {
     let resources = capture::probe_render_resources()?;
     let mut cells = Vec::new();
@@ -526,7 +538,7 @@ pub fn run_sweep(golden_dir: &std::path::Path) -> Option<(SweepReport, Vec<(Stri
             requested_tier: tier_name(tier).to_string(),
             resolved_tier: outcome.resolved_tier,
             lighting: lighting.to_string(),
-            backend: "vulkan".to_string(),
+            backend: format!("{:?}", resources.2.backend).to_lowercase(),
             class: "Cel".to_string(),
             frame_stats: outcome.stats,
             golden: outcome.golden,
@@ -568,15 +580,19 @@ pub fn run_sweep(golden_dir: &std::path::Path) -> Option<(SweepReport, Vec<(Stri
         let info = &resources.2;
         format!("{} ({:?})", info.name, info.backend)
     };
-    let driver = {
-        // RenderResources 不含 driver；从一次性 probe app 读
-        // RenderAdapterInfo 代价高——driver 以空串如实记录（gpu 字段已含
-        // backend；provenance 完备性见 docs/performance/targets.md）。
-        String::new()
-    };
+    let driver = format!("{} {}", resources.2.driver, resources.2.driver_info);
     Some((
         SweepReport {
             schema: SWEEP_SCHEMA,
+            metric: SWEEP_METRIC,
+            optimized: !cfg!(debug_assertions),
+            workload_fnv1a64: golden_harness::fnv1a64_hex(
+                concat!(
+                    include_str!("lib.rs"),
+                    include_str!("../../benchmarks/src/lib.rs")
+                )
+                .as_bytes(),
+            ),
             evidence_policy: "ADR-0029: fixed sweep cells, labeled axes; regression gate = mean \
                               frame time +10% vs baseline on the same device",
             captured_unix_seconds: std::time::SystemTime::now()
@@ -587,8 +603,12 @@ pub fn run_sweep(golden_dir: &std::path::Path) -> Option<(SweepReport, Vec<(Stri
             driver,
             os: format!("{} {}", std::env::consts::OS, std::env::consts::ARCH),
             backends: BackendCoverage {
-                vulkan: "run",
-                others: "skipped-unavailable (single-adapter machine; no dx12/metal/gl)",
+                vulkan: if format!("{:?}", resources.2.backend) == "Vulkan" {
+                    "run"
+                } else {
+                    "not-run"
+                },
+                others: "only the adapter recorded in each cell was measured",
             },
             frames: [WARMUP_FRAMES, MEASURED_FRAMES],
             cells,
@@ -628,11 +648,8 @@ fn golden_subset_eval(
         stats,
         golden_harness::Tolerance::default(),
     );
-    if !report.passed {
-        // 诊断：超容差时把当前捕获落盘（golden 目录旁，不覆盖基线）。
-        let current_path = golden_dir.join(format!("{}.current.png", target_id.replace('/', "_")));
-        std::fs::write(current_path, png_bytes).expect("write current capture");
-    }
+    // The caller owns diagnostic captures under its unique output directory.
+    // Golden comparison never writes into the accepted baseline directory.
     GoldenCellStatus {
         status: if report.passed { "matched" } else { "exceeded" }.into(),
         max_channel_delta: report.stats.max_channel_delta,
@@ -648,6 +665,13 @@ fn golden_subset_eval(
 /// 基线文件的可读形态（gate 输入）。
 #[derive(serde::Deserialize)]
 pub struct BaselineReport {
+    pub schema: String,
+    pub metric: String,
+    pub optimized: bool,
+    pub workload_fnv1a64: String,
+    pub driver: String,
+    pub os: String,
+    pub frames: [usize; 2],
     /// Required adapter/backend identity for a comparable baseline.
     #[serde(default)]
     pub gpu: String,
@@ -665,13 +689,58 @@ pub fn gate_against(baseline: &BaselineReport, current: &SweepReport) -> (bool, 
     if baseline.gpu.is_empty() || baseline.gpu != current.gpu {
         invalid.push("GPU identity differs or is missing".into());
     }
+    if baseline.schema != SWEEP_SCHEMA
+        || current.schema != SWEEP_SCHEMA
+        || baseline.metric != SWEEP_METRIC
+        || current.metric != SWEEP_METRIC
+        || !baseline.optimized
+        || !current.optimized
+        || baseline.workload_fnv1a64.is_empty()
+        || baseline.workload_fnv1a64 != current.workload_fnv1a64
+        || baseline.driver.trim().is_empty()
+        || baseline.driver != current.driver
+        || baseline.os.is_empty()
+        || baseline.os != current.os
+        || baseline.frames != current.frames
+    {
+        invalid.push("incomparable build, driver, workload or measurement domain".into());
+    }
     if baseline.cells.is_empty() {
         invalid.push("empty baseline coverage".into());
     }
     let mut seen = std::collections::HashSet::new();
+    let mut baseline_ids = std::collections::HashSet::new();
+    for cell in &baseline.cells {
+        if !baseline_ids.insert(&cell.target_id) {
+            invalid.push(format!("duplicate baseline cell: {}", cell.target_id));
+        }
+        if cell.golden.as_ref().is_some_and(|g| g.status != "matched")
+            || (GOLDEN_SUBSET.contains(&cell.target_id.as_str()) && cell.golden.is_none())
+        {
+            invalid.push(format!(
+                "{}: invalid baseline Golden evidence",
+                cell.target_id
+            ));
+        }
+    }
     for cell in &current.cells {
         if !seen.insert(&cell.target_id) {
             invalid.push(format!("duplicate cell: {}", cell.target_id));
+        }
+        if !baseline_ids.contains(&cell.target_id) {
+            invalid.push(format!(
+                "baseline lacks required current cell: {}",
+                cell.target_id
+            ));
+        }
+        if !valid_stats(&cell.frame_stats) {
+            invalid.push(format!("{}: invalid timing statistics", cell.target_id));
+        }
+        if GOLDEN_SUBSET.contains(&cell.target_id.as_str()) && cell.golden.is_none() {
+            invalid.push(format!(
+                "{}: required Golden evidence missing",
+                cell.target_id
+            ));
         }
         if let Some(golden) = &cell.golden
             && golden.status != "matched"
@@ -691,6 +760,12 @@ pub fn gate_against(baseline: &BaselineReport, current: &SweepReport) -> (bool, 
         if current_cell.resolved_tier != base_cell.resolved_tier
             || current_cell.class != base_cell.class
             || current_cell.backend != base_cell.backend
+            || current_cell.scene != base_cell.scene
+            || current_cell.count != base_cell.count
+            || current_cell.pose != base_cell.pose
+            || current_cell.resolution != base_cell.resolution
+            || current_cell.requested_tier != base_cell.requested_tier
+            || current_cell.lighting != base_cell.lighting
         {
             invalid.push(format!(
                 "{}: effective quality/backend changed",
@@ -699,7 +774,8 @@ pub fn gate_against(baseline: &BaselineReport, current: &SweepReport) -> (bool, 
         }
         let base_mean = base_cell.frame_stats.mean_ms;
         let current_mean = current_cell.frame_stats.mean_ms;
-        if !base_mean.is_finite()
+        if !valid_stats(&base_cell.frame_stats)
+            || !base_mean.is_finite()
             || base_mean <= 0.0
             || !current_mean.is_finite()
             || current_mean <= 0.0
@@ -728,6 +804,85 @@ pub fn gate_against(baseline: &BaselineReport, current: &SweepReport) -> (bool, 
             invalid_cells: invalid,
         },
     )
+}
+
+fn valid_stats(s: &SweepFrameStats) -> bool {
+    [s.mean_ms, s.median_ms, s.p95_ms, s.min_ms, s.max_ms]
+        .iter()
+        .all(|x| x.is_finite() && *x > 0.)
+        && s.min_ms <= s.median_ms
+        && s.median_ms <= s.p95_ms
+        && s.p95_ms <= s.max_ms
+        && s.min_ms <= s.mean_ms
+        && s.mean_ms <= s.max_ms
+}
+
+/// Required collection is checked independently of whichever baseline is supplied.
+pub fn validate_required_sweep(report: &SweepReport) -> Vec<String> {
+    let mut expected = std::collections::BTreeSet::new();
+    for &resolution in &RESOLUTIONS {
+        for &tier in &TIERS {
+            for light in LIGHTINGS {
+                for count in COUNTS {
+                    expected.insert(cell_target_id(
+                        "crowd", count, "static", resolution, tier, light,
+                    ));
+                }
+                for pose in POSES {
+                    expected.insert(cell_target_id("strip", 1, pose, resolution, tier, light));
+                }
+            }
+        }
+    }
+    for (scene, count, pose) in [("crowd", 1000, "static"), ("strip", 1, "animated")] {
+        expected.insert(cell_target_id(
+            scene,
+            count,
+            pose,
+            [1280, 720],
+            StylizedExecutionTier::High,
+            "day",
+        ));
+    }
+    let actual: std::collections::BTreeSet<_> =
+        report.cells.iter().map(|c| c.target_id.clone()).collect();
+    let mut errors = Vec::new();
+    if actual != expected || actual.len() != report.cells.len() {
+        errors.push("required sweep inventory differs".into());
+    }
+    for cell in &report.cells {
+        let tier = match cell.requested_tier.as_str() {
+            "portable" => StylizedExecutionTier::Portable,
+            "standard" => StylizedExecutionTier::Standard,
+            "high" => StylizedExecutionTier::High,
+            _ => {
+                errors.push(format!("{}: invalid requested tier", cell.target_id));
+                continue;
+            }
+        };
+        if cell.target_id
+            != cell_target_id(
+                &cell.scene,
+                cell.count,
+                &cell.pose,
+                cell.resolution,
+                tier,
+                &cell.lighting,
+            )
+        {
+            errors.push(format!(
+                "{}: identity differs from cell fields",
+                cell.target_id
+            ));
+        }
+    }
+    // A self-comparison validates metadata, statistics and required Golden fields,
+    // without establishing regression or accepting this report as a baseline.
+    let baseline: BaselineReport =
+        serde_json::from_value(serde_json::to_value(report).expect("serialize report"))
+            .expect("report/baseline fields match");
+    errors.extend(gate_against(&baseline, report).1.invalid_cells);
+    errors
 }
 
 /// 由 Unix 秒推导 ISO 日期（civil-from-days；无 chrono 依赖）。
@@ -770,7 +925,10 @@ mod tests {
             class: "Cel".into(),
             frame_stats: SweepFrameStats {
                 mean_ms,
-                ..SweepFrameStats::default()
+                median_ms: mean_ms,
+                p95_ms: mean_ms,
+                min_ms: mean_ms,
+                max_ms: mean_ms,
             },
             golden: None,
             gpu_timing: None,
@@ -780,12 +938,15 @@ mod tests {
     fn report(cells: Vec<SweepCell>) -> SweepReport {
         SweepReport {
             schema: SWEEP_SCHEMA,
+            metric: SWEEP_METRIC,
+            optimized: true,
+            workload_fnv1a64: "test-workload".into(),
             evidence_policy: "",
             captured_unix_seconds: 0,
             engine_git_commit: String::new(),
             gpu: "test GPU".into(),
-            driver: String::new(),
-            os: String::new(),
+            driver: "test-driver".into(),
+            os: "test-os".into(),
             backends: BackendCoverage {
                 vulkan: "run",
                 others: "skipped-unavailable",
@@ -796,12 +957,13 @@ mod tests {
         }
     }
 
+    fn baseline(cells: Vec<SweepCell>) -> BaselineReport {
+        serde_json::from_value(serde_json::to_value(report(cells)).unwrap()).unwrap()
+    }
+
     #[test]
     fn gate_flags_regression_over_threshold() {
-        let baseline = BaselineReport {
-            gpu: "test GPU".into(),
-            cells: vec![cell("a", 10.0), cell("b", 5.0)],
-        };
+        let baseline = baseline(vec![cell("a", 10.0), cell("b", 5.0)]);
         // a: 10 → 11.2（+12% > 10%）回归；b: 5 → 5.4（+8%）通过。
         let current = report(vec![cell("a", 11.2), cell("b", 5.4)]);
         let (failed, outcome) = gate_against(&baseline, &current);
@@ -813,10 +975,7 @@ mod tests {
 
     #[test]
     fn gate_rejects_missing_coverage_even_when_remaining_cells_are_fast() {
-        let baseline = BaselineReport {
-            gpu: "test GPU".into(),
-            cells: vec![cell("a", 10.0), cell("gone", 3.0)],
-        };
+        let baseline = baseline(vec![cell("a", 10.0), cell("gone", 3.0)]);
         let current = report(vec![cell("a", 10.9)]);
         let (failed, outcome) = gate_against(&baseline, &current);
         assert!(failed, "missing required coverage must fail");
@@ -843,5 +1002,41 @@ mod tests {
             "night",
         );
         assert_eq!(id, "strip/animated/512x512/standard/night");
+    }
+
+    #[test]
+    fn gate_rejects_partial_baseline_duplicates_and_missing_golden() {
+        let base = baseline(vec![cell("a", 1.)]);
+        assert!(gate_against(&base, &report(vec![cell("a", 1.), cell("b", 1.)])).0);
+        let duplicate = baseline(vec![cell("a", 1.), cell("a", 1.)]);
+        assert!(gate_against(&duplicate, &report(vec![cell("a", 1.)])).0);
+        let required = GOLDEN_SUBSET[0];
+        assert!(
+            gate_against(
+                &baseline(vec![cell(required, 1.)]),
+                &report(vec![cell(required, 1.)])
+            )
+            .0
+        );
+        assert!(!validate_required_sweep(&report(vec![cell("a", 1.)])).is_empty());
+    }
+
+    #[test]
+    fn gate_rejects_changed_measurement_domain_workload_and_statistics() {
+        let base = baseline(vec![cell("a", 1.)]);
+        assert!(!gate_against(&base, &report(vec![cell("a", 1.)])).0);
+        for mutation in 0..7 {
+            let mut r = report(vec![cell("a", 1.)]);
+            match mutation {
+                0 => r.driver = "different".into(),
+                1 => r.optimized = false,
+                2 => r.workload_fnv1a64 = "different".into(),
+                3 => r.metric = "gpu-ms",
+                4 => r.cells[0].resolution = [1024, 1024],
+                5 => r.cells[0].frame_stats.p95_ms = f64::NAN,
+                _ => r.cells[0].lighting = "night".into(),
+            }
+            assert!(gate_against(&base, &r).0, "mutation {mutation}");
+        }
     }
 }
