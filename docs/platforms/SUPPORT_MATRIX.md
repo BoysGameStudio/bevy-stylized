@@ -20,7 +20,7 @@
 | iOS / Metal | ✅ Compatible | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | Not qualified |
 | Android / Vulkan | ✅ Compatible | ✅ ARM64 smoke, local Bevy fork | 🧪 SwiftShader + MoltenVK smoke | 🧪 Class/hull paths | 🧪 Procedural + static character, touch/resume | 🧪 API 35 emulator only | ⚪ Not measured | Experimental; hardware follow-up scoped below |
 | Android / GLES | ✅ Compatible | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | Not qualified |
-| Web / WebGPU | ✅ Compatible | ✅ standalone wasm32 | ✅ real browser compilation | ✅ Cel/Character/Hero + hull | ✅ static asset capture | ✅ Linux/Chrome 153, RTX 5090 | ⚪ Not measured | Experimental, scoped below |
+| Web / WebGPU | ✅ Compatible | ✅ standalone wasm32 | ✅ real browser compilation | ✅ Cel/Character/Hero + hull | ✅ static asset capture | ✅ Linux/Chrome 153 (envelope) + macOS/Chrome 153 (exact) | ⚪ Not measured | Experimental; per-version qualification (ADR-0021), scoped below |
 | Web / WebGL2 | Outside current commitment | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | No support promise |
 | Consoles | Port-ready architecture only | N/A | N/A | N/A | N/A | N/A | N/A | Port-ready |
 
@@ -193,3 +193,13 @@ fixture is pixel-exact on macOS Chrome 153 (Dawn/Metal vs wgpu/Metal). The
 a version-qualification or tolerance decision stays open in ADR-0021, which
 remains a V1 Blocker. No row above changes; this addendum makes no new support
 claim.
+
+**Resolution (2026-09-22, later the same day):** ADR-0021 is Accepted with
+per-browser-version qualification; the browser-vs-native gate now prefers exact
+equality and otherwise applies the compiler-divergence envelope of
+[reference/08 §5](../reference/08-golden-tolerance-and-cross-layer-criteria.md)
+(≤13 differing pixels, ≤32/255 max channel delta, every differing pixel
+tier2-edge-confined). The recorded Linux Chrome 153 divergence (6 px / 18 ch /
+max 31) passes the envelope; the macOS Chrome 153 run remains exact. This is
+still not a general browser-support claim: other browsers, versions, drivers
+and feature scope are unmeasured until individually recorded.

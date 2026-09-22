@@ -48,7 +48,7 @@ remains explicitly qualified.
 
 ## Platforms
 - [x] Support matrix updated with evidence.
-- [ ] Web baseline ADR closed.
+- [x] Web baseline ADR closed (ADR-0021 Accepted 2026-09-22: WebGPU-only, real hardware adapter required, per-version qualification with the reference/08 §5 envelope).
 - [x] Backend-specific pipeline creation tests run.
 - [x] Any `Supported` target has real runtime evidence.
 

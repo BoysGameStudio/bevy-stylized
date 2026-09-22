@@ -24,7 +24,7 @@
 | ADR-0018 | Three-Axis Runtime Model | Accepted | [`0018-three-axis-runtime-model.md`](0018-three-axis-runtime-model.md) |
 | ADR-0019 | V1 Reference Family Scope | Accepted | [`0019-reference-family-scope.md`](0019-reference-family-scope.md) |
 | ADR-0020 | glTF Extras vs Sidecar Precedence | Proposed | [`0020-metadata-precedence.md`](0020-metadata-precedence.md) |
-| ADR-0021 | Web Baseline Policy | V1 Blocker | [`0021-web-baseline-policy.md`](0021-web-baseline-policy.md) |
+| ADR-0021 | Web Baseline Policy | Accepted | [`0021-web-baseline-policy.md`](0021-web-baseline-policy.md) |
 | ADR-0022 | RenderDevice Capability Lifecycle | Accepted | [`0022-render-device-capability-lifecycle.md`](0022-render-device-capability-lifecycle.md) |
 | ADR-0023 | Render Semantics Matrix | Accepted | [`0023-render-semantics-matrix.md`](0023-render-semantics-matrix.md) |
 | ADR-0024 | Cargo Feature Policy | Accepted | [`0024-cargo-feature-policy.md`](0024-cargo-feature-policy.md) |

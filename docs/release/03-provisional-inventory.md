@@ -370,8 +370,10 @@ and clippy were rerun; the final isolated snapshot uses the latter identity.
   masked hull/edge policy landed with GPU evidence (`shadow_casting.rs`,
   `masked_outline.rs`); masked screen-edge appearance (wide boundary band) and
   masked shadow casting remain explicitly unqualified cells.
-- ADR-0010/0021: initial WebGPU verification is complete for the recorded adapter;
-  release-wide browser/version requirements remain open. WebGL2 is not promised.
+- ADR-0010/0021: ADR-0021 is Accepted (2026-09-22) — WebGPU-only baseline with
+  per-browser-version qualification and the reference/08 §5 divergence envelope;
+  Chrome 153 records exist for Linux (envelope) and macOS (exact). ADR-0010 stays
+  open for release-wide platform policy. WebGL2 is not promised.
   Windows/D3D12, Metal, mobile devices and Linux/GLES have no equivalent local
   qualification. This environment has no `adb`, Xcode, Wine or GLES discovery
   tools, and its current wgpu feature graph does not build GL.
