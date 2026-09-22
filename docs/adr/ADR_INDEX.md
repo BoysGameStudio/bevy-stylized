@@ -20,7 +20,7 @@
 | ADR-0014 | Reference vs Runtime Artifact Boundary | Proposed | [`0014-reference-vs-runtime-artifact-boundary.md`](0014-reference-vs-runtime-artifact-boundary.md) |
 | ADR-0015 | Blender Reference Export Bridge | Accepted | [`0015-blender-reference-export-bridge.md`](0015-blender-reference-export-bridge.md) |
 | ADR-0016 | Package Naming | Accepted | [`0016-package-naming.md`](0016-package-naming.md) |
-| ADR-0017 | License and Provenance | V1 Blocker | [`0017-license-and-provenance.md`](0017-license-and-provenance.md) |
+| ADR-0017 | License and Provenance | Accepted | [`0017-license-and-provenance.md`](0017-license-and-provenance.md) |
 | ADR-0018 | Three-Axis Runtime Model | Accepted | [`0018-three-axis-runtime-model.md`](0018-three-axis-runtime-model.md) |
 | ADR-0019 | V1 Reference Family Scope | Accepted | [`0019-reference-family-scope.md`](0019-reference-family-scope.md) |
 | ADR-0020 | glTF Extras vs Sidecar Precedence | Proposed | [`0020-metadata-precedence.md`](0020-metadata-precedence.md) |

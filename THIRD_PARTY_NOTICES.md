@@ -22,9 +22,12 @@ Reference/provenance sources discussed by the documentation include:
 - Bevy 0.19.1 source/API documentation;
 - wgpu/WebGPU/glTF specifications and documentation.
 
-These entries document provenance and technical reference relationships. They are **not** a final license determination for a future runtime repository.
+These entries document provenance and technical reference relationships.
 
-Before publishing runtime/source artifacts, close ADR-0017 (`License and Provenance`) and perform a dedicated license/provenance review of any copied, modified, generated, bundled or redistributed material.
+ADR-0017 (Accepted 2026-09-22) records the license determination: proprietary
+private project, all rights reserved, no distribution (see LICENSE). Any future
+distribution plan reopens ADR-0017 and requires a dedicated license/provenance
+review of any copied, modified, generated, bundled or redistributed material.
 
 No unlicensed commercial-game asset should be added to the public fixtures or CI requirements.
 

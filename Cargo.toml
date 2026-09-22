@@ -35,8 +35,8 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.98"
 repository = "https://github.com/BoysGameStudio/bevy-stylized"
-# License intentionally unset at the workspace level: pending ADR-0017 /
-# provenance review; source attribution remains in THIRD_PARTY_NOTICES.md.
+# Proprietary private project (ADR-0017 Accepted 2026-09-22): all rights
+# reserved, no distribution; see LICENSE and THIRD_PARTY_NOTICES.md.
 
 [workspace.lints.clippy]
 # Bevy-inherent: ECS queries are complex types and systems take many

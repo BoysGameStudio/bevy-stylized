@@ -61,7 +61,7 @@ remains explicitly qualified.
 
 ## Release / Governance
 - [x] ADR-0016 Package Naming closed: `bevy-stylized`.
-- [ ] License/provenance ADR closed.
+- [x] License/provenance ADR closed. (ADR-0017 Accepted 2026-09-22: proprietary private, no distribution; distribution reopens review)
 - [x] Bevy compatibility matrix published.
 - [x] Selected Linux local feature matrix passes (seven standalone consumers, schema, inspector and scoped WebGPU).
 - [x] Showcase suite complete.
