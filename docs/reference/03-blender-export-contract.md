@@ -3,8 +3,9 @@
 This document owns the Blender-to-runtime boundary. The
 [export bridge](../authoring/02-blender-reference-export-bridge.md) owns build stages;
 the [reference workflow](01-reference-authoring-workflow.md) owns reproduction.
-ADR-0012 and ADR-0020 remain unresolved; describing current mechanisms does not
-freeze a broader interchange API.
+ADR-0012 is Accepted (2026-09-22, current static character scope); ADR-0020
+remains Proposed. Describing current mechanisms does not freeze a broader
+interchange API.
 
 ## Current static character export
 
@@ -205,8 +206,9 @@ and compiler implementation, not copied into an export-settings checklist.
 ## Unresolved generalization and schema ownership
 
 Attribute quantization, shader-location policy, generalized unit/negative-scale
-validation and broad exporter support remain bounded by ADR-0012 and the actual
-profile implementation. Current static qualification does not settle those choices.
+validation and broad exporter support remain the explicit follow-up scope named
+by ADR-0012 (Accepted 2026-09-22) and the actual profile implementation. Current
+static qualification does not settle those choices.
 
 The current authoring schemas cover source manifests, static recipes, capture
 contracts and the NPR attribute inventory. The inventory generates the loader's

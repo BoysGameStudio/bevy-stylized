@@ -14,7 +14,7 @@ not a fresh run on every documentation revision. Detailed criteria live in
 ## Architecture
 - [x] Surface Class × Execution Tier × Validation Mode implemented without semantic conflation.
 - [x] Material / Instance / View separation enforced.
-- [ ] Instance transport ADR closed.
+- [x] Instance transport ADR closed (ADR-0004 Accepted 2026-09-22).
 - [ ] Runtime Material backend ADR closed.
 - [ ] Whole-pipeline resource budget ADR closed.
 
@@ -26,7 +26,7 @@ remains explicitly qualified.
 
 - [x] Blender upstream Golden produced before runtime export.
 - [x] Reference toolchain locked (Blender / Gacha Setup / digests).
-- [ ] Blender export contract frozen.
+- [x] Blender export contract frozen (ADR-0012, current static character scope; named follow-up sub-items stay explicit).
 - [ ] Reference upgrade policy frozen.
 - [ ] Production validated against independent upstream Golden.
 - [ ] Production variants pass accepted regression and semantic suites.
@@ -42,7 +42,7 @@ remains explicitly qualified.
 ## Rendering semantics
 - [x] Opaque/Mask/Blend/etc. support matrix published.
 - [x] Native opaque/mask prepass and hull/screen outline regressions tested.
-- [ ] Optional runtime shadows and remaining masked/transparent outline combinations qualified.
+- [x] Optional runtime shadows (Hero opt-in via `shadow-casting`) qualified; masked/transparent outline combinations explicitly bounded by ADR-0023 (masked screen-edge appearance and masked shadow casting stay unqualified cells).
 - [x] Skinning/morph semantics tested.
 - [x] Cull inheritance tested.
 

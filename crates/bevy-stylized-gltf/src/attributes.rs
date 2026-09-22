@@ -14,7 +14,8 @@
 //!   （如 `_NPR_MASK` → `NPR_MASK`）；
 //! - 每个 attribute 使用稳定的 `id`（base `0x4E50_5200_0000_0000`，"NPR"）。
 //!
-//! 量化/shader location 分配未冻结（pending ADR-0012）：v1 全部以未压缩
+//! 量化/shader location 分配是 ADR-0012（Accepted 2026-09-22）明确未冻结的
+//! 后续项：v1 全部以未压缩
 //! float32 传输，shader location 由 profile 在材质编译期分配。
 
 use bevy::{mesh::MeshVertexAttribute, mesh::VertexFormat};
