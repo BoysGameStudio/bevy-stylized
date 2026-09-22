@@ -286,9 +286,13 @@ fn fragment(vertex: VertexOutput, @builtin(front_facing) front_facing: bool) -> 
     }
 
 #ifdef STYLIZED_BASE_COLOR
-    var base_output: FragmentOutput;
-    base_output.color = vec4<f32>(base.rgb,1.0);
-    return base_output;
+    // naga MSL 后端为每个 struct 返回值在函数作用域合成 `_tmp`；多个
+    // struct return 同级会重定义（Metal 编译失败）。块作用域隔离。
+    if true {
+        var base_output: FragmentOutput;
+        base_output.color = vec4<f32>(base.rgb,1.0);
+        return base_output;
+    }
 #endif
 
     let authored_base = base;
@@ -343,10 +347,12 @@ fn fragment(vertex: VertexOutput, @builtin(front_facing) front_facing: bool) -> 
 #endif
 
 #ifdef STYLIZED_NDOTH
-    var half_output: FragmentOutput;
-    let h=normalize(light_direction+hero_view_direction(in.world_position.xyz));
-    half_output.color=vec4<f32>(vec3<f32>(max(dot(normal,h),0.0)),1.0);
-    return half_output;
+    if true { // 同上：struct return 隔离到块作用域（naga MSL `_tmp`）。
+        var half_output: FragmentOutput;
+        let h=normalize(light_direction+hero_view_direction(in.world_position.xyz));
+        half_output.color=vec4<f32>(vec3<f32>(max(dot(normal,h),0.0)),1.0);
+        return half_output;
+    }
 #endif
 
     let body_light=select(light_direction,-light_direction,material.source_conventions.w>0.5);
@@ -547,9 +553,11 @@ fn fragment(vertex: VertexOutput, @builtin(front_facing) front_facing: bool) -> 
 #endif
 
 #ifdef STYLIZED_LIGHTING_FACTORS
-    var factor_output: FragmentOutput;
-    factor_output.color = vec4<f32>(lit_factor, sharp_factor, 1.0, 1.0);
-    return factor_output;
+    if true { // 同上：struct return 隔离到块作用域（naga MSL `_tmp`）。
+        var factor_output: FragmentOutput;
+        factor_output.color = vec4<f32>(lit_factor, sharp_factor, 1.0, 1.0);
+        return factor_output;
+    }
 #endif
 
     // 双档光照（docs/reference/07 §3.7 已核实：sharp/soft 串联相乘 +
@@ -586,9 +594,11 @@ fn fragment(vertex: VertexOutput, @builtin(front_facing) front_facing: bool) -> 
         shaded_base+=nonmetal;
     }
 #ifdef STYLIZED_PRE_PALETTE
-    var palette_input: FragmentOutput;
-    palette_input.color=vec4<f32>(shaded_base,1.0);
-    return palette_input;
+    if true { // 同上：struct return 隔离到块作用域（naga MSL `_tmp`）。
+        var palette_input: FragmentOutput;
+        palette_input.color=vec4<f32>(shaded_base,1.0);
+        return palette_input;
+    }
 #endif
     var ambient = lights.ambient_color.rgb;
 #ifdef NPR_HOST_INPUTS
