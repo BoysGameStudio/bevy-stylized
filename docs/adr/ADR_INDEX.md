@@ -14,7 +14,7 @@
 | ADR-0008 | Outline Architecture | Proposed | [`0008-outline-architecture.md`](0008-outline-architecture.md) |
 | ADR-0009 | Lighting Backends | Proposed | [`0009-lighting-backends.md`](0009-lighting-backends.md) |
 | ADR-0010 | Platform Support Policy | Proposed | [`0010-platform-support-policy.md`](0010-platform-support-policy.md) |
-| ADR-0011 | Reference Toolchain Lock | V1 Blocker | [`0011-reference-toolchain.md`](0011-reference-toolchain.md) |
+| ADR-0011 | Reference Toolchain Lock | Accepted | [`0011-reference-toolchain.md`](0011-reference-toolchain.md) |
 | ADR-0012 | Blender Export Contract | V1 Blocker | [`0012-blender-export-contract.md`](0012-blender-export-contract.md) |
 | ADR-0013 | Upstream Reference Upgrade Policy | Proposed | [`0013-upstream-reference-upgrade.md`](0013-upstream-reference-upgrade.md) |
 | ADR-0014 | Reference vs Runtime Artifact Boundary | Proposed | [`0014-reference-vs-runtime-artifact-boundary.md`](0014-reference-vs-runtime-artifact-boundary.md) |
