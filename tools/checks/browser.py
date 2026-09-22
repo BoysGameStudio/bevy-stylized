@@ -35,6 +35,97 @@ def validate_capture(value, backend, primitives):
     return data
 
 
+def expected_native_backend():
+    """本机侧的期望 backend（严格身份，无静默回落）：Linux/其他 = Vulkan；
+    macOS = Metal（MoltenVK 上游不可用，见 ADR-0021 证据）。"""
+    import sys
+    return 'Metal' if sys.platform == 'darwin' else 'Vulkan'
+
+
+# ---------------------------------------------------------------------------
+# 浏览器比较 envelope（docs/reference/08 §5；ADR-0021）。
+# 只对 "WebGPU 浏览器（Dawn/Tint）vs 本机 Vulkan（wgpu/naga）" 域生效；
+# 边缘判定规则与 labs/validation 的 tier2 `is_edge_pixel` 逐位一致。
+
+TIER2_EDGE_GRADIENT = 32.0 / 255.0
+"""tier2 3×3 亮度梯度阈值（与 labs/validation/src/tier2.rs 相同）。"""
+ENVELOPE_EDGE_RADIUS = 3
+"""差异像素 7×7 窗口内（任一图像）必须存在 tier2 边缘像素。"""
+ENVELOPE_MAX_DIFFERING_PIXELS = 13
+"""差异像素上限（512² 的 0.005%）。"""
+ENVELOPE_MAX_CHANNEL_DELTA = 32
+"""最大通道差上限（32/255）。"""
+
+
+def _f32(value):
+    """舍入到 IEEE 单精度（与 tier2 的 Rust f32 算术逐位一致）。"""
+    return struct.unpack('f', struct.pack('f', value))[0]
+
+
+def _luminance(data, offset):
+    """BT.709 亮度（tier2 同一权重；逐步 f32 舍入保持与 Rust 逐位一致）。"""
+    r = _f32(data[offset] / 255.0)
+    g = _f32(data[offset + 1] / 255.0)
+    b = _f32(data[offset + 2] / 255.0)
+    return _f32(_f32(_f32(_f32(0.2126) * r) + _f32(_f32(0.7152) * g))
+                + _f32(_f32(0.0722) * b))
+
+
+def _is_edge_pixel(data, width, height, x, y, threshold=TIER2_EDGE_GRADIENT):
+    """labs/validation/src/tier2.rs `is_edge_pixel` 的逐位 Python 移植。"""
+    center = _luminance(data, (y * width + x) * 4)
+    for dy in (-1, 0, 1):
+        for dx in (-1, 0, 1):
+            if dx == 0 and dy == 0:
+                continue
+            nx = max(0, min(x + dx, width - 1))
+            ny = max(0, min(y + dy, height - 1))
+            if abs(_luminance(data, (ny * width + nx) * 4) - center) > threshold:
+                return True
+    return False
+
+
+def _edge_within(data, width, height, x, y, radius=ENVELOPE_EDGE_RADIUS):
+    """(x, y) 的 (2r+1)² 窗口内是否存在 tier2 边缘像素。"""
+    for dy in range(-radius, radius + 1):
+        for dx in range(-radius, radius + 1):
+            nx = max(0, min(x + dx, width - 1))
+            ny = max(0, min(y + dy, height - 1))
+            if _is_edge_pixel(data, width, height, nx, ny):
+                return True
+    return False
+
+
+def evaluate_browser_envelope(a, b, width=512, height=512):
+    """评估编译器分歧 envelope（仅浏览器 vs 本机域；reference/08 §5）。
+
+    返回结构化结果：差异像素数、最大通道差、是否全部差异都落在 tier2
+    边缘窗口内（edge_confined）及 envelope 是否成立（pass）。
+    """
+    differing = [i for i in range(width * height)
+                 if a[i * 4:i * 4 + 4] != b[i * 4:i * 4 + 4]]
+    max_delta = max((abs(x - y) for x, y in zip(a, b)), default=0)
+    edge_confined = all(
+        _edge_within(a, width, height, i % width, i // width)
+        or _edge_within(b, width, height, i % width, i // width)
+        for i in differing)
+    passed = (len(differing) <= ENVELOPE_MAX_DIFFERING_PIXELS
+              and max_delta <= ENVELOPE_MAX_CHANNEL_DELTA and edge_confined)
+    return {
+        'policy': 'docs/reference/08#5-browser-webgpu-dawn-vs-native-vulkanmetal',
+        'pass': passed,
+        'differing_pixels': len(differing),
+        'max_channel_delta': max_delta,
+        'edge_confined': edge_confined,
+        'limits': {
+            'differing_pixels': ENVELOPE_MAX_DIFFERING_PIXELS,
+            'max_channel_delta': ENVELOPE_MAX_CHANNEL_DELTA,
+            'edge_window_radius': ENVELOPE_EDGE_RADIUS,
+            'edge_gradient': TIER2_EDGE_GRADIENT,
+        },
+    }
+
+
 def primitive_count(asset):
     data = asset.read_bytes()
     if data[:4] != b'glTF' or data[16:20] != b'JSON':
@@ -145,19 +236,25 @@ def run(project, asset, out):
     if browser.get('errors'):
         raise CheckFailed('browser reported asynchronous errors')
     a = validate_capture(browser['result'], 'BrowserWebGpu', primitives)
-    b = validate_capture(native, 'Vulkan', primitives)
+    b = validate_capture(native, expected_native_backend(), primitives)
     from PIL import Image
     Image.frombytes('RGBA', (512, 512), a).save(out/'browser.png')
     Image.frombytes('RGBA', (512, 512), b).save(out/'native.png')
     differences = [abs(x-y) for x, y in zip(a, b)]
-    result = dict(schema='bevy_stylized.webgpu-validation/v1', status='PASS' if a == b else 'FAIL',
+    exact = a == b
+    # exact 优先；不一致时评估 reference/08 §5 的编译器分歧 envelope（仅此域）。
+    envelope = None if exact else evaluate_browser_envelope(a, b)
+    passed = exact or (envelope is not None and envelope['pass'])
+    result = dict(schema='bevy_stylized.webgpu-validation/v1',
+                  status='PASS' if passed else 'FAIL',
+                  exact_match=exact, envelope=envelope,
                   browser=browser['browser'], browser_adapter=browser['result'].get('adapter'),
                   native_device=native['device'], flags=flags, files=files, standalone_lock_sha256=standalone_lock,
                   max_channel_difference=max(differences), differing_channels=sum(x != 0 for x in differences),
                   source=project.source_identity(),
-                  scope='512x512 same-fixture Vulkan/WebGPU exact reproduction: compiled static asset, Cel/Character/Hero and native hull outlines; no WebGL2, shadow/prepass/table/deformation or general browser support claim')
+                  scope='512x512 same-fixture browser-WebGPU vs native (Vulkan on Linux, Metal on macOS) reproduction (exact pixel equality preferred; approved compiler-divergence envelope per docs/reference/08 §5 as fallback for this domain only): compiled static asset, Cel/Character/Hero and native hull outlines; no WebGL2, shadow/prepass/table/deformation or general browser support claim')
     (out/'report.json').write_text(json.dumps(result, indent=2)+'\n')
     project.report('webgpu', result)
     if result['status'] != 'PASS':
-        raise CheckFailed('same-fixture browser/native pixels differ; inspect captures without rebaselining')
+        raise CheckFailed('same-fixture browser/native pixels differ beyond the approved envelope; inspect captures without rebaselining')
     return result

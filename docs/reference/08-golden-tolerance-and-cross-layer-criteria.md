@@ -40,3 +40,34 @@ actual inputs, adapter, metrics and pass/fail for each applicable criterion.
 A prior source or renderer result is not a substitute for a current changed
 case. Structural adoption, independent image criteria and platform qualification
 remain separate. The retired synthetic reference lane is not an acceptance input.
+
+## 5. Browser WebGPU (Dawn) vs native Vulkan/Metal
+
+Owner-approved 2026-09-22: per-browser-version qualification with a documented
+compiler-divergence envelope for this comparison domain ONLY (browser WebGPU
+vs native — Vulkan on Linux, Metal on macOS; the expected native backend is
+platform-explicit in the lane identity check, never silently substituted).
+
+Exact pixel equality remains the preferred criterion. When exact equality fails,
+the lane evaluates the approved fallback envelope (all three must hold):
+
+1. differing_pixels ≤ 13 (0.005% of 512²);
+2. max channel delta ≤ 32/255;
+3. every differing pixel is edge-confined: its 7×7 window (radius 3) contains a
+   tier2 edge pixel — 3×3 luminance gradient > 32/255 per
+   `labs/validation/src/tier2.rs::is_edge_pixel` — in either image. Structural
+   differences (flat-region or off-edge) fail regardless of count or delta.
+
+The envelope exists because Dawn (Tint) and wgpu (naga) disagree on float
+rounding in high-gradient specular regions; it never applies to same-toolchain
+reproduction (§1), the cross-renderer tier2 criteria (§3), Blender parity or any
+golden comparison, none of which change.
+
+Measured basis (Chrome 153.0.8010.52, Linux, NVIDIA 615.71.09, hardware
+Blackwell adapter, 2026-09-22): 6 differing pixels / 18 channels, max delta
+31/255, all in hair specular highlights, byte-deterministic across runs; all 6
+pixels edge-confined (verified independently by the Rust classifier and its
+bit-exact Python port, full-map parity 0/524288 mismatches). The same fixture
+is pixel-exact on macOS Chrome 153 (Dawn/Metal vs wgpu/Metal). Qualification is
+per browser/driver version: a new browser or driver version requires
+re-measurement, and any divergence larger than the envelope fails as before.

@@ -80,7 +80,19 @@ fn pixel(data: &[u8], width: usize, x: usize, y: usize) -> [u8; 3] {
 }
 
 /// 3×3 邻域最大梯度（亮度差）。
-fn is_edge(data: &[u8], width: usize, height: usize, x: usize, y: usize, threshold: f32) -> bool {
+///
+/// 公开因为 docs/reference/08 §5 的浏览器比较 envelope 引用本规则；
+/// Python 宿主实现（tools/checks/browser.py）必须与本函数逐位一致——
+/// 一致性由 tests/python 的 envelope 测试与录制图像对的交叉核对钉死。
+#[must_use]
+pub fn is_edge_pixel(
+    data: &[u8],
+    width: usize,
+    height: usize,
+    x: usize,
+    y: usize,
+    threshold: f32,
+) -> bool {
     let center = luminance(&pixel(data, width, x, y));
     let mut max_gradient = 0.0_f32;
     for dy in -1_i32..=1 {
@@ -158,8 +170,8 @@ pub fn evaluate_tier2(
             let delta = (0..3)
                 .map(|c| (f32::from(pa[c]) - f32::from(pb[c])).abs() / 255.0)
                 .fold(0.0_f32, f32::max);
-            if is_edge(a.rgba8, width, height, x, y, thresholds.edge_gradient)
-                || is_edge(b.rgba8, width, height, x, y, thresholds.edge_gradient)
+            if is_edge_pixel(a.rgba8, width, height, x, y, thresholds.edge_gradient)
+                || is_edge_pixel(b.rgba8, width, height, x, y, thresholds.edge_gradient)
             {
                 edge_count += 1;
             } else {
@@ -304,8 +316,8 @@ pub fn evaluate_tier2_region(
                 .fold(0.0_f32, f32::max);
             sum += f64::from(delta);
             squared += f64::from(delta * delta);
-            if !(is_edge(a.rgba8, width, height, x, y, thresholds.edge_gradient)
-                || is_edge(b.rgba8, width, height, x, y, thresholds.edge_gradient))
+            if !(is_edge_pixel(a.rgba8, width, height, x, y, thresholds.edge_gradient)
+                || is_edge_pixel(b.rgba8, width, height, x, y, thresholds.edge_gradient))
             {
                 max_nonedge = max_nonedge.max(delta);
             }
