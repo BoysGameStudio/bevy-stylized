@@ -7,8 +7,8 @@
 //! - [`metadata`]：`bevy_stylized.*` namespaced extras 与 `.npr.json`
 //!   sidecar 的 typed 导入；extras/sidecar 冲突显式暴露（ADR-0020
 //!   Proposed，绝不静默取舍）；
-//! - [`setup`]：`GltfPlugin` 配置入口与初始化顺序守卫（ADR-0028，
-//!   机制标记为 provisional）。
+//! - [`setup`]：`GltfPlugin` 配置入口与初始化顺序守卫（ADR-0028
+//!   Accepted）。
 
 #[cfg(feature = "bevy-integration")]
 pub mod attributes;

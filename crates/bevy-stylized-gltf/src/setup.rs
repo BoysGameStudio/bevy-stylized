@@ -1,9 +1,9 @@
 //! `GltfPlugin` 配置入口与初始化顺序守卫。
 //!
-//! **Provisional（ADR-0028 未决）**：`_NPR_*` attribute 必须在
+//! **ADR-0028（Accepted）**：`_NPR_*` attribute 必须在
 //! `GltfPlugin` 加入 `App` **之前**注册到 plugin 上——`GltfPlugin::finish`
 //! 会把 `custom_vertex_attributes` 克隆进 `GltfLoader`，之后没有任何公开
-//! API 可以补救。ADR-0028 尚未选定正式机制；当前选择是
+//! API 可以补救。正式机制为
 //! "builder 配置 + fail-closed 顺序守卫"，证据见 facade 的插件顺序集成测试。
 
 use bevy::{app::App, gltf::GltfPlugin};
@@ -12,7 +12,7 @@ use crate::attributes::StylizedGltfPluginExt;
 
 /// 返回已注册全部 `_NPR_*` 顶点属性的 [`GltfPlugin`]（正确入口）。
 ///
-/// 用法（provisional，pending ADR-0028）：
+/// 用法（ADR-0028 Accepted）：
 ///
 /// ```ignore
 /// App::new()

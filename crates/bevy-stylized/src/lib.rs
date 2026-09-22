@@ -26,7 +26,7 @@
 //! # }
 //! ```
 //!
-//! **注意（ADR-0028，provisional）**：DefaultPlugins 自带的 `GltfPlugin`
+//! **注意（ADR-0028 Accepted）**：DefaultPlugins 自带的 `GltfPlugin`
 //! 不含 `_NPR_*` 注册，加完 DefaultPlugins 再装 `StylizedPlugin` **不能**
 //! retroactively 补注册；请用 [`stylized_gltf_plugin`] 替换默认
 //! `GltfPlugin`（见该函数文档）。
@@ -175,7 +175,7 @@ pub struct StylizedQualityPolicyResource(pub StylizedQualityPolicy);
 
 /// 返回已注册全部 `_NPR_*` 顶点属性的 `GltfPlugin`。
 ///
-/// **Provisional（ADR-0028 未决）**：当前机制为 builder 配置 +
+/// **ADR-0028 Accepted**：机制为 builder 配置 +
 /// fail-closed 顺序守卫（[`check_gltf_plugin_not_added`]）。用法：
 ///
 /// ```ignore

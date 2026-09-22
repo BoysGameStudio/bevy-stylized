@@ -4,7 +4,7 @@
 //! （docs/reference/06 §4）。本模块把该契约编码为 Bevy
 //! [`MeshVertexAttribute`] 常量与注册表，经
 //! [`StylizedGltfPluginExt::add_npr_vertex_attributes`] 在
-//! **GltfPlugin 加入 App 之前**注册（ADR-0028，机制标记为 provisional）。
+//! **GltfPlugin 加入 App 之前**注册（ADR-0028 Accepted）。
 //!
 //! Canonical attribute registration is checked against the generated contract.
 //! Only canonical NPR spellings are registered:
@@ -202,7 +202,7 @@ pub const NPR_VERTEX_ATTRIBUTES: [NprVertexAttributeRegistration; 10] = [
 
 /// 为 [`bevy::gltf::GltfPlugin`] 注册全部 `_NPR_*` 自定义顶点属性。
 ///
-/// **调用时机（ADR-0028，provisional）**：必须在把 `GltfPlugin` 加入
+/// **调用时机（ADR-0028 Accepted）**：必须在把 `GltfPlugin` 加入
 /// `App` **之前**调用；`GltfPlugin::finish` 会把 attribute 表烤进
 /// `GltfLoader`，之后再注册会被静默丢弃。facade 提供
 /// `bevy_stylized::stylized_gltf_plugin()` 作为正确入口。
