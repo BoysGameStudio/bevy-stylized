@@ -149,6 +149,16 @@ the original/fixed hull-only, screen-only and hybrid captures are pixel-identica
 on this machine. No Golden images or tolerances were changed. This is partial
 suite coverage, not a passed full GPU lane.
 
+2026-09-22 update: the Naga `_tmp` redefinition is fixed at the WGSL level
+(commit `c177382`; struct-typed debug returns isolated into block scope).
+`morph_skinning` (5/5), `hero_precision`, `profile_lighting` and
+`sampling_camera` now pass on Metal. Remaining pre-existing macOS-host
+failures: `outline_advanced`, `golden_cel`, `golden_character` are Metal
+golden-delta cases (cross-device Golden comparison on Metal was never
+qualified, docs/reference/08 §1), and `asset_adoption` requires an explicit
+local `STYLIZED_TEST_ASSET` input that was not provisioned in this run.
+macOS stays Not qualified above.
+
 On SwiftShader, cold-launched original/fixed APK pairs were each captured after
 600 update frames at the same front pose, camera and 1080×2400 resolution.
 Both procedural and static-character application ROIs `(0,160)-(1080,2240)`

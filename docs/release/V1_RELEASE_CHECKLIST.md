@@ -6,8 +6,8 @@ not a fresh run on every documentation revision. Detailed criteria live in
 [the provisional inventory](03-provisional-inventory.md).
 
 ## Architecture decisions
-- [ ] No ADR remains in `V1 Blocker` status.
-- [ ] Every `Accepted` ADR contains completed Decision, Evidence and Consequences.
+- [x] No ADR remains in `V1 Blocker` status (ADR-0007 closed 2026-09-22, the last one).
+- [x] Every `Accepted` ADR contains completed Decision, Evidence and Consequences (enforced by tools/checks/check_docs.py).
 - [ ] `TRACEABILITY.md` references every normative ADR relevant to V1.
 - [x] Documentation linter passes with no errors.
 
@@ -28,9 +28,9 @@ remains explicitly qualified.
 - [x] Reference toolchain locked (Blender / Gacha Setup / digests).
 - [x] Blender export contract frozen (ADR-0012, current static character scope; named follow-up sub-items stay explicit).
 - [ ] Reference upgrade policy frozen.
-- [ ] Production validated against independent upstream Golden.
-- [ ] Production variants pass accepted regression and semantic suites.
-- [ ] Reference artifact provenance complete.
+- [x] Production validated against independent upstream Golden (static matched-case scope: 6/6 strict cases on RTX 5090/Vulkan, rechecked on the current tree 2026-09-22; ADR-0007).
+- [x] Production variants pass accepted regression and semantic suites (required GPU lane 42/42 Linux/Vulkan; semantic matrix suites green).
+- [x] Reference artifact provenance complete (source lock → build manifest → case file → comparison report, machine-checked hashes).
 - [x] Reference-only code/assets excluded from default shipping build.
 
 ## Authoring

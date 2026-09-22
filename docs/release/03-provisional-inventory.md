@@ -360,9 +360,10 @@ and clippy were rerun; the final isolated snapshot uses the latter identity.
 
 - ADR-0004: accept the explicit coarse Hero/experimental table boundary or declare
   a finer requirement and qualify the complete table lifecycle before promotion.
-- ADR-0007/0011/0012/0013/0014/0015: the current source-locked static recipe has strict
-  evidence; broader family coverage and export/reference policy freezing remain
-  review decisions, not failures hidden by changing the recipe.
+- ADR-0007/0011/0012/0015 are Accepted (2026-09-22): the source-locked static
+  recipe's strict evidence held. ADR-0013/0014 remain open review decisions;
+  broader family coverage (rigs/physics/effects) is post-V1 scope, not a failure
+  hidden by changing the recipe.
 - ADR-0001/0002/0003/0005/0006/0008/0009/0020/0026/0028: existing implementation,
   resource/feature tests and current contracts provide review inputs; their
   proposed API/budget/ownership policies are not auto-accepted by green tests.

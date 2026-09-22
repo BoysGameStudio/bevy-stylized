@@ -1,7 +1,8 @@
 # Golden tolerance and independent comparison criteria
 
-> Status: Existing numeric criteria retained without relaxation. Cross-renderer
-> qualification remains Draft / ADR-0007; a failed metric is still a failure.
+> Status: Existing numeric criteria retained without relaxation. ADR-0007 is
+> Accepted (2026-09-22); the §3 cross-renderer thresholds are the qualified
+> static-scope criteria. A failed metric is still a failure.
 
 ## 1. Same-toolchain reproduction
 
