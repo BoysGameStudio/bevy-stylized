@@ -1,4 +1,4 @@
-//! Instance 层数据传输（provisional，pending ADR-0004）。
+//! Instance 层数据传输（ADR-0004 Accepted 合同）。
 //!
 //! 依据 It-3b 的 spike 证据（`target/tmp/adr-0004-spike/`）：MeshTag 方案
 //! 在 100/1000 实例下保持 1 次 draw（自动合批未破坏），且 Portable 不依赖
@@ -17,7 +17,7 @@
 //! bits 0..=23 = 槽位索引（全精度数据在 `crate::instance_table` 的
 //! `ShaderBuffer` 表里），bits 24..=31 flags 不变。
 //!
-//! 位布局是 **provisional**：ADR-0004 关闭前任何外部代码不得依赖它；
+//! 位布局自 ADR-0004 Accepted（2026-09-22）起**稳定**；
 //! 读写只能经 [`StylizedInstanceData::to_tag`] / [`StylizedInstanceData::from_tag`]。
 //!
 //! 数据流：`StylizedInstanceData` 组件 → [`sync_instance_tags`] →
@@ -53,7 +53,7 @@ pub const TAG_TABLE_INDEX_MASK: u32 = 0x00FF_FFFF;
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq, Reflect)]
 pub struct StylizedInstanceSlot(pub u32);
 
-/// Instance 数据传输通道（provisional，pending ADR-0004）。
+/// Instance 数据传输通道（ADR-0004 Accepted）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Reflect)]
 pub enum StylizedInstanceTransport {
     /// MeshTag 位打包（Portable 基线；spike 已验证合批不破坏）。
@@ -93,9 +93,9 @@ pub fn select_transport(
 /// （ADR-0030 §6；目前唯一派生项是 [`StylizedInstanceTransportMode`]）。
 ///
 /// 由 facade 的重配置事务在同一个 `&mut World` 作用域内调用；本资源是
-/// provisional 标记（ADR-0004 未决，运行时按 per-entity
-/// [`StylizedInstanceSlot`] 组件声明表通道），已存在的 slot 组件不回写，
-/// 变更后新建的内容观察到新模式。
+/// 运行时按 per-entity
+/// [`StylizedInstanceSlot`] 组件声明表通道（ADR-0004 Accepted）；
+/// 已存在的 slot 组件不回写，变更后新建的内容观察到新模式。
 pub fn refresh_capability_dependents(world: &mut bevy::prelude::World) {
     let mode = select_transport(
         world

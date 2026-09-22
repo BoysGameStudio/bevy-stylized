@@ -130,7 +130,8 @@ impl Default for StylizedMaterialDescriptor {
 /// Instance 层描述符：per-character / per-instance 的可变数据。
 ///
 /// 对应 docs/rendering/02 的 `StylizedInstanceGpu` 逻辑数据模型；
-/// GPU 传输机制由 ADR-0004 决定，本类型不承诺任何内存布局。
+/// GPU 传输机制由 ADR-0004（Accepted）决定；本类型是逻辑模型，
+/// 稳定运输布局见 render 层 MeshTag 位布局与 StorageTable 合同。
 #[derive(Clone, Debug, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
@@ -164,7 +165,7 @@ impl Default for StylizedInstanceDescriptor {
 }
 
 /// Instance 层全精度记录（V2-e GPU Instance Database 的记录 schema；
-/// provisional pending ADR-0004）。
+/// ADR-0004 Accepted 的 StorageTable 通道记录）。
 ///
 /// **两档保真契约**（同一逻辑数据的两条传输通道）：
 ///

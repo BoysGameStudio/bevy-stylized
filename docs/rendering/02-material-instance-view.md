@@ -136,7 +136,7 @@ Soft Transition
 
 ---
 
-## StylizedInstance Data Transport（V1 Blocker）
+## StylizedInstance Data Transport（ADR-0004 Accepted）
 
 `StylizedInstanceGpu` 只是逻辑数据模型；V1 还必须定义它如何进入 Bevy 0.19 GPU pipeline，同时保留 automatic instancing/batching。
 
@@ -187,7 +187,7 @@ Automatic Instancing/Batched Draw 未被无意破坏
 Portable baseline 有非-storage-buffer fallback（若 WebGL2/GLES3.0 在支持范围内）
 ```
 
-在该 ADR 通过前，不应把任何具体 storage-buffer 方案写成稳定公共 ABI。
+ADR-0004 已验收（2026-09-22）：MeshTag 位布局与 StorageTable 生命周期是稳定合同；Hero 全精度表未采用。
 
 ---
 
@@ -202,9 +202,9 @@ MeshTag transport (threshold step 1/254), rejects storage-table slots and explic
 material-side overrides, and does not claim full-precision animated-character
 parity. See [the contract and verification](../showcase/04-realtime-validation.md).
 
-## Provisional StorageTable lifecycle (2026-09-20)
+## StorageTable lifecycle (2026-09-20)
 
-StorageTable remains experimental under ADR-0004. An idle native app keeps only an
+StorageTable is the accepted contract under ADR-0004 (Accepted 2026-09-22). An idle native app keeps only an
 unallocated table placeholder; a storage asset is created only for explicit entries.
 Slots are dense indices in one
 published table snapshot, not persistent handles. Entries are ordered by Entity
@@ -231,8 +231,8 @@ preparation. Unchanged records do not upload or recreate bindings.
 The native schedule owns this synchronization. Hosts that take over presentation
 must invoke the same system before instance tag synchronization and asset events.
 The host still chooses StorageTable only on a supported tier; Portable materials
-keep their independent zero-storage layouts. This lifecycle improvement does not
-close ADR-0004 or claim a faster transport than MeshTag.
+keep their independent zero-storage layouts. This lifecycle is the accepted
+ADR-0004 table contract; it does not claim a faster transport than MeshTag.
 
 ## Native camera ownership and timing provenance (2026-09-20)
 

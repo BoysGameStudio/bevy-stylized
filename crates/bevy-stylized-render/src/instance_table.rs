@@ -1,4 +1,4 @@
-//! GPU Instance Database（V2-e，provisional pending ADR-0004 关闭）：
+//! GPU Instance Database（V2-e；ADR-0004 Accepted）：
 //! StorageTable 传输通道。
 //!
 //! 形态（ADR-0004 的"MeshTag 索引表"方案，spike 证据见

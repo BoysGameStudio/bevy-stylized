@@ -598,7 +598,7 @@ mod tests {
 }
 
 // ---------------------------------------------------------------------------
-// V2-e：StorageTable 变体（Standard+；provisional pending ADR-0004）
+// V2-e：StorageTable 变体（Standard+；ADR-0004 Accepted）
 // ---------------------------------------------------------------------------
 
 /// Character 的 StorageTable 变体材质：与 [`StylizedCharacterMaterial`]
