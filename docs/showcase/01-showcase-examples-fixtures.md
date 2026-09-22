@@ -23,12 +23,16 @@
 > 会话重放末次捕获逐字节一致；scene-runtime 全栈 wasm32 编译证明通过。覆盖映射：PC
 > 7 已有验证 / 10 仅展示，Android 1 已有验证 / 16 待实现，Browser 17 待实现。
 >
-> **未关闭项（所有者 / 阻塞条件）：** 产品公共重配置 API（产品所有者；阻塞会话内 tier
-> 变更）；wasm-bindgen-cli 装配与实时 Chromium 运行（阻塞全量 webgpu lane）；浏览器
-> 宿主接入与 APK/浏览器资产字节闭包桥接（宿主工作）；扩大"已有验证"覆盖格（终跑属
-> 合格 Linux GPU 主机；本 Metal 主机有预存在限制：golden 增量、readiness 停滞、
-> workloads GPU 时间戳读回失败）；控制协议传输与 adb 取回编排进 dev.py（宿主工具）；
-> 交互式部分提交的完整撤销。
+> **未关闭项（所有者 / 阻塞条件）：** wasm-bindgen-cli 装配与实时 Chromium 运行
+> （阻塞全量 webgpu lane）；浏览器宿主接入与 APK/浏览器资产字节闭包桥接（宿主
+> 工作）；扩大"已有验证"覆盖格（终跑属合格 Linux GPU 主机；本 Metal 主机有预存在
+> 限制：golden 增量、readiness 停滞、workloads GPU 时间戳读回失败）；控制协议传输
+> 与 adb 取回编排进 dev.py（宿主工具）；交互式部分提交的完整撤销。
+>
+> **2026-09-22 更新：** 产品公共重配置 API 已交付（ADR-0030，Proposed；
+> `bevy_stylized::reconfiguration`）——会话内 tier/class/fallback policy 对 Stage B
+> 快照确定性重解析、原子应用、代次 + 变更通知、结构化拒绝；控制器的 tier 拒绝
+> 先尝试会话内升档，设备级缺口才要求新 device 会话。
 >
 > 当前可执行入口见[运行手册](02-running-the-showcase-suite.md)。以上为本地证据，不构成
 > V1 就绪或新平台合格声明；[SUPPORT_MATRIX](../platforms/SUPPORT_MATRIX.md) 不变。
@@ -107,7 +111,7 @@ P1 表示全量迁移前必须解决，P2 表示应在相应模块迁移前明�
 | 编号 | 级别 | 初稿问题及具体后果 | 修订与验证要求 |
 |---|---|---|---|
 | R1 | P1 | 统一 runtime 未明确由谁推进 App；现有 harness 的 GPU probe 使用线程/block_on，readiness 有 `while app.update()`，不能直接作为 Android/Web runner | 共享非阻塞状态推进；事件循环归宿主；仅桌面 headless 包装允许 pump。验证恢复/读回时事件循环保持响应。**本地证据（2026-09-22）**：`labs/scene-runtime` 的 `CaseDriver` 为非阻塞状态机（宿主每帧推进一次，自身不 pump、不忙等），桌面 headless 包装是唯一泵送实现；`android-smoke` 的 `driver_host` 以 Update 系统逐帧推进 driver（无第二事件循环、无阻塞接收），API-35 模拟器 -gpu host 实测通过；浏览器宿主接入属后续工作 |
-| R2 | P1 | 初稿允许任意 preset 同会话切换，但 `StylizedPlugin::finish` 只初始化能力结果；改 recipe 不会重建 Device 或上调已解析能力 | 定义 SessionPlan 和会话重配置事务；产品所有者补齐公共配置接口，设备能力变化由宿主重建设备会话。不能直接写 resolved 资源。**本地证据（2026-09-22）**：`labs/scene-runtime::session` 定义了重配置事务状态机与 `SessionHost` 接口；接管失败只清理候选、device loss 后旧回执不能命中新槽位等验收行经 fake host 单测验证。产品公共重配置 API 仍是未关闭的产品侧缺口 |
+| R2 | P1 | 初稿允许任意 preset 同会话切换，但 `StylizedPlugin::finish` 只初始化能力结果；改 recipe 不会重建 Device 或上调已解析能力 | 定义 SessionPlan 和会话重配置事务；产品所有者补齐公共配置接口，设备能力变化由宿主重建设备会话。不能直接写 resolved 资源。**本地证据（2026-09-22）**：`labs/scene-runtime::session` 定义了重配置事务状态机与 `SessionHost` 接口；接管失败只清理候选、device loss 后旧回执不能命中新槽位等验收行经 fake host 单测验证；产品公共重配置 API 已落地（2026-09-22，ADR-0030 `bevy_stylized::reconfiguration`：快照重解析 + 原子应用 + 结构化拒绝，GPU 证据见 `labs/scene-runtime/tests/reconfiguration_evidence.rs`）。Device features/limits 变化仍需新 device 会话 |
 | R3 | P1 | 原方案仅标记 generation/tick；现有 `CaptureRequest` 只有 entity/target，Probe 的 frame 在 Render Cleanup 自增，不能证明图像属于该 tick 或 GPU 已完成 | 定义跨提取/提交/读回的 CaptureStamp 和快照保留；单步屏障与连续流水线捕获均必须证明逐帧身份。**本地证据（2026-09-22）**：`tests/harness` 已落地中性 `CaptureStamp`（请求序列 + 主世界 update 序号 + 渲染帧镜像 + 首次完成接受），GPU 证据测试见 `tests/harness/tests/capture_stamp.rs`；实验 tick 映射已由 `labs/scene-runtime` 的 ExperimentClock 落地（2026-09-22） |
 | R4 | P1 | 初稿让 APK 在一个进程内运行所有严格用例，弱化现有每用例独立进程合同；全局 PipelineCache 的错误会污染后续 readiness，资源和质量状态也会串场 | 既有严格 GPU gate 保留每用例新进程；共享会话只用于交互和明确的生命周期测试。失败用例不能阻止下一隔离用例被核对。**本地证据（2026-09-22）**：tests/integration 迁移到 `CaptureCycle` 后每用例仍是独立 App/driver 实例，19 个测试二进制 pre/post 逐项一致（含 8 个预存在失败的身份不变），严格 gate 的进程模型未动 |
 | R5 | P1 | “同等级 bundle 检查”未定义跨平台字节来源；Inspector 用文件路径与 canonicalize，APK 无对应语义；检查后再加载也可能读到不同内容 | 逻辑路径校验与资源适配分离，固定内容身份，校验实际送入 loader 的字节；参考输入域继续独立 |
@@ -263,10 +267,12 @@ SessionPlan 生成可审查的执行计划。组合节点使用稳定逻辑 ID�
 features/limits 改变则必须建立新 Device。宿主可以重建 App/设备会话，严格隔离
 用例必须新进程；不把“所有修改都要求用户手工重启”作为长期交互设计。
 
-当前 `StylizedPlugin::finish` 不提供上述完整重配置能力，此项是目标接口要求，
-不是现有行为。底层设备/Surface 重建接口缺失时，改动归引擎或产品所有者，场景
-层只协调其生命周期。Portable baseline 保留声明的 device 限制，不能为了切换
-方便统一申请最高能力；不同 SessionPlan 的结果不能混为相同执行条件。
+产品侧已提供公共重配置接口（2026-09-22，ADR-0030
+`bevy_stylized::reconfiguration`：对 Stage B 快照重解析并原子更新，Device
+features/limits 变更仍需新 device 会话，由宿主重建）。底层设备/Surface 重建
+接口缺失时，改动归引擎或产品所有者，场景层只协调其生命周期。Portable
+baseline 保留声明的 device 限制，不能为了切换方便统一申请最高能力；不同
+SessionPlan 的结果不能混为相同执行条件。
 
 同一配方在 PC/Android 上不能按操作系统改物体数、材质、灯光或相机。配方身份
 排除资产绝对根路径；执行身份另加 run ID、源码/lock、设备/驱动/backend、实际
@@ -826,7 +832,7 @@ face-SDF head、two-bone、morph cube、hair strip 可用确定性原语表达�
 | 问题 | 已知事实与目标决定 | 尚缺的证据 / 责任所有者 |
 |---|---|---|
 | 事件推进与 Surface 时序 | winit 的生命周期约束明确；宿主拥有事件循环，runtime 非阻塞 | Bevy 当前 Android 回调/渲染线程时序、暂停中读回及重复恢复的实测；引擎/平台宿主负责 |
-| 会话重配置与 device loss | Device 请求能力不能原地增加；目标采用重配置事务与检查点重放 | 产品公共重配置 API、宿主设备重建入口、各平台失败恢复语义；产品/引擎/宿主负责 |
+| 会话重配置与 device loss | Device 请求能力不能原地增加；目标采用重配置事务与检查点重放 | ~~产品公共重配置 API~~（2026-09-22 已交付，ADR-0030）、宿主设备重建入口、各平台失败恢复语义；引擎/宿主负责 |
 | 精确帧与连续捕获 | 当前读回没有 tick；目标 stamp 跨提取/提交/完成，快照不可变 | 多在途（不同 tick/同 tick 多 target）、重复完成、取消、编辑后新鲜内容的身份与像素一致性已由 `tests/harness/tests/capture_stamp.rs` 本地证明（2026-09-22，Metal）；乱序强制构造、多 view 组合与 temporal history 仍缺；harness/runtime 负责 |
 | 资产身份与缓存 | APK 非文件系统，同路径加载设置可能复用首次值 | 实际 loader 字节核验、同名包隔离、多语义绑定、重载与资源稳定；资产适配/runtime 负责 |
 | 共享 UI 与声明模型 | 场景语义可与输入/布局分离；模型是目录/控件/回放的共同来源 | 全部旧场景能无丢失表达，触摸/键鼠操作得到等价配方，事务/撤销可重放；model/content/UI 负责 |

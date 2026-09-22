@@ -347,9 +347,21 @@ mod interactive {
 
     fn describe(reason: &RefusalReason) -> String {
         match reason {
-            RefusalReason::TierRequired { required, resolved } => format!(
-                "case requires {required:?} but the session resolved {resolved:?}; a new session is required"
-            ),
+            RefusalReason::TierRequired {
+                required,
+                resolved,
+                reconfiguration_attempted,
+            } => {
+                if *reconfiguration_attempted {
+                    format!(
+                        "case requires {required:?}; in-session reconfiguration was refused by the device (session resolved {resolved:?}); a new device session is required"
+                    )
+                } else {
+                    format!(
+                        "case requires {required:?} but the session resolved {resolved:?} and no capability snapshot is available to attempt reconfiguration"
+                    )
+                }
+            }
             RefusalReason::AssetRootFixed(id) => format!(
                 "{id} needs a fixed asset root; the session asset root is fixed at startup (a new session is required)"
             ),

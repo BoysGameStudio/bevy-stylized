@@ -33,3 +33,4 @@
 | ADR-0027 | Current Bevy Baseline | Accepted | [`0027-bevy-compatibility-policy.md`](0027-bevy-compatibility-policy.md) |
 | ADR-0028 | glTF Plugin Initialization Ordering | V1 Blocker | [`0028-gltf-plugin-initialization.md`](0028-gltf-plugin-initialization.md) |
 | ADR-0029 | Performance Evidence Policy | Accepted | [`0029-performance-evidence-policy.md`](0029-performance-evidence-policy.md) |
+| ADR-0030 | Runtime Capability Reconfiguration | Proposed | [`0030-runtime-reconfiguration.md`](0030-runtime-reconfiguration.md) |

@@ -89,6 +89,22 @@ pub fn select_transport(
     }
 }
 
+/// 依据当前 [`crate::StylizedRenderCapabilities`] 刷新能力派生状态
+/// （ADR-0030 §6；目前唯一派生项是 [`StylizedInstanceTransportMode`]）。
+///
+/// 由 facade 的重配置事务在同一个 `&mut World` 作用域内调用；本资源是
+/// provisional 标记（ADR-0004 未决，运行时按 per-entity
+/// [`StylizedInstanceSlot`] 组件声明表通道），已存在的 slot 组件不回写，
+/// 变更后新建的内容观察到新模式。
+pub fn refresh_capability_dependents(world: &mut bevy::prelude::World) {
+    let mode = select_transport(
+        world
+            .get_resource::<crate::StylizedRenderCapabilities>()
+            .and_then(|capabilities| capabilities.resolved.as_ref()),
+    );
+    world.insert_resource(StylizedInstanceTransportMode(mode));
+}
+
 /// Instance 层 NPR 数据（对应 core 的 [`StylizedInstanceDescriptor`]；
 /// 组件化 + MeshTag 打包传输）。
 #[derive(Component, Clone, Copy, Debug, PartialEq, Reflect)]

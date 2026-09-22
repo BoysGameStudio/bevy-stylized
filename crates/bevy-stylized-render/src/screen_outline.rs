@@ -23,8 +23,8 @@ use bevy::{
     mesh::{Mesh, MeshVertexBufferLayoutRef},
     pbr::{Material, MaterialPipeline, MaterialPipelineKey, MeshMaterial3d},
     prelude::{
-        Asset, Assets, Camera3d, Commands, Component, Entity, GlobalTransform, Query, Reflect, Res,
-        ResMut, Transform, With,
+        Asset, Assets, Camera3d, Commands, Component, Entity, GlobalTransform, Has, Query, Reflect,
+        RemovedComponents, Res, ResMut, Transform, With,
     },
     render::render_resource::{
         AsBindGroup, CompareFunction, ShaderType, SpecializedMeshPipelineError,
@@ -161,22 +161,36 @@ pub struct StylizedScreenOutlineOverlay {
 }
 
 /// 同步系统：带 [`StylizedScreenOutline`] 的相机获得 prepass 组件 +
-/// overlay 三角形；组件移除时清理（tier 门控在生成处判定）。
+/// overlay 三角形；组件移除或运行时降级（ADR-0030：重配置后解析档低于
+/// Standard）时撤销本系统授予的 prepass 与 overlay，回落 hull-only。
+///
+/// 所有权：本系统独占带 [`StylizedScreenOutline`] 相机的
+/// `DepthPrepass`/`NormalPrepass`；宿主不得为同一相机另行添加 prepass。
 pub fn sync_screen_outline(
     mut commands: Commands,
     capabilities: Option<Res<StylizedRenderCapabilities>>,
-    cameras: Query<(Entity, &StylizedScreenOutline), With<Camera3d>>,
+    cameras: Query<(Entity, &StylizedScreenOutline, Has<DepthPrepass>), With<Camera3d>>,
+    mut removed: RemovedComponents<StylizedScreenOutline>,
     overlays: Query<(Entity, &StylizedScreenOutlineOverlay)>,
     // Option：资产资源缺失（无 AssetPlugin 的 headless 测试）时零工作。
     mut materials: Option<ResMut<Assets<StylizedScreenOutlineMaterial>>>,
     mut meshes: Option<ResMut<Assets<Mesh>>>,
 ) {
     let resolved = capabilities.and_then(|c| c.resolved.clone());
-    for (camera, settings) in &cameras {
+    for (camera, settings, had_prepass) in &cameras {
         let (mode, fell_back) =
             resolve_outline_mode(StylizedOutlineMode::ScreenSpace, resolved.as_ref());
         if fell_back {
-            // Standard 以下：回落 hull-only，不产生 prepass 成本。
+            // Standard 以下：回落 hull-only，不产生 prepass 成本；运行时已
+            // 授予的 prepass/overlay 撤销（ADR-0030 降档路径）。
+            if had_prepass {
+                commands
+                    .entity(camera)
+                    .remove::<(DepthPrepass, NormalPrepass)>();
+            }
+            if let Some((overlay, _)) = overlays.iter().find(|(_, o)| o.camera == camera) {
+                commands.entity(overlay).despawn();
+            }
             continue;
         }
         let _ = mode;
@@ -220,6 +234,16 @@ pub fn sync_screen_outline(
             GlobalTransform::IDENTITY,
             bevy::prelude::Visibility::Inherited,
         ));
+    }
+    // StylizedScreenOutline 组件移除：回收本系统授予的 overlay 与 prepass
+    // （相机可能已 despawn，移除只对仍存在的实体生效）。
+    for camera in removed.read() {
+        if let Some((overlay, _)) = overlays.iter().find(|(_, o)| o.camera == camera) {
+            commands.entity(overlay).despawn();
+        }
+        if let Ok(mut entity) = commands.get_entity(camera) {
+            entity.remove::<(DepthPrepass, NormalPrepass)>();
+        }
     }
 }
 

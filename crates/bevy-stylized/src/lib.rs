@@ -42,11 +42,13 @@ pub use integration::{
 // tier override 由 LOD 系统与 governor 共同消费，单一真源在 render）。
 #[cfg(feature = "render")]
 mod dynamic_quality;
+pub mod reconfiguration;
 
 pub mod prelude {
     //! 常用类型的一站式导出。
     #[cfg(feature = "render")]
     pub use crate::dynamic_quality::*;
+    pub use crate::reconfiguration::*;
     #[cfg(feature = "render")]
     pub use crate::stylized_render::*;
     pub use crate::{StylizedPlugin, capability::*, stylized_core::prelude::*};
@@ -62,6 +64,10 @@ pub use capability::{
 pub use dynamic_quality::{
     StylizedDynamicQuality, StylizedDynamicQualityPlugin, StylizedQualityDecisionEvent,
     StylizedTierOverride, dynamic_quality_system,
+};
+pub use reconfiguration::{
+    StylizedCapabilitiesChanged, StylizedReconfigApplied, StylizedReconfigError,
+    StylizedReconfigGeneration, StylizedReconfigurationExt,
 };
 
 /// core crate 的整体 re-export（facade 不复制逻辑）。
@@ -121,6 +127,9 @@ impl Plugin for StylizedPlugin {
             app.insert_resource(self.capability_config.clone());
         }
         app.init_resource::<StylizedQualityPolicyResource>();
+        // ADR-0030：重配置代次与变更通知消息（入口见 reconfiguration 模块）。
+        app.init_resource::<reconfiguration::StylizedReconfigGeneration>()
+            .add_message::<reconfiguration::StylizedCapabilitiesChanged>();
         app.register_type::<StylizedMaterialDescriptor>()
             .register_type::<StylizedInstanceDescriptor>()
             .register_type::<StylizedViewDescriptor>()

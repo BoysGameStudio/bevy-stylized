@@ -18,8 +18,9 @@ CARGO_INCREMENTAL=0 cargo run -p showcase -- workloads --out <new-dir> # headles
 CARGO_INCREMENTAL=0 cargo test -p showcase -- --ignored # 全场景非黑捕获检查（GPU-gated）
 ```
 
-交互模式在同一窗口会话内用 ←/→ 切换用例；tier 上调与资产根变更以结构化
-信息拒绝（R2）。`workloads` 子命令 headless 运行，使用默认 feature，不依赖
+交互模式在同一窗口会话内用 ←/→ 切换用例；tier 需求超过当前已解析档时先经
+产品重配置 API（ADR-0030）尝试会话内升档，设备级缺口才结构化拒绝并要求新
+device 会话；资产根变更仍以结构化信息拒绝（R2）。`workloads` 子命令 headless 运行，使用默认 feature，不依赖
 egui/Inspector；数值合同见[性能合同](../performance/targets.md)。静态角色
 交互检查使用 `inspect` 子命令（`--features inspector`），见下文证据纪律。
 

@@ -9,8 +9,11 @@
 //!
 //! 会话限制规则（与 G1 交互模式一致）：
 //!
-//! - 用例声明的 tier 需求高于会话已解析上限 → [`RefusalReason::TierRequired`]
-//!   （已解析能力不能在同一会话内上调，需要新会话）；
+//! - 用例声明的 tier 需求高于会话已解析上限 → 先经产品公共重配置 API
+//!   （ADR-0030）尝试会话内升档；设备已具备能力则直接切换，设备级缺口
+//!   （特性/limits 不在 Stage B 快照中）才拒绝为
+//!   [`RefusalReason::TierRequired`]（`reconfiguration_attempted` 区分
+//!   "已尝试被设备拒绝——需要新 device 会话"与"无能力快照——无法尝试"）；
 //! - 用例声明了资产依赖而会话资产根在启动时固定 →
 //!   [`RefusalReason::AssetRootFixed`]；
 //! - 切换时重置视图为会话基线（上一用例的视图不泄漏），再应用目标用例
@@ -21,6 +24,7 @@ use serde::{Deserialize, Serialize};
 
 use bevy_stylized::prelude::StylizedExecutionTier;
 use bevy_stylized::prelude::{StylizedViewDescriptor, StylizedViewSettings};
+use bevy_stylized::reconfiguration::StylizedReconfigurationExt;
 use scenario_model::ident::{Generation, SceneId};
 use scenes::registry::{SceneBinding, ViewPresetFn, bindings};
 
@@ -66,6 +70,10 @@ pub enum RefusalReason {
         required: StylizedExecutionTier,
         /// 会话已解析上限。
         resolved: StylizedExecutionTier,
+        /// 是否已尝试会话内重配置（ADR-0030）：`true` = 设备级缺口，需要
+        /// 新 device 会话；`false` = 无能力快照，无法尝试。
+        #[serde(default)]
+        reconfiguration_attempted: bool,
     },
     /// 用例需要固定/不同的资产根。
     AssetRootFixed(SceneId),
@@ -194,6 +202,7 @@ impl SessionController {
             return CommandPlan::Refused(RefusalReason::TierRequired {
                 required,
                 resolved: ceiling,
+                reconfiguration_attempted: false,
             });
         }
         if entry.has_assets {
@@ -202,13 +211,40 @@ impl SessionController {
         CommandPlan::Switch(target)
     }
 
-    /// 执行命令：合法性评估 → 视图基线重置 → 账本切换。
+    /// 执行命令：合法性评估 →（tier 拒绝时先尝试会话内重配置，R2/ADR-0030）
+    /// → 视图基线重置 → 账本切换。
     pub fn command(&mut self, world: &mut World, command: &SessionCommand) -> CommandOutcome {
-        let plan = self.evaluate(command);
+        let mut reconfiguration_attempted = false;
+        let mut plan = self.evaluate(command);
+        // R2/ADR-0030：tier 拒绝先经产品公共 API 尝试会话内重配置；设备
+        // 已具备能力时无需新会话。请求不低于用例需求档，保留会话其余配置
+        // （class/fallback policy/Stage A 特性断言不变）。
+        if let CommandPlan::Refused(RefusalReason::TierRequired { required, .. }) = plan
+            && let Some(mut config) = world
+                .get_resource::<bevy_stylized::StylizedCapabilityConfig>()
+                .cloned()
+        {
+            reconfiguration_attempted = true;
+            if config.requested_tier < required {
+                config.requested_tier = required;
+            }
+            // 设备级缺口（Err）：保留原拒绝，由下方标记 attempted。
+            if let Ok(applied) = world.apply_stylized_reconfiguration(config) {
+                self.tier_ceiling = Some(applied.current.tier);
+                plan = self.evaluate(command);
+            }
+        }
         let CommandPlan::Switch(target) = plan else {
-            let CommandPlan::Refused(reason) = plan else {
+            let CommandPlan::Refused(mut reason) = plan else {
                 unreachable!("CommandPlan is Switch or Refused")
             };
+            if let RefusalReason::TierRequired {
+                reconfiguration_attempted: attempted,
+                ..
+            } = &mut reason
+            {
+                *attempted = reconfiguration_attempted;
+            }
             return CommandOutcome::Refused(reason);
         };
         // 重置视图为会话基线（上一用例的视图不泄漏）→ 应用目标用例 preset。
@@ -335,6 +371,7 @@ mod tests {
             CommandPlan::Refused(RefusalReason::TierRequired {
                 required: StylizedExecutionTier::Standard,
                 resolved: StylizedExecutionTier::Portable,
+                reconfiguration_attempted: false,
             })
         );
         // Standard 会话允许。
@@ -354,5 +391,87 @@ mod tests {
                 SceneId::new("reference").expect("id")
             ))
         );
+    }
+
+    /// R2/ADR-0030：设备级缺口（快照无 storage buffer）→ 尝试会话内重配置
+    /// 后仍拒绝，`reconfiguration_attempted = true`，会话状态不变。
+    #[test]
+    fn command_attempts_reconfiguration_and_reports_device_gap() {
+        use bevy_stylized::prelude::{StylizedCapabilityConfig, StylizedResolvedCapabilities};
+        use bevy_stylized::reconfiguration::StylizedReconfigGeneration;
+        use bevy_stylized::stylized_core::{
+            StylizedCapabilitySet, StylizedGpuLimits, resolve_variant,
+        };
+
+        let mut app = bevy::prelude::App::new();
+        let mut controller = controller();
+        controller.set_tier_ceiling(StylizedExecutionTier::Portable);
+        // Portable-only 快照（无 storage buffer）：Standard 不可解析。
+        let actual = StylizedCapabilitySet {
+            limits: StylizedGpuLimits {
+                max_bind_groups: 4,
+                max_storage_buffers_per_shader_stage: 0,
+                max_uniform_buffers_per_shader_stage: 12,
+            },
+            ..StylizedCapabilitySet::default()
+        };
+        let incumbent = resolve_variant(
+            bevy_stylized::stylized_core::StylizedSurfaceClass::Cel,
+            StylizedExecutionTier::Portable,
+            &actual,
+            bevy_stylized::stylized_core::StylizedFallbackPolicy::ReduceTier,
+        )
+        .expect("portable resolves");
+        app.insert_resource(StylizedCapabilityConfig::default());
+        app.insert_resource(StylizedResolvedCapabilities {
+            actual,
+            resolved: Ok(incumbent.clone()),
+            report: None,
+        });
+
+        let outcome = controller.command(
+            app.world_mut(),
+            &SessionCommand::SelectCase(SceneId::new("outline-advanced").expect("id")),
+        );
+        assert_eq!(
+            outcome,
+            CommandOutcome::Refused(RefusalReason::TierRequired {
+                required: StylizedExecutionTier::Standard,
+                resolved: StylizedExecutionTier::Portable,
+                reconfiguration_attempted: true,
+            })
+        );
+        // 会话仍停在原用例；已解析 tier 未被伪装上调。
+        assert_eq!(controller.current().id.as_str(), "overview");
+        assert_eq!(
+            app.world()
+                .get_resource::<StylizedReconfigGeneration>()
+                .map(|g| g.0),
+            // 重解析落回 Portable（tier_reduced），请求配置确实变化 → 代次 +1，
+            // 但会话上限保持 Portable（不冒充重新初始化）。
+            Some(1)
+        );
+    }
+
+    /// 无能力快照（无 StylizedCapabilityConfig/Stage B 资源）→ 无法尝试，
+    /// `reconfiguration_attempted = false`。
+    #[test]
+    fn command_without_snapshot_refuses_without_attempt() {
+        let mut app = bevy::prelude::App::new();
+        let mut controller = controller();
+        controller.set_tier_ceiling(StylizedExecutionTier::Portable);
+        let outcome = controller.command(
+            app.world_mut(),
+            &SessionCommand::SelectCase(SceneId::new("outline-advanced").expect("id")),
+        );
+        assert_eq!(
+            outcome,
+            CommandOutcome::Refused(RefusalReason::TierRequired {
+                required: StylizedExecutionTier::Standard,
+                resolved: StylizedExecutionTier::Portable,
+                reconfiguration_attempted: false,
+            })
+        );
+        assert_eq!(controller.current().id.as_str(), "overview");
     }
 }
