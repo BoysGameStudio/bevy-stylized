@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "StylizedInstanceGpuRecord",
-  "description": "Instance 层全精度记录（V2-e GPU Instance Database 的记录 schema；\nprovisional pending ADR-0004）。\n\n**两档保真契约**（同一逻辑数据的两条传输通道）：\n\n- **Portable（MeshTag 位打包）**：只携带粗粒度子集——\n  `face_threshold` u8 量化（1/254 步进）、`face_side` 1 bit、\n  `outline_scale` u7（0..=2）、`profile_index` u8、`quality_flags` 的\n  低 8 bit；`palette_index` 与 `light_tint` **不可表达**；\n- **Standard+（StorageTable）**：本记录全字段全精度（f32 / u32），\n  MeshTag 退化为 24-bit 槽位索引。\n\n通道选择由 resolver 决定（tier ≥ Standard 且设备具备 storage buffer\n⇒ StorageTable；否则 MeshTagBits + 登记\n[`StylizedFallbackStep::InstanceTableToMeshTag`](crate::StylizedFallbackStep::InstanceTableToMeshTag)\n语义）。",
+  "description": "Instance 层全精度记录（V2-e GPU Instance Database 的记录 schema；\nADR-0004 Accepted 的 StorageTable 通道记录）。\n\n**两档保真契约**（同一逻辑数据的两条传输通道）：\n\n- **Portable（MeshTag 位打包）**：只携带粗粒度子集——\n  `face_threshold` u8 量化（1/254 步进）、`face_side` 1 bit、\n  `outline_scale` u7（0..=2）、`profile_index` u8、`quality_flags` 的\n  低 8 bit；`palette_index` 与 `light_tint` **不可表达**；\n- **Standard+（StorageTable）**：本记录全字段全精度（f32 / u32），\n  MeshTag 退化为 24-bit 槽位索引。\n\n通道选择由 resolver 决定（tier ≥ Standard 且设备具备 storage buffer\n⇒ StorageTable；否则 MeshTagBits + 登记\n[`StylizedFallbackStep::InstanceTableToMeshTag`](crate::StylizedFallbackStep::InstanceTableToMeshTag)\n语义）。",
   "type": "object",
   "properties": {
     "face_side": {
