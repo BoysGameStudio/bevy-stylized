@@ -29,13 +29,10 @@ use std::time::Instant;
 use bevy::{
     DefaultPlugins,
     app::{App, PluginGroup},
-    asset::{AssetPlugin, Assets},
+    asset::AssetPlugin,
     color::LinearRgba,
-    image::Image,
-    math::{Mat4, Quat, Vec3},
-    mesh::skinning::{SkinnedMesh, SkinnedMeshInverseBindposes},
-    pbr::MeshMaterial3d,
-    prelude::{Camera3d, Component, Mesh, Mesh3d, Query, Transform, With},
+    math::{Quat, Vec3},
+    prelude::{Component, Query, Transform, With},
     render::{
         RenderPlugin,
         settings::{RenderCreation, RenderResources},
@@ -44,6 +41,11 @@ use bevy::{
 };
 use bevy_stylized::prelude::*;
 use golden_harness::capture;
+use scenario_model::action::{ActionGraph, ActionKind, ActionNode};
+use scenario_model::canon::CanonicalU64;
+use scenario_model::ident::{ActionId, SessionId};
+use scene_runtime::{CaseDriver, DriverLimits, run_to_completion};
+use scenes::CameraRecipe;
 
 /// sweep 报告 schema 标识。
 pub const SWEEP_SCHEMA: &str = "bevy_stylized.sweep/v2";
@@ -230,82 +232,12 @@ struct StripRootJoint;
 #[derive(bevy::prelude::Resource)]
 struct StripAnimFrame(u32);
 
-/// strip 场景：程序化双骨骼蒙皮条带（与 showcase `animation` 用例同一
-/// 构建逻辑；此处内联以控制相机/pose 轴——showcase 版本自带机位）。
+/// strip 场景：共享 `labs/scenes` 的无相机双骨骼条带构建器（showcase
+/// `animation` 用例同一实现）；本模块只保留自己的姿态/采样参数
+/// （docs/showcase/01：提取无相机的条带构建器，保留各自姿态与采样参数）。
 fn build_strip(app: &mut App, animated: bool) {
-    let (cols, rows) = (2usize, 16usize);
-    let mut positions = Vec::new();
-    let mut normals = Vec::new();
-    let mut uvs = Vec::new();
-    let mut joints: Vec<[u16; 4]> = Vec::new();
-    let mut weights = Vec::new();
-    for r in 0..=rows {
-        let v = r as f32 / rows as f32;
-        for c in 0..=cols {
-            let u = c as f32 / cols as f32;
-            positions.push([(u - 0.5) * 0.8, v * 2.4 - 1.2, 0.0]);
-            normals.push([0.0, 0.0, 1.0]);
-            uvs.push([u, v]);
-            let j = u16::from(v > 0.5);
-            joints.push([j, 0, 0, 0]);
-            weights.push([1.0, 0.0, 0.0, 0.0]);
-        }
-    }
-    let mut indices = Vec::new();
-    for r in 0..rows {
-        for c in 0..cols {
-            let i = (r * (cols + 1) + c) as u32;
-            let w = cols as u32 + 1;
-            indices.extend_from_slice(&[i, i + 1, i + w, i + 1, i + w + 1, i + w]);
-        }
-    }
-    let mut mesh = Mesh::new(
-        bevy::mesh::PrimitiveTopology::TriangleList,
-        bevy::asset::RenderAssetUsages::default(),
-    );
-    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, positions);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
-    mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
-    mesh.insert_attribute(
-        Mesh::ATTRIBUTE_JOINT_INDEX,
-        bevy::mesh::VertexAttributeValues::Uint16x4(joints),
-    );
-    mesh.insert_attribute(
-        Mesh::ATTRIBUTE_JOINT_WEIGHT,
-        bevy::mesh::VertexAttributeValues::Float32x4(weights),
-    );
-    mesh.insert_indices(bevy::mesh::Indices::U32(indices));
-    let mesh = app.world_mut().resource_mut::<Assets<Mesh>>().add(mesh);
-
-    let root = app
-        .world_mut()
-        .spawn((Transform::from_xyz(0.0, -1.2, 0.0), StripRootJoint))
-        .id();
-    let tip = app
-        .world_mut()
-        .spawn((Transform::from_xyz(0.0, 0.0, 0.0),))
-        .id();
-    app.world_mut().entity_mut(root).add_child(tip);
-    let inverse_bindposes = app
-        .world_mut()
-        .resource_mut::<Assets<SkinnedMeshInverseBindposes>>()
-        .add(SkinnedMeshInverseBindposes::from(vec![
-            Mat4::from_translation(Vec3::new(0.0, 1.2, 0.0)),
-            Mat4::IDENTITY,
-        ]));
-    let material = app
-        .world_mut()
-        .resource_mut::<Assets<StylizedCelMaterial>>()
-        .add(StylizedCelMaterial::default());
-    app.world_mut().spawn((
-        Mesh3d(mesh),
-        MeshMaterial3d(material),
-        SkinnedMesh {
-            inverse_bindposes,
-            joints: vec![root, tip],
-        },
-        Transform::IDENTITY,
-    ));
+    let root = scenes::builders::build_strip(app);
+    app.world_mut().entity_mut(root).insert(StripRootJoint);
     if animated {
         // 帧计数驱动（不用 Time：捕获确定性 = golden 可重复）。
         app.insert_resource(StripAnimFrame(0));
@@ -379,6 +311,33 @@ pub fn cell_target_id(
     )
 }
 
+/// 宿主绑定场景（内容经 build_strip/scenes 构建器直接装配；观测相机经
+/// 驱动器的相机配方覆盖生成——见 scene-runtime driver 文档）。
+fn noop_scene(_world: &mut bevy::prelude::World) -> CameraRecipe {
+    CameraRecipe::new(Vec3::ZERO, Vec3::ZERO)
+}
+
+fn noop_binding() -> scenes::registry::SceneBinding {
+    scenes::registry::SceneBinding {
+        id: "regression-cell",
+        symbol: "regression::noop_scene",
+        build: noop_scene,
+        view: None,
+    }
+}
+
+fn tiny_graph(id: &str, kind: ActionKind) -> ActionGraph {
+    ActionGraph {
+        nodes: vec![ActionNode {
+            id: ActionId::new(id).expect("action id"),
+            tick: CanonicalU64(0),
+            depends_on: vec![],
+            writes: vec![],
+            kind,
+        }],
+    }
+}
+
 /// 单个 cell 的测量产出。
 pub struct CellOutcome {
     /// 帧统计。
@@ -443,24 +402,32 @@ pub fn measure_cell(
         .to_string();
 
     apply_lighting(&mut app, lighting);
-    let target = {
-        let mut images = app.world_mut().resource_mut::<Assets<Image>>();
-        capture::create_capture_target(&mut images, resolution[0], resolution[1])
-    };
-    app.world_mut().spawn((
-        Camera3d::default(),
-        capture::capture_target_bundle(&target),
-        bevy::core_pipeline::tonemapping::Tonemapping::None,
-        Transform::from_xyz(0.0, 2.0, 18.0).looking_at(Vec3::ZERO, Vec3::Y),
-    ));
+    // 观测生命周期归 CaseDriver：观测相机（配方覆盖）+ 管线就绪等待；
+    // 暖场/计时帧是测量域（app-update-wall-ms），由本函数宿主式泵送，
+    // 不经实验时钟（docs/showcase/01：测量语义不变）。
+    let mut driver = CaseDriver::new(
+        app.world(),
+        SessionId::new("regression-cell").expect("session id"),
+        noop_binding(),
+        tiny_graph(
+            "wait",
+            ActionKind::WaitReady {
+                condition: scenario_model::action::ReadyCondition::PipelinesReady,
+            },
+        ),
+        DriverLimits::default(),
+    )
+    .expect("cell plan")
+    .with_camera_recipe(CameraRecipe::new(Vec3::new(0.0, 2.0, 18.0), Vec3::ZERO))
+    .with_resolution(resolution[0], resolution[1]);
     match scene {
-        // crowd：复用 benchmarks 的实例场景构建器（link, don't duplicate）。
-        "crowd" => benchmarks::build_portable_instances(&mut app, count),
+        // crowd：scenes 的实例场景构建器（link, don't duplicate）。
+        "crowd" => scenes::builders::build_portable_instances(&mut app, count),
         "strip" => build_strip(&mut app, pose == "animated"),
         other => panic!("unknown scene {other}"),
     }
 
-    golden_harness::readiness::wait(&mut app, 24);
+    run_to_completion(&mut app, &mut driver, 700).expect("cell readiness");
     // Readiness must not move the accepted animated Golden's frame sequence.
     if let Some(mut frame) = app.world_mut().get_resource_mut::<StripAnimFrame>() {
         frame.0 = 0;
@@ -475,18 +442,24 @@ pub fn measure_cell(
         samples.push(start.elapsed().as_secs_f64() * 1000.0);
     }
 
-    // golden 子集：尾帧捕获 + 只读已接受基线 diff。
+    // golden 子集：尾帧捕获（driver observe 周期，与旧"请求→下一帧"逐帧
+    // 一致）+ 只读已接受基线 diff。
     let (golden, png) = if GOLDEN_SUBSET.contains(&target_id.as_str()) {
-        let request = capture::request_capture(app.world_mut(), target);
-        let mut frame = None;
-        for _ in 0..600 {
-            app.update();
-            if let Some(f) = capture::try_take(app.world_mut(), request.clone()) {
-                frame = Some(f);
-                break;
-            }
-        }
-        let frame = frame.expect("golden capture timed out");
+        driver
+            .run_actions(tiny_graph(
+                "observe",
+                ActionKind::Observe {
+                    observation: "golden".to_string(),
+                    view: None,
+                },
+            ))
+            .expect("observe plan");
+        run_to_completion(&mut app, &mut driver, 700).expect("golden capture timed out");
+        let frame = driver
+            .drain_observations()
+            .pop()
+            .expect("golden observation")
+            .image;
         let png = golden_harness::encode_png(&frame).expect("encode png");
         (
             Some(golden_subset_eval(golden_dir, &target_id, &png)),

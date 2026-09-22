@@ -1,0 +1,28 @@
+[package]
+name = "scenario-model"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+readme = "../../README.md"
+publish = false
+description = "Unified cross-platform scene workbench: pure-data scenario model (catalog, recipe/action/session schemas, canonicalization, identity)."
+
+# 依赖边界（docs/showcase/01 §依赖与代码所有权）：无 App、GPU、UI、文件系统；
+# 产品语义（执行 tier、schema 版本载体）引用 bevy-stylized-core 的纯数据合同，
+# 不复制字段定义。sha2/serde_json/thiserror 之外的引擎或运行时依赖禁止进入。
+[dependencies]
+bevy-stylized-core = { path = "../../crates/bevy-stylized-core" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+sha2.workspace = true
+
+schemars = { workspace = true, optional = true }
+
+[features]
+default = []
+schema = ["dep:schemars", "bevy-stylized-core/schema"]
+
+[lints]
+workspace = true

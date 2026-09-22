@@ -18,6 +18,7 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 half = "=2.7.1"
+validation = { path = "../../labs/validation" }
 
 [dev-dependencies]
 tempfile.workspace = true

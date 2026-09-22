@@ -12,12 +12,10 @@ use bevy::{
     app::{App, PluginGroup},
     asset::{AssetPlugin, Assets},
     color::LinearRgba,
-    core_pipeline::tonemapping::Tonemapping,
-    image::Image,
     math::{Vec3, primitives::Cuboid, primitives::Sphere},
     mesh::Mesh,
     pbr::MeshMaterial3d,
-    prelude::{Camera3d, Mesh3d, Transform},
+    prelude::{Mesh3d, Transform},
     render::{
         RenderPlugin,
         settings::{RenderCreation, RenderResources},
@@ -25,16 +23,14 @@ use bevy::{
     window::{ExitCondition, WindowPlugin},
 };
 use bevy_stylized::prelude::*;
-use bevy_stylized::stylized_render::screen_outline::{
-    StylizedScreenOutline, StylizedScreenOutlineOverlay,
-};
+use bevy_stylized::stylized_render::screen_outline::StylizedScreenOutlineOverlay;
 use golden_harness::{
     CapturedImage, GoldenPaths, GoldenProvenance, Tolerance, capture, diff_rgba8,
 };
 
 const SIZE: u32 = 512;
 
-fn headless_app(resources: RenderResources) -> (App, capture::CaptureTarget) {
+fn headless_app(resources: RenderResources) -> App {
     let mut app = App::new();
     app.add_plugins(
         DefaultPlugins
@@ -62,10 +58,6 @@ fn headless_app(resources: RenderResources) -> (App, capture::CaptureTarget) {
     app.add_plugins(StylizedPlugin::default());
     capture::install(&mut app);
     golden_harness::readiness::install(&mut app);
-    let target = {
-        let mut images = app.world_mut().resource_mut::<Assets<Image>>();
-        capture::create_capture_target(&mut images, SIZE, SIZE)
-    };
     *app.world_mut().resource_mut::<StylizedViewSettings>() =
         StylizedViewSettings(StylizedViewDescriptor {
             key_light_direction: Vec3::new(0.4, 0.8, 0.5).normalize(),
@@ -76,11 +68,11 @@ fn headless_app(resources: RenderResources) -> (App, capture::CaptureTarget) {
         });
     app.finish();
     app.cleanup();
-    (app, target)
+    app
 }
 
 /// 场景：两个叠放方块 + 一个球（接触褶皱 + 剪影）。
-fn build_scene(app: &mut App, hull: bool, screen: bool) {
+fn build_scene(app: &mut App, hull: bool) {
     let material = app
         .world_mut()
         .resource_mut::<Assets<StylizedCelMaterial>>()
@@ -121,31 +113,74 @@ fn build_scene(app: &mut App, hull: bool, screen: bool) {
             entity.insert(StylizedOutline::new(outline.clone()));
         }
     }
-    let target = app.world().resource::<TargetHolder>().0.clone();
-    let mut camera = app.world_mut().spawn((
-        Camera3d::default(),
-        capture::capture_target_bundle(&target),
-        Tonemapping::None,
-        Transform::from_xyz(2.2, 1.6, 3.4).looking_at(Vec3::new(0.0, 0.3, 0.0), Vec3::Y),
-    ));
-    if screen {
-        camera.insert(StylizedScreenOutline::default());
-    }
 }
 
-#[derive(bevy::prelude::Resource, Clone)]
-struct TargetHolder(capture::CaptureTarget);
-
-fn capture_frame(app: &mut App, target: &capture::CaptureTarget) -> CapturedImage {
-    golden_harness::readiness::wait(app, 24);
-    let request = capture::request_capture(app.world_mut(), target.clone());
-    for _ in 0..600 {
-        app.update();
-        if let Some(frame) = capture::try_take(app.world_mut(), request.clone()) {
-            return frame;
+/// 经 CaseDriver 观测周期捕获（readiness 就绪 + 24 帧暖场后观测；
+/// 与旧 `readiness::wait(24)` 后请求逐帧一致）。screen 变体的
+/// screen-space 附件经相机配方声明（内容级 per-camera opt-in）。
+/// 返回（图像, 第 3 帧时点的 overlay 数）——overlay 断言留在测试。
+fn capture_frame(app: &mut App, screen: bool) -> (CapturedImage, usize) {
+    if !app
+        .world()
+        .contains_resource::<scene_runtime::CycleResource>()
+    {
+        let attachment = if screen {
+            scenes::CameraAttachment::ScreenOutline
+        } else {
+            scenes::CameraAttachment::None
+        };
+        app.insert_resource(scene_runtime::CycleResource(
+            scene_runtime::CaptureCycle::new(
+                scenario_model::ident::SessionId::new("outline-advanced").expect("session id"),
+                scenes::CameraRecipe::with_attachment(
+                    Vec3::new(2.2, 1.6, 3.4),
+                    Vec3::new(0.0, 0.3, 0.0),
+                    attachment,
+                ),
+                (SIZE, SIZE),
+                true,
+                660,
+            ),
+        ));
+    }
+    app.world_mut()
+        .resource_scope(
+            |world, mut cycle: bevy::prelude::Mut<scene_runtime::CycleResource>| {
+                cycle.begin_capture(world, scene_runtime::Settle::ReadinessThenFrames(24))
+            },
+        )
+        .expect("capture profile must be a valid plan");
+    let mut overlays = 0;
+    let mut done = false;
+    for i in 0..660 {
+        let status = app.world_mut().resource_scope(
+            |world, mut cycle: bevy::prelude::Mut<scene_runtime::CycleResource>| cycle.pump(world),
+        );
+        match status {
+            scene_runtime::DriverStatus::Running => {
+                app.update();
+                if i == 2 {
+                    // 与旧流程同一点：相机生成后的第 3 次 update 结束。
+                    overlays = overlay_count(app);
+                }
+            }
+            scene_runtime::DriverStatus::Done => {
+                done = true;
+                break;
+            }
+            scene_runtime::DriverStatus::Failed(error) => panic!("capture timed out: {error}"),
         }
     }
-    panic!("capture timed out");
+    assert!(done, "capture timed out");
+    let receipt = app
+        .world_mut()
+        .resource_scope(
+            |_world, mut cycle: bevy::prelude::Mut<scene_runtime::CycleResource>| {
+                cycle.take_receipt()
+            },
+        )
+        .expect("capture must produce an observation");
+    (receipt.image, overlays)
 }
 
 fn overlay_count(app: &mut App) -> usize {
@@ -168,18 +203,11 @@ fn outline_advanced_hull_screen_hybrid() {
         ("screen_only", false, true),
         ("hybrid", true, true),
     ] {
-        let (mut app, target) = headless_app(resources.clone());
-        app.insert_resource(TargetHolder(target.clone()));
-        build_scene(&mut app, hull, screen);
-        let overlays = {
-            for _ in 0..3 {
-                app.update();
-            }
-            overlay_count(&mut app)
-        };
+        let mut app = headless_app(resources.clone());
+        build_scene(&mut app, hull);
+        let (frame, overlays) = capture_frame(&mut app, screen);
         // screen 开启时必须有 overlay；关闭时必须没有。
         assert_eq!(overlays > 0, screen, "{name}: overlay presence");
-        let frame = capture_frame(&mut app, &target);
         let diagnostics = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../target/stylized/outline-advanced")
             .join(std::process::id().to_string());

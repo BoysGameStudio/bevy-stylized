@@ -1,0 +1,14 @@
+{
+  "name": "jcs-utf16-sort",
+  "description": "RFC 8785 §3.2.3 属性名按 UTF-16 码元排序：U+10000 的前导代理 0xD800 小于 U+FFFD；UTF-8 字节序会给出相反结果。",
+  "model": "json",
+  "version": "scenario-model.canon/v1",
+  "input": {
+    "": 1,
+    "𐀀": 2,
+    "z": 3,
+    "a": 4
+  },
+  "canonical": "{\"\":1,\"a\":4,\"z\":3,\"𐀀\":2}",
+  "sha256": null
+}

@@ -7,18 +7,24 @@ use golden_harness::{CapturedImage, capture};
 use render_app::headless_app;
 const SIZE: u32 = 256;
 
-fn frame(app: &mut App, target: &capture::CaptureTarget) -> CapturedImage {
-    for _ in 0..32 {
-        app.update();
-    }
-    let request = capture::request_capture(app.world_mut(), target.clone());
-    for _ in 0..600 {
-        app.update();
-        if let Some(image) = capture::try_take(app.world_mut(), request.clone()) {
-            return image;
-        }
-    }
-    panic!("post capture timeout");
+fn frame(app: &mut App) -> CapturedImage {
+    scene_runtime::capture_in_app(
+        app,
+        &scenario_model::ident::SessionId::new("post-lifecycle").expect("session id"),
+        &scenes::CameraRecipe::new(Vec3::new(0., 0., 5.), Vec3::ZERO),
+        (SIZE, SIZE),
+        scene_runtime::Settle::Frames(32),
+        false,
+        640,
+    )
+    .expect("post capture timeout")
+}
+
+fn camera(app: &mut App) -> Entity {
+    app.world_mut()
+        .resource_scope(|_world, cycle: Mut<scene_runtime::CycleResource>| {
+            cycle.observation_entity().expect("observation camera")
+        })
 }
 
 #[test]
@@ -43,21 +49,8 @@ fn post_controller_renders_and_disable_remove_restore_pixels() {
         .add(m);
     app.world_mut()
         .spawn((Mesh3d(mesh), MeshMaterial3d(material), Transform::IDENTITY));
-    let target = capture::create_capture_target(
-        &mut app.world_mut().resource_mut::<Assets<Image>>(),
-        SIZE,
-        SIZE,
-    );
-    let camera = app
-        .world_mut()
-        .spawn((
-            Camera3d::default(),
-            capture::capture_target_bundle(&target),
-            bevy::core_pipeline::tonemapping::Tonemapping::None,
-            Transform::from_xyz(0., 0., 5.).looking_at(Vec3::ZERO, Vec3::Y),
-        ))
-        .id();
-    let original = frame(&mut app, &target);
+    let original = frame(&mut app);
+    let camera = camera(&mut app);
     app.world_mut()
         .entity_mut(camera)
         .insert(StylizedPostProcess {
@@ -67,7 +60,7 @@ fn post_controller_renders_and_disable_remove_restore_pixels() {
             chromatic_aberration: 0.,
             display_transform: StylizedDisplayTransform::None,
         });
-    let enabled = frame(&mut app, &target);
+    let enabled = frame(&mut app);
     assert!(
         app.world()
             .get::<StylizedFullscreenEffect>(camera)
@@ -83,7 +76,7 @@ fn post_controller_renders_and_disable_remove_restore_pixels() {
         .0
         .camera
         .post_enabled = false;
-    let disabled = frame(&mut app, &target);
+    let disabled = frame(&mut app);
     assert!(
         app.world()
             .get::<StylizedFullscreenEffect>(camera)
@@ -98,11 +91,11 @@ fn post_controller_renders_and_disable_remove_restore_pixels() {
         .0
         .camera
         .post_enabled = true;
-    assert_eq!(enabled.data, frame(&mut app, &target).data);
+    assert_eq!(enabled.data, frame(&mut app).data);
     app.world_mut()
         .entity_mut(camera)
         .remove::<StylizedPostProcess>();
-    assert_eq!(original.data, frame(&mut app, &target).data);
+    assert_eq!(original.data, frame(&mut app).data);
     assert!(
         app.world()
             .get::<StylizedFullscreenEffect>(camera)

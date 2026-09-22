@@ -1,0 +1,161 @@
+{
+  "name": "recipe-actions",
+  "description": "带动作图的 SceneRecipe：整数 tick/有理步长为十进制字符串；required_effects 集合去重排序；seed 为 2^53+1 验证 64 位字符串编码；f64 0.02/0.5/0.25 规范编码。",
+  "model": "scene_recipe",
+  "kind": "recipe",
+  "version": "scenario-model.canon/v1",
+  "input": {
+    "schema": {
+      "major": 1,
+      "minor": 0
+    },
+    "scene": {
+      "id": "face",
+      "preset": null
+    },
+    "seed": "9007199254740993",
+    "rng": {
+      "algorithm": "chacha",
+      "version": "1"
+    },
+    "resolution": {
+      "width": 512,
+      "height": 512
+    },
+    "anti_aliasing": {
+      "type": "none"
+    },
+    "tier": "standard",
+    "required_effects": [
+      "rim",
+      "face_sdf",
+      "rim"
+    ],
+    "assets": [
+      {
+        "id": "reference-scene",
+        "source": "fixtures/synthetic/reference-scene",
+        "sha256": null
+      }
+    ],
+    "camera": {
+      "position": [
+        0.0,
+        1.5,
+        2.5
+      ],
+      "target": [
+        0.0,
+        1.0,
+        0.0
+      ],
+      "fov_degrees": 35.0
+    },
+    "parameters": {
+      "outline_width": 0.02
+    },
+    "actions": {
+      "nodes": [
+        {
+          "id": "apply",
+          "tick": "0",
+          "depends_on": [],
+          "writes": [
+            {
+              "scope": "material",
+              "id": "hero_face"
+            }
+          ],
+          "kind": {
+            "type": "apply_params",
+            "target": {
+              "scope": "material",
+              "id": "hero_face"
+            },
+            "params": {
+              "rim_strength": 0.5
+            }
+          }
+        },
+        {
+          "id": "wait",
+          "tick": "0",
+          "depends_on": [],
+          "writes": [],
+          "kind": {
+            "type": "wait_ready",
+            "condition": {
+              "type": "pipelines_ready"
+            }
+          }
+        },
+        {
+          "id": "step",
+          "tick": "0",
+          "depends_on": [
+            "wait"
+          ],
+          "writes": [],
+          "kind": {
+            "type": "fixed_step",
+            "ticks": "10",
+            "step": {
+              "numerator": "1",
+              "denominator": "60"
+            }
+          }
+        },
+        {
+          "id": "deform",
+          "tick": "0",
+          "depends_on": [
+            "apply"
+          ],
+          "writes": [
+            {
+              "scope": "entity",
+              "id": "hero"
+            }
+          ],
+          "kind": {
+            "type": "deform",
+            "target": {
+              "scope": "entity",
+              "id": "hero"
+            },
+            "channel": "smile",
+            "value": 0.25
+          }
+        },
+        {
+          "id": "capture",
+          "tick": "10",
+          "depends_on": [
+            "deform",
+            "step"
+          ],
+          "writes": [],
+          "kind": {
+            "type": "observe",
+            "observation": "rgba8",
+            "view": "main"
+          }
+        },
+        {
+          "id": "mark",
+          "tick": "10",
+          "depends_on": [
+            "capture"
+          ],
+          "writes": [],
+          "kind": {
+            "type": "checkpoint",
+            "label": "after-capture"
+          }
+        }
+      ]
+    }
+  },
+  "canonical": "{\"actions\":{\"nodes\":[{\"depends_on\":[],\"id\":\"apply\",\"kind\":{\"params\":{\"rim_strength\":0.5},\"target\":{\"id\":\"hero_face\",\"scope\":\"material\"},\"type\":\"apply_params\"},\"tick\":\"0\",\"writes\":[{\"id\":\"hero_face\",\"scope\":\"material\"}]},{\"depends_on\":[],\"id\":\"wait\",\"kind\":{\"condition\":{\"type\":\"pipelines_ready\"},\"type\":\"wait_ready\"},\"tick\":\"0\",\"writes\":[]},{\"depends_on\":[\"wait\"],\"id\":\"step\",\"kind\":{\"step\":{\"denominator\":\"60\",\"numerator\":\"1\"},\"ticks\":\"10\",\"type\":\"fixed_step\"},\"tick\":\"0\",\"writes\":[]},{\"depends_on\":[\"apply\"],\"id\":\"deform\",\"kind\":{\"channel\":\"smile\",\"target\":{\"id\":\"hero\",\"scope\":\"entity\"},\"type\":\"deform\",\"value\":0.25},\"tick\":\"0\",\"writes\":[{\"id\":\"hero\",\"scope\":\"entity\"}]},{\"depends_on\":[\"deform\",\"step\"],\"id\":\"capture\",\"kind\":{\"observation\":\"rgba8\",\"type\":\"observe\",\"view\":\"main\"},\"tick\":\"10\",\"writes\":[]},{\"depends_on\":[\"capture\"],\"id\":\"mark\",\"kind\":{\"label\":\"after-capture\",\"type\":\"checkpoint\"},\"tick\":\"10\",\"writes\":[]}]},\"anti_aliasing\":{\"type\":\"none\"},\"assets\":[{\"id\":\"reference-scene\",\"sha256\":null,\"source\":\"fixtures/synthetic/reference-scene\"}],\"camera\":{\"fov_degrees\":35,\"position\":[0,1.5,2.5],\"target\":[0,1,0]},\"parameters\":{\"outline_width\":0.02},\"required_effects\":[\"face_sdf\",\"rim\"],\"resolution\":{\"height\":512,\"width\":512},\"rng\":{\"algorithm\":\"chacha\",\"version\":\"1\"},\"scene\":{\"id\":\"face\",\"preset\":null},\"schema\":{\"major\":1,\"minor\":0},\"seed\":\"9007199254740993\",\"tier\":\"standard\"}",
+  "sha256": "ee0050e9e6d5cfb7ecff5427136dbc15aa657aa7b3b9801a65f1304677951426"
+}

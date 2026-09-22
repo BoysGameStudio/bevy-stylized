@@ -7,11 +7,10 @@ use bevy::{
     app::{App, PluginGroup},
     asset::{AssetPlugin, Assets, RenderAssetUsages},
     color::{Color, LinearRgba},
-    core_pipeline::tonemapping::Tonemapping,
     image::{Image, ImageSampler},
     math::Vec3,
     pbr::MeshMaterial3d,
-    prelude::{Camera3d, Mesh, Mesh3d, Transform},
+    prelude::{Mesh, Mesh3d, Transform},
     render::{
         RenderPlugin,
         render_resource::{Extent3d, TextureDimension, TextureFormat},
@@ -24,6 +23,9 @@ use bevy_stylized::prelude::*;
 use golden_harness::{
     CapturedImage, GoldenPaths, GoldenProvenance, Tolerance, capture, diff_rgba8,
 };
+use scenario_model::ident::SessionId;
+use scene_runtime::{Settle, capture_in_app};
+use scenes::CameraRecipe;
 
 const WIDTH: u32 = 512;
 const HEIGHT: u32 = 512;
@@ -34,7 +36,7 @@ fn golden_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/golden/character-portable")
 }
 
-fn headless_app(resources: RenderResources, asset_root: &str) -> (App, capture::CaptureTarget) {
+fn headless_app(resources: RenderResources, asset_root: &str) -> App {
     let mut app = App::new();
     app.add_plugins(
         DefaultPlugins
@@ -56,10 +58,6 @@ fn headless_app(resources: RenderResources, asset_root: &str) -> (App, capture::
     );
     app.add_plugins(StylizedPlugin::default());
     capture::install(&mut app);
-    let target = {
-        let mut images = app.world_mut().resource_mut::<Assets<Image>>();
-        capture::create_capture_target(&mut images, WIDTH, HEIGHT)
-    };
     app.insert_resource(bevy::prelude::ClearColor(Color::srgb(0.105, 0.12, 0.13)));
     *app.world_mut().resource_mut::<StylizedViewSettings>() =
         StylizedViewSettings(StylizedViewDescriptor {
@@ -71,7 +69,7 @@ fn headless_app(resources: RenderResources, asset_root: &str) -> (App, capture::
         });
     app.finish();
     app.cleanup();
-    (app, target)
+    app
 }
 
 fn gpu_info(app: &App) -> (String, String) {
@@ -86,15 +84,19 @@ fn gpu_info(app: &App) -> (String, String) {
         .unwrap_or_else(|| ("unknown".to_owned(), "unknown".to_owned()))
 }
 
-fn capture_frame(app: &mut App, target: &capture::CaptureTarget) -> CapturedImage {
-    let request = capture::request_capture(app.world_mut(), target.clone());
-    for _ in 0..MAX_WAIT_FRAMES {
-        app.update();
-        if let Some(frame) = capture::try_take(app.world_mut(), request.clone()) {
-            return frame;
-        }
-    }
-    panic!("capture readback timed out");
+/// 经 CaseDriver 观测周期捕获（settle→observe；帧语义与旧手写
+/// "SETTLE_FRAMES 次 update 后请求、下一帧提取"逐帧一致）。
+fn capture_frame(app: &mut App) -> CapturedImage {
+    capture_in_app(
+        app,
+        &SessionId::new("golden-character").expect("session id"),
+        &CameraRecipe::new(Vec3::new(0.0, 0.0, 5.2), Vec3::ZERO),
+        (WIDTH, HEIGHT),
+        Settle::Frames(SETTLE_FRAMES as u64),
+        false,
+        MAX_WAIT_FRAMES as usize + 40,
+    )
+    .expect("capture readback timed out")
 }
 
 fn evaluate_case(
@@ -298,18 +300,9 @@ fn character_synthetic_golden() {
         eprintln!("golden-character: no GPU adapter available; skipping");
         return;
     };
-    let (mut app, target) = headless_app(resources, "assets");
+    let mut app = headless_app(resources, "assets");
     synthetic_character_scene(&mut app);
-    app.world_mut().spawn((
-        Camera3d::default(),
-        capture::capture_target_bundle(&target),
-        Tonemapping::None,
-        Transform::from_xyz(0.0, 0.0, 5.2).looking_at(Vec3::ZERO, Vec3::Y),
-    ));
-    for _ in 0..SETTLE_FRAMES {
-        app.update();
-    }
-    let captured = capture_frame(&mut app, &target);
+    let captured = capture_frame(&mut app);
     let (gpu, driver) = gpu_info(&app);
     let ok = evaluate_case(
         &golden_dir(),

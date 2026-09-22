@@ -2,12 +2,11 @@ use bevy::{
     DefaultPlugins,
     app::{App, PluginGroup},
     asset::{AssetPlugin, Assets},
-    core_pipeline::tonemapping::Tonemapping,
     image::Image,
     math::Vec3,
     mesh::Mesh,
     pbr::MeshMaterial3d,
-    prelude::{Camera3d, Mesh3d, Transform},
+    prelude::{Mesh3d, Transform},
     render::{
         RenderPlugin,
         render_resource::{Extent3d, TextureDimension, TextureFormat},
@@ -169,41 +168,23 @@ fn render_mask(class: u8, prepass: u8) -> golden_harness::CapturedImage {
         let right_alpha = data[(32 * 64 + 40) * 4 + 3];
         assert_eq!(right_alpha, 0, "texture alpha must be 0 on the right half");
     }
-    let target = {
-        let mut images = app.world_mut().resource_mut::<Assets<Image>>();
-        capture::create_capture_target(&mut images, 256, 256)
+    // 经 CaseDriver 观测周期捕获（readiness 就绪 + 24 帧暖场；prepass 变体
+    // 经相机配方的 Prepass 附件声明，与旧逐相机 insert 等价）。
+    let attachment = scenes::CameraAttachment::Prepass {
+        depth: prepass >= 1,
+        normal: prepass >= 2,
+        motion_vector: false,
     };
-    let camera = app
-        .world_mut()
-        .spawn((
-            Camera3d::default(),
-            capture::capture_target_bundle(&target),
-            Tonemapping::None,
-            Transform::from_xyz(0.0, 0.0, 3.0).looking_at(Vec3::ZERO, Vec3::Y),
-        ))
-        .id();
-    if prepass == 1 {
-        app.world_mut()
-            .entity_mut(camera)
-            .insert(bevy::core_pipeline::prepass::DepthPrepass);
-    }
-    if prepass == 2 {
-        app.world_mut().entity_mut(camera).insert((
-            bevy::core_pipeline::prepass::DepthPrepass,
-            bevy::core_pipeline::prepass::NormalPrepass,
-        ));
-    }
-    golden_harness::readiness::wait(&mut app, 24);
-    let request = capture::request_capture(app.world_mut(), target);
-    let mut frame = None;
-    for _ in 0..600 {
-        app.update();
-        if let Some(f) = capture::try_take(app.world_mut(), request.clone()) {
-            frame = Some(f);
-            break;
-        }
-    }
-    let frame = frame.expect("capture");
+    let frame = scene_runtime::capture_in_app(
+        &mut app,
+        &scenario_model::ident::SessionId::new("alpha-probe").expect("session id"),
+        &scenes::CameraRecipe::with_attachment(Vec3::new(0.0, 0.0, 3.0), Vec3::ZERO, attachment),
+        (256, 256),
+        scene_runtime::Settle::ReadinessThenFrames(24),
+        true,
+        660,
+    )
+    .expect("capture");
     // 左半（alpha=255）= 纹理红；右半（alpha=0 < cutoff）= 被 discard 露背景。
     let px = |x: usize, y: usize| {
         let o = (y * 256 + x) * 4;

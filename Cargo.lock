@@ -359,6 +359,7 @@ dependencies = [
  "bevy",
  "bevy-stylized",
  "golden-harness",
+ "scenes",
  "serde",
  "serde_json",
 ]
@@ -2527,6 +2528,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 2.0.18",
+ "validation",
 ]
 
 [[package]]
@@ -3853,10 +3855,12 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 name = "regression-lab"
 version = "0.1.0"
 dependencies = [
- "benchmarks",
  "bevy",
  "bevy-stylized",
  "golden-harness",
+ "scenario-model",
+ "scene-runtime",
+ "scenes",
  "serde",
  "serde_json",
 ]
@@ -3944,6 +3948,45 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "scenario-model"
+version = "0.1.0"
+dependencies = [
+ "bevy-stylized-core",
+ "schemars",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "scene-runtime"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy-stylized",
+ "golden-harness",
+ "scenario-model",
+ "scenes",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+]
+
+[[package]]
+name = "scenes"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy-stylized",
+ "bevy-stylized-core",
+ "bevy_color",
+ "bevy_math",
+ "scenario-model",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -4115,6 +4158,9 @@ dependencies = [
  "bevy_egui",
  "gltf",
  "golden-harness",
+ "scenario-model",
+ "scene-runtime",
+ "scenes",
  "serde",
  "serde_json",
  "sha2",
@@ -4259,6 +4305,10 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy-stylized",
+ "golden-harness",
+ "scenario-model",
+ "scene-runtime",
+ "scenes",
  "serde_json",
 ]
 
@@ -4274,6 +4324,9 @@ dependencies = [
  "gltf",
  "golden-harness",
  "naga",
+ "scenario-model",
+ "scene-runtime",
+ "scenes",
  "serde",
  "serde_json",
  "sha2",
@@ -4620,6 +4673,15 @@ dependencies = [
  "js-sys",
  "serde_core",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "validation"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
 ]
 
 [[package]]

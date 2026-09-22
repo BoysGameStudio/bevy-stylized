@@ -1,0 +1,21 @@
+{
+  "name": "jcs-numbers",
+  "description": "RFC 8785 §3.2.2.3 数字表示：普通/指数记法分界（1e20/1e21、1e-6/1e-7）、-0 归一、最短回读。",
+  "model": "json",
+  "version": "scenario-model.canon/v1",
+  "input": {
+    "big": 1e20,
+    "bigger": 1e21,
+    "frac": 0.1,
+    "int": 42,
+    "max": 1.7976931348623157e308,
+    "neg": -3,
+    "negzero": -0.0,
+    "small": 1e-6,
+    "smaller": 1e-7,
+    "sub": 5e-324,
+    "zero": 0.0
+  },
+  "canonical": "{\"big\":100000000000000000000,\"bigger\":1e+21,\"frac\":0.1,\"int\":42,\"max\":1.7976931348623157e+308,\"neg\":-3,\"negzero\":0,\"small\":0.000001,\"smaller\":1e-7,\"sub\":5e-324,\"zero\":0}",
+  "sha256": null
+}

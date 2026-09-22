@@ -89,6 +89,9 @@ def run(project, asset, out):
     version = tomllib.loads((project.root/'Cargo.toml').read_text())['workspace']['dependencies']['bevy']['version']
     manifest = '[workspace]\n[package]\nname="stylized-browser-smoke"\nversion="0.0.0"\nedition="2024"\n[dependencies]\n'
     manifest += 'bevy={version='+json.dumps(version)+',default-features=false,features=["bevy_winit","x11","webgpu","bevy_gltf","bevy_scene","bevy_animation","png","reflect_auto_register"]}\n'
+    # Apple 上 wgpu 仅在 vulkan-portability feature 下编译 Vulkan 后端（MoltenVK）；
+    # 该 feature 在非 Apple 目标为空转依赖，不改变 Linux 合格路径。
+    manifest += 'bevy_render={version='+json.dumps(version)+',default-features=false,features=["vulkan-portability"]}\n'
     for name, path in [('bevy-stylized', 'crates/bevy-stylized'), ('golden-harness', 'tests/harness')]:
         manifest += name+'={path='+json.dumps(str(project.root/path))+'}\n'
     manifest += 'serde_json="1"\nwasm-bindgen='+json.dumps('='+wasm_version)+'\n'

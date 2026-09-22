@@ -50,8 +50,10 @@ def run(project, out):
     if os.environ.get('STYLIZED_GPU') == 'disabled':
         raise ResourceBlocked('required GPU unavailable')
     log = project.run_output/'workloads.log'
+    # 测量已脱离 Inspector（docs/showcase/01）：workloads 子命令在默认
+    # headless 构建下运行，不再需要 --features inspector。
     command = ['cargo', 'run', '--locked', '--release', '-p', 'showcase',
-               '--features', 'inspector', '--', 'workloads', '--out', str(out)]
+               '--', 'workloads', '--out', str(out)]
     with log.open('w') as stream:
         result = invoke(command, cwd=project.root, env=dict(os.environ, CARGO_INCREMENTAL='0'),
                         stdout=stream, stderr=subprocess.STDOUT)

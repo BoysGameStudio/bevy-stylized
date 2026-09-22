@@ -1,0 +1,35 @@
+[package]
+name = "scenes"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+readme = "../../README.md"
+publish = false
+description = "Registered scene content for the unified scene workbench: metadata and view presets (pure data) plus content builders and camera recipes behind the `build` feature."
+
+# 依赖边界（docs/showcase/01 §依赖与代码所有权）：元数据部分只依赖
+# model/产品纯数据；`build` feature 才引入产品渲染 API 与 Bevy。
+# 本层无 runner、UI、判定或测量。
+[dependencies]
+scenario-model = { path = "../scenario-model" }
+bevy-stylized-core = { path = "../../crates/bevy-stylized-core" }
+bevy_math = { workspace = true, features = ["std"] }
+bevy_color = { workspace = true, features = ["std"] }
+thiserror.workspace = true
+
+bevy = { workspace = true, optional = true, features = [
+    "bevy_animation",
+    "bevy_gltf",
+    "bevy_scene",
+    "png",
+    "reflect_auto_register",
+] }
+bevy-stylized = { path = "../../crates/bevy-stylized", optional = true }
+
+[features]
+default = []
+build = ["dep:bevy", "dep:bevy-stylized"]
+
+[lints]
+workspace = true

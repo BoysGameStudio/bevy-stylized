@@ -14,7 +14,9 @@ bevy = { workspace = true, features = [
     "reflect_auto_register",
 ] }
 bevy-stylized = { path = "../../crates/bevy-stylized" }
-benchmarks = { path = "../benchmarks" }
+scenes = { path = "../scenes", features = ["build"] }
+scene-runtime = { path = "../scene-runtime" }
+scenario-model = { path = "../scenario-model" }
 golden-harness = { path = "../../tests/harness" }
 serde.workspace = true
 serde_json.workspace = true

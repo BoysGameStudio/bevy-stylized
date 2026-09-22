@@ -1,0 +1,30 @@
+[package]
+name = "scene-runtime"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+readme = "../../README.md"
+publish = false
+description = "Non-blocking CaseDriver, session reconfiguration coordination, scene ownership, action scheduling and observation normalization for the unified scene workbench."
+
+# 依赖边界（docs/showcase/01 §依赖与代码所有权）：依赖 model/scenes 与中性
+# harness；通过宿主接口请求设备操作，不持有平台事件循环。
+[dependencies]
+scenario-model = { path = "../scenario-model" }
+scenes = { path = "../scenes", features = ["build"] }
+golden-harness = { path = "../../tests/harness" }
+bevy-stylized = { path = "../../crates/bevy-stylized" }
+bevy = { workspace = true, features = [
+    "bevy_animation",
+    "bevy_gltf",
+    "bevy_scene",
+    "png",
+    "reflect_auto_register",
+] }
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

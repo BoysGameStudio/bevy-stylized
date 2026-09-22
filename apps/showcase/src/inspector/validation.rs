@@ -1,14 +1,12 @@
 //! Frame-indexed scans and separate instrumented performance measurements.
+//!
+//! 渲染图时间戳测量插件与百分比统计归 `benchmarks::measurement`
+//! （docs/showcase/01：测量脱离 UI）；本模块只保留 Inspector 自己的
+//! 扫描/测量编排。
 use super::{Recipe, Runtime, State, asset, fit, state::DebugMode};
-use bevy::{
-    diagnostic::DiagnosticsStore,
-    prelude::*,
-    render::{
-        RenderApp,
-        diagnostic::{RecordDiagnostics, RenderDiagnosticsPlugin},
-        renderer::{RenderDevice, RenderGraph, RenderGraphSystems},
-    },
-};
+pub(crate) use benchmarks::measurement::install_measurement;
+use benchmarks::measurement::stats;
+use bevy::{diagnostic::DiagnosticsStore, prelude::*, render::renderer::RenderDevice};
 use golden_harness::{CapturedImage, capture as gpu};
 use serde_json::{Value, json};
 use std::{
@@ -16,32 +14,6 @@ use std::{
     path::Path,
     time::{Duration, Instant},
 };
-
-pub(crate) fn install_measurement(app: &mut App) {
-    app.add_plugins(RenderDiagnosticsPlugin);
-    app.sub_app_mut(RenderApp).add_systems(
-        RenderGraph,
-        (
-            begin
-                .after(RenderGraphSystems::Begin)
-                .before(RenderGraphSystems::Render),
-            end.after(RenderGraphSystems::Render)
-                .before(bevy::render::diagnostic::resolve_encoder),
-        ),
-    );
-}
-fn begin(mut context: bevy::render::renderer::RenderContext) {
-    let recorder = context
-        .diagnostic_recorder()
-        .expect("measurement plugin installed");
-    recorder.begin_time_span(context.command_encoder(), "inspector_frame".into());
-}
-fn end(mut context: bevy::render::renderer::RenderContext) {
-    let recorder = context
-        .diagnostic_recorder()
-        .expect("measurement plugin installed");
-    recorder.end_time_span(context.command_encoder());
-}
 fn update(app: &mut App) -> Result<(), String> {
     app.update();
     if let Some(e) = &app.world().resource::<State>().error {
@@ -270,15 +242,6 @@ fn scan(app: &mut App, out: &Path, base: Recipe, frames: usize) -> Result<Value,
         json!({"schema":"bevy_stylized.realtime-scan/v1","status":if passed{"PASS"}else{"FAIL"},"scope":"frame-indexed replay equality and review frames; repeatability alone does not qualify absence of temporal artifacts","msaa":4,"frames_per_phase":frames,"virtual_fps":60,"pipelined_rendering":false,"phases":["orbit","light","zoom"],"repeats":2,"loop_closure":closures,"readback_perturbs_wall_clock":true,"rows":rows}),
     )
 }
-pub(crate) fn stats(values: &[f64]) -> Value {
-    if values.is_empty() {
-        return Value::Null;
-    }
-    let mut sorted = values.to_vec();
-    sorted.sort_by(f64::total_cmp);
-    let n = sorted.len();
-    json!({"count":n,"mean":values.iter().sum::<f64>()/n as f64,"median":if n.is_multiple_of(2){(sorted[n/2-1]+sorted[n/2])*0.5}else{sorted[n/2]},"p95":sorted[((n as f64*0.95).ceil() as usize).saturating_sub(1)],"min":sorted[0],"max":sorted[n-1]})
-}
 fn measure(app: &mut App, base: Recipe, frames: usize) -> Result<Value, String> {
     let mut reports = Vec::new();
     for mode in [DebugMode::Beauty, DebugMode::Lighting] {
@@ -345,16 +308,4 @@ fn measure(app: &mut App, base: Recipe, frames: usize) -> Result<Value, String> 
     Ok(
         json!({"schema":"bevy_stylized.realtime-performance/v1","status":if gpu{"PASS"}else{"FAIL"},"scope":"instrumented two-view inspector baseline, not a shipping-frame budget or accepted regression baseline","optimized":!cfg!(debug_assertions),"resolution_per_view":[base.resolution,base.resolution],"view_count":2,"msaa":4,"capture_readbacks":false,"diagnostic_readbacks":true,"pipelined_rendering":false,"device":app.world().get_resource::<bevy::render::renderer::RenderAdapterInfo>().map(|v|format!("{:?}",v.0)),"files":base.files,"reports":reports}),
     )
-}
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn percentiles_do_not_drop_the_tail() {
-        let s = stats(&[1., 2., 3., 100.]);
-        assert_eq!(s["p95"], 100.);
-        assert_eq!(s["mean"], 26.5);
-        assert_eq!(s["median"], 2.5);
-        assert!(stats(&[]).is_null());
-    }
 }

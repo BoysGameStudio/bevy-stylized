@@ -1,0 +1,30 @@
+{
+  "name": "session-plan",
+  "description": "SessionPlan：集合字段（plugins）按声明规则排序去重；session 域 SHA-256 进入执行身份。",
+  "model": "session_plan",
+  "kind": "session",
+  "version": "scenario-model.canon/v1",
+  "input": {
+    "schema": {
+      "major": 1,
+      "minor": 0
+    },
+    "backend": "vulkan",
+    "device_features": [
+      "texture_compression_bc"
+    ],
+    "limits_profile": "portable-baseline",
+    "tier_ceiling": "standard",
+    "plugins": [
+      "stylized_gltf",
+      "stylized"
+    ],
+    "asset_source": "filesystem",
+    "instrumentation": [
+      "gpu_spans"
+    ],
+    "runner": "headless"
+  },
+  "canonical": "{\"asset_source\":\"filesystem\",\"backend\":\"vulkan\",\"device_features\":[\"texture_compression_bc\"],\"instrumentation\":[\"gpu_spans\"],\"limits_profile\":\"portable-baseline\",\"plugins\":[\"stylized\",\"stylized_gltf\"],\"runner\":\"headless\",\"schema\":{\"major\":1,\"minor\":0},\"tier_ceiling\":\"standard\"}",
+  "sha256": "dfc2356ae392e484817d7b136d877b28a2ded0ff36599beff0e3b36fd61b6b2f"
+}

@@ -4,6 +4,8 @@
 #[cfg(feature = "character")]
 mod character;
 
+mod driver_host;
+
 #[cfg(not(feature = "character"))]
 use bevy::{
     camera::ScalingMode, core_pipeline::tonemapping::Tonemapping,
@@ -40,8 +42,14 @@ pub fn main() {
     let mut app = App::new();
     app.insert_resource(ClearColor(Color::srgb(0.08, 0.10, 0.15)))
         .add_plugins(plugins)
-        .add_plugins(StylizedPlugin::default())
-        .add_systems(Update, (input_and_lifecycle, heartbeat));
+        .add_plugins(StylizedPlugin::default());
+    // harness 中性探针（driver 的捕获/就绪前置；R1：平台事件循环不变）。
+    golden_harness::capture::install(&mut app);
+    golden_harness::readiness::install(&mut app);
+    app.init_resource::<driver_host::ReplayHost>().add_systems(
+        Update,
+        (input_and_lifecycle, heartbeat, driver_host::pump_replay),
+    );
     #[cfg(not(feature = "character"))]
     app.add_systems(Startup, setup);
     #[cfg(feature = "character")]

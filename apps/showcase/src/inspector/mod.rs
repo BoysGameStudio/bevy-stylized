@@ -1,4 +1,19 @@
 //! Static renderer inspection. No gameplay, animation controller or sibling dependency.
+//!
+//! 共享运行时对齐的处置（H4b；docs/showcase/01 line 135/194-195）：
+//!
+//! - **读回身份**：capture.json 携带 harness `CaptureStamp`（additive
+//!   `stamps` 字段）；generation/revision 与 scenario-model 的
+//!   Generation/Revision 语义一一对应；
+//! - **保留在 Inspector 本地（各自有明确理由）**：编译产物 bundle 的输入
+//!   验收（不可变字节核验，line 137——不与 labs/reference 合并）；
+//!   A/B 双侧同步捕获 + retire-排空语义（与 `cancel_capture` 的丢弃语义
+//!   不同，`retired_captures` 验收依赖它）；就绪谓词（adoption 计数 +
+//!   bounds + 连续稳定帧，超出 driver `WaitReady` 的语义）；相机/调试
+//!   控制（R12 边界：A/B 克隆材质与 RenderLayers 分区是诊断面，不触碰
+//!   共享实验状态——唯一全局写入是 Inspector 独占应用的
+//!   `StylizedViewSettings`）；
+//! - egui 面板只存在于本 crate（桌面宿主）；共享层无 UI 依赖。
 mod asset;
 mod capture;
 mod options;

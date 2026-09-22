@@ -1,0 +1,54 @@
+{
+  "name": "recipe-minimal",
+  "description": "最小 SceneRecipe：默认值展开后的 JCS 字节与 recipe 域 SHA-256。浮点 45.0/0.0 按 ECMAScript 规则编码为 45/0；seed 为十进制字符串。",
+  "model": "scene_recipe",
+  "kind": "recipe",
+  "version": "scenario-model.canon/v1",
+  "input": {
+    "schema": {
+      "major": 1,
+      "minor": 0
+    },
+    "scene": {
+      "id": "outline",
+      "preset": null
+    },
+    "seed": "42",
+    "rng": {
+      "algorithm": "chacha",
+      "version": "1"
+    },
+    "resolution": {
+      "width": 512,
+      "height": 512
+    },
+    "anti_aliasing": {
+      "type": "msaa",
+      "samples": 4
+    },
+    "tier": "portable",
+    "required_effects": [
+      "outline"
+    ],
+    "assets": [],
+    "camera": {
+      "position": [
+        0.0,
+        1.0,
+        3.0
+      ],
+      "target": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "fov_degrees": 45.0
+    },
+    "parameters": {},
+    "actions": {
+      "nodes": []
+    }
+  },
+  "canonical": "{\"actions\":{\"nodes\":[]},\"anti_aliasing\":{\"samples\":4,\"type\":\"msaa\"},\"assets\":[],\"camera\":{\"fov_degrees\":45,\"position\":[0,1,3],\"target\":[0,0,0]},\"parameters\":{},\"required_effects\":[\"outline\"],\"resolution\":{\"height\":512,\"width\":512},\"rng\":{\"algorithm\":\"chacha\",\"version\":\"1\"},\"scene\":{\"id\":\"outline\",\"preset\":null},\"schema\":{\"major\":1,\"minor\":0},\"seed\":\"42\",\"tier\":\"portable\"}",
+  "sha256": "0b207abf60657534255ce2b8da845616c0ce5c52d3c924877e699963390bc742"
+}

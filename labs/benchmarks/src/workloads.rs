@@ -1,6 +1,16 @@
-//! Fixed single-view procedural workloads with GPU timestamps and CPU wall time.
-use crate::inspector::validation::{install_measurement, stats};
+//! 固定 workload 配方与 runner（docs/showcase/01：测量协议、采样器、统计与
+//! 性能报告归 `labs/benchmarks`；不依赖 egui/Inspector/桌面窗口）。
+//!
+//! 自 `apps/showcase` 迁入，数值身份逐字保留：9 个 workload 名、512²、
+//! 600 帧、3 repeats、诊断路径 `render/inspector_frame/elapsed_gpu`、
+//! 报告 schema `bevy_stylized.workloads/v1` 及全部 JSON 键均不改变。
+//! 单视图程序化负载，GPU 时间戳 + CPU 墙钟分列记录。
+
+use crate::measurement::{install_measurement, stats};
 use bevy::{
+    DefaultPlugins,
+    app::PluginGroup,
+    asset::{AssetMetaCheck, AssetPlugin},
     core_pipeline::tonemapping::Tonemapping,
     diagnostic::DiagnosticsStore,
     mesh::{
@@ -10,10 +20,12 @@ use bevy::{
     },
     prelude::*,
     render::{
+        RenderPlugin,
         render_resource::{Extent3d, TextureDimension, TextureFormat},
         renderer::RenderDevice,
-        settings::RenderResources,
+        settings::{RenderCreation, RenderResources},
     },
+    window::{ExitCondition, WindowPlugin},
 };
 use bevy_stylized::prelude::*;
 use golden_harness::{capture, readiness};
@@ -23,6 +35,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// 固定 workload 名（数值身份；顺序与既有报告一致）。
 pub const CASES: [&str; 9] = [
     "hero-1",
     "hero-3",
@@ -85,7 +98,7 @@ fn build(app: &mut App, name: &str) -> (SceneState, Vec3, f32) {
     };
     if let Some(n) = name.strip_prefix("portable-") {
         let count: u32 = n.parse().expect("registered count");
-        benchmarks::build_portable_instances(app, count);
+        crate::build_portable_instances(app, count);
         let cols = (count as f32).sqrt().ceil();
         let rows = (count as f32 / cols).ceil();
         return (
@@ -191,16 +204,60 @@ fn step(app: &mut App, state: &SceneState, frame: usize) {
     }
     app.update();
 }
-fn measure(resources: RenderResources, name: &str, out: &Path) -> Result<Value, String> {
-    let mut app = crate::configured_headless_app(
-        resources,
-        "assets",
-        Some(StylizedExecutionTier::Portable),
-        |app| {
-            install_measurement(app);
-            readiness::install(app);
-        },
+
+/// workload 的 headless App 装配（Portable tier；与既有 runner 同一装配语义：
+/// 同步管线编译、无窗口、capture 就绪探针与测量插件经 `configure` 注入）。
+fn headless_app(resources: RenderResources, configure: impl FnOnce(&mut App)) -> App {
+    let mut app = App::new();
+    // 必须在 StylizedPlugin 之前（Stage B 在 finish 时读该配置）。
+    app.insert_resource(StylizedCapabilityConfig {
+        requested_tier: StylizedExecutionTier::Portable,
+        ..StylizedCapabilityConfig::default()
+    });
+    app.add_plugins(
+        DefaultPlugins
+            .build()
+            .set(AssetPlugin {
+                file_path: "assets".to_string(),
+                meta_check: AssetMetaCheck::Never,
+                ..Default::default()
+            })
+            .set(RenderPlugin {
+                render_creation: RenderCreation::Manual(resources),
+                synchronous_pipeline_compilation: true,
+                ..Default::default()
+            })
+            .set(WindowPlugin {
+                primary_window: None,
+                exit_condition: ExitCondition::DontExit,
+                ..Default::default()
+            }),
     );
+    app.add_plugins(StylizedPlugin::default());
+    capture::install(&mut app);
+    configure(&mut app);
+    app.finish();
+    app.cleanup();
+    app
+}
+
+/// workload 的 view 默认值（昼间 + 斜上 key light；数值身份沿用既有 runner）。
+fn default_view(app: &mut App) {
+    *app.world_mut().resource_mut::<StylizedViewSettings>() =
+        StylizedViewSettings(StylizedViewDescriptor {
+            key_light_direction: Vec3::new(0.5, 0.8, 0.6).normalize(),
+            key_light_color: LinearRgba::WHITE,
+            exposure: 1.0,
+            day_night_factor: 1.0,
+            ..StylizedViewDescriptor::default()
+        });
+}
+
+fn measure(resources: RenderResources, name: &str, out: &Path) -> Result<Value, String> {
+    let mut app = headless_app(resources, |app| {
+        install_measurement(app);
+        readiness::install(app);
+    });
     if !app
         .world()
         .resource::<RenderDevice>()
@@ -209,7 +266,7 @@ fn measure(resources: RenderResources, name: &str, out: &Path) -> Result<Value, 
     {
         return Err("required GPU timestamps unavailable".into());
     }
-    crate::default_view(&mut app);
+    default_view(&mut app);
     let (state, target_point, height) = build(&mut app, name);
     let target = {
         let mut images = app.world_mut().resource_mut::<Assets<Image>>();
@@ -239,7 +296,7 @@ fn measure(resources: RenderResources, name: &str, out: &Path) -> Result<Value, 
                 vignette_strength: 0.5,
                 chromatic_aberration: 0.004,
                 display_transform: StylizedDisplayTransform::SimpleCompress,
-                ..default()
+                ..Default::default()
             });
     }
     let deadline = Instant::now() + Duration::from_secs(60);
@@ -339,6 +396,7 @@ fn measure(resources: RenderResources, name: &str, out: &Path) -> Result<Value, 
     )
 }
 
+/// 运行全部 9 个 workload × 3 repeats，写出 `report.json`（schema 与键不变）。
 pub fn run(args: &[String]) -> Result<(), String> {
     let out = args
         .windows(2)

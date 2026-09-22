@@ -1,13 +1,49 @@
 //! Headless offscreen capture: render a camera into an [`Image`] target and
 //! read the pixels back to the CPU. No window is ever created.
+//!
+//! ## 时钟域与 CaptureStamp（docs/showcase/01 R3/R13 的中性证据层）
+//!
+//! harness 定义三个时钟域，stamp 只绑定前两个；墙钟属于性能测量域
+//! （`labs/benchmarks`），不进入捕获身份：
+//!
+//! - **主世界 update 序号**（[`CaptureClock::updates_completed`]）：
+//!   `app.update()` 的完成次数（每个 App 从 0 开始单调递增，系统挂在
+//!   `Last`）。这是 [`CaptureStamp::issued_update_index`] 与
+//!   [`CaptureStamp::completed_update_index`] 的时钟域。
+//! - **渲染世界 Cleanup 帧计数**：render schedule 的执行次数（与
+//!   `readiness::Probe` 的帧计数同域），经共享原子镜像回主世界；
+//!   [`CaptureStamp::completed_render_frame`] 记录接受完成时点的该值。
+//!
+//! 绑定语义（经本模块 GPU 证据测试验证）：
+//!
+//! - 在两次 update 之间调用 [`request_capture`]（harness 消费者的既有用法）
+//!   时，`issued_update_index == K` 意味着像素来自第 K+1 次 update 的提取：
+//!   提取在 Main schedule 之后执行，复制命令与该帧渲染在同一 submission
+//!   中提交（引擎 `gpu_readback` 路径）。系统内发请求则属于当次 update
+//!   的提取；调用方应记录用法差异。
+//! - 完成身份 = 首次被接受的 `ReadbackComplete`（引擎对存留的 `Readback`
+//!   组件每帧重复请求读回；首次完成后 harness 即 despawn 请求实体，
+//!   晚到的完成被丢弃，见 `duplicate_completions_*` 测试）。接受的完成
+//!   对应该请求实体的首次复制，因此逐帧身份跨提取/提交/读回成立。
+//! - 快照不可变：引擎在 `map_async` 回调内把映射区复制为独立 `Vec`
+//!   后 unmap，缓冲池只复用 GPU buffer，绝不复用交出的字节；
+//!   `try_take*` 取走后 inbox 不再持有该请求的数据。
+//! - 实验 tick、有理步长、稳定逻辑 ID 与提取前屏障是 scene-runtime 的
+//!   映射职责（phase F）；本层不提供、也不假设这些概念。
 
 use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex};
 
 use bevy::{
+    app::Last,
     asset::{Assets, RenderAssetUsages},
     camera::RenderTarget,
-    prelude::{App, Bundle, Camera, Commands, Entity, Handle, Image, On, Resource, World},
+    ecs::schedule::IntoScheduleConfigs,
+    prelude::{
+        App, Bundle, Camera, Commands, Entity, Handle, Image, On, Res, ResMut, Resource, World,
+    },
     render::{
+        Render, RenderApp, RenderSystems,
         gpu_readback::{Readback, ReadbackComplete},
         render_resource::{Extent3d, TextureDimension, TextureFormat, TextureUsages},
         renderer::initialize_renderer,
@@ -82,27 +118,100 @@ pub fn capture_target_bundle(target: &CaptureTarget) -> impl Bundle {
     )
 }
 
+/// 捕获时钟（主世界 update 序号 + 请求序列；时钟域见模块文档）。
+#[derive(Resource, Default)]
+struct CaptureClock {
+    /// 已完成的 `app.update()` 次数。
+    updates_completed: u64,
+    /// 下一个请求序列号。
+    next_sequence: u64,
+}
+
+fn tick_capture_clock(mut clock: ResMut<CaptureClock>) {
+    clock.updates_completed += 1;
+}
+
+/// 渲染世界 Cleanup 帧计数的主世界镜像（与 `readiness::Probe` 帧计数同域）。
+#[derive(Resource, Clone, Default)]
+struct CaptureRenderFrame(Arc<Mutex<u64>>);
+
+fn tick_render_frame(counter: Res<CaptureRenderFrame>) {
+    let mut frame = counter.0.lock().expect("render frame lock");
+    *frame += 1;
+}
+
+/// 完成时点（接受 `ReadbackComplete` 时记录）。
+#[derive(Clone, Copy, Debug)]
+struct CompletionMark {
+    /// 接受时已完成的主世界 update 次数。
+    update_index: u64,
+    /// 接受时点的渲染世界 Cleanup 帧计数（渲染器缺失或未运行为 None）。
+    render_frame: Option<u64>,
+}
+
 #[derive(Resource, Default)]
 struct CaptureInbox {
     pending: HashSet<Entity>,
-    frames: HashMap<Entity, Vec<u8>>,
+    frames: HashMap<Entity, (Vec<u8>, CompletionMark)>,
+}
+
+/// 捕获身份：跨提取/提交/读回的逐帧证明（时钟域定义见模块文档）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CaptureStamp {
+    /// 请求序列号（per App 单调递增，从 0 开始）。
+    pub sequence: u64,
+    /// 请求时点已完成的主世界 update 次数。
+    pub issued_update_index: u64,
+    /// 完成被接受时点已完成的主世界 update 次数。
+    pub completed_update_index: u64,
+    /// 完成被接受时点的渲染世界 Cleanup 帧计数（无渲染器时为 None）。
+    pub completed_render_frame: Option<u64>,
+}
+
+/// 带回执的捕获结果：图像 + 身份 stamp。
+#[derive(Clone, Debug)]
+pub struct StampedCapture {
+    /// 捕获图像（独立拥有的字节，见模块文档的快照不可变性）。
+    pub image: CapturedImage,
+    /// 身份回执。
+    pub stamp: CaptureStamp,
 }
 
 /// Installs the readback-completed observer. Call once per app before
 /// requesting captures.
 pub fn install(app: &mut App) {
     app.init_resource::<CaptureInbox>();
+    app.init_resource::<CaptureClock>();
+    app.init_resource::<CaptureRenderFrame>();
+    app.add_systems(Last, tick_capture_clock);
+    let mirror = app.world().resource::<CaptureRenderFrame>().clone();
+    if let Some(render_app) = app.get_sub_app_mut(RenderApp) {
+        render_app
+            .insert_resource(mirror)
+            .add_systems(Render, tick_render_frame.in_set(RenderSystems::Cleanup));
+    }
     app.add_observer(
         |event: On<ReadbackComplete>,
          mut commands: Commands,
-         mut inbox: bevy::prelude::ResMut<CaptureInbox>| {
+         mut inbox: ResMut<CaptureInbox>,
+         clock: Res<CaptureClock>,
+         render_frame: Res<CaptureRenderFrame>| {
             // Several GPU copies may already be in flight when the first one
             // completes. Only the first completion belongs to this request;
             // late events must neither despawn again nor recreate consumed data.
             if !inbox.pending.remove(&event.entity) {
                 return;
             }
-            inbox.frames.insert(event.entity, event.data.clone());
+            let mark = CompletionMark {
+                update_index: clock.updates_completed,
+                render_frame: match *render_frame.0.lock().expect("render frame lock") {
+                    0 => None,
+                    frame => Some(frame),
+                },
+            };
+            inbox
+                .frames
+                .insert(event.entity, (event.data.clone(), mark));
             // `Readback` re-copies every frame while attached; one shot is enough.
             commands.entity(event.entity).despawn();
         },
@@ -114,13 +223,54 @@ pub fn install(app: &mut App) {
 pub struct CaptureRequest {
     entity: Entity,
     target: CaptureTarget,
+    sequence: u64,
+    issued_update_index: u64,
+}
+
+impl CaptureRequest {
+    /// 请求序列号（per App 单调递增）。
+    #[must_use]
+    pub fn sequence(&self) -> u64 {
+        self.sequence
+    }
+
+    /// 请求时点已完成的主世界 update 次数（时钟域见模块文档）。
+    #[must_use]
+    pub fn issued_update_index(&self) -> u64 {
+        self.issued_update_index
+    }
 }
 
 /// Requests a texture readback starting on the next rendered frame.
 pub fn request_capture(world: &mut World, target: CaptureTarget) -> CaptureRequest {
     let entity = world.spawn(Readback::texture(target.image.clone())).id();
+    let (sequence, issued_update_index) = {
+        let mut clock = world.resource_mut::<CaptureClock>();
+        let sequence = clock.next_sequence;
+        clock.next_sequence += 1;
+        (sequence, clock.updates_completed)
+    };
     world.resource_mut::<CaptureInbox>().pending.insert(entity);
-    CaptureRequest { entity, target }
+    CaptureRequest {
+        entity,
+        target,
+        sequence,
+        issued_update_index,
+    }
+}
+
+/// 取消一个未完成的请求：接受队列移除 + despawn 读回实体。
+///
+/// 取消后 [`try_take`] / [`try_take_stamped`] 永远返回 `None`；引擎若仍
+/// 投递晚到的完成事件，会因不在接受队列而被忽略，不影响后续请求的身份。
+pub fn cancel_capture(world: &mut World, request: CaptureRequest) {
+    world
+        .resource_mut::<CaptureInbox>()
+        .pending
+        .remove(&request.entity);
+    if let Ok(entity) = world.get_entity_mut(request.entity) {
+        entity.despawn();
+    }
 }
 
 /// Returns the captured frame once the readback has landed.
@@ -128,11 +278,16 @@ pub fn request_capture(world: &mut World, target: CaptureTarget) -> CaptureReque
 /// The GPU copy buffer is row-padded to 256 bytes; the returned image is
 /// always tightly packed RGBA8.
 pub fn try_take(world: &mut World, request: CaptureRequest) -> Option<CapturedImage> {
-    let data = world
+    try_take_stamped(world, request).map(|capture| capture.image)
+}
+
+/// [`try_take`] 的带回执形式：返回图像与身份 [`CaptureStamp`]。
+pub fn try_take_stamped(world: &mut World, request: CaptureRequest) -> Option<StampedCapture> {
+    let (data, mark) = world
         .resource_mut::<CaptureInbox>()
         .frames
         .remove(&request.entity)?;
-    CapturedImage::new(
+    let image = CapturedImage::new(
         request.target.width,
         request.target.height,
         depad_rgba8(
@@ -140,7 +295,16 @@ pub fn try_take(world: &mut World, request: CaptureRequest) -> Option<CapturedIm
             request.target.width as usize,
             request.target.height as usize,
         ),
-    )
+    )?;
+    Some(StampedCapture {
+        image,
+        stamp: CaptureStamp {
+            sequence: request.sequence,
+            issued_update_index: request.issued_update_index,
+            completed_update_index: mark.update_index,
+            completed_render_frame: mark.render_frame,
+        },
+    })
 }
 
 /// Strips the 256-byte row alignment wgpu applies to texture copy buffers.
@@ -187,6 +351,73 @@ pub fn probe_render_resources() -> Option<RenderResources> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn stamped_take_records_sequence_and_clock_domains() {
+        let mut app = App::new();
+        install(&mut app);
+        let target = || CaptureTarget {
+            image: Handle::default(),
+            width: 64,
+            height: 1,
+        };
+        // 首个请求：未跑过 update，issued=0，序列 0。
+        let first = request_capture(app.world_mut(), target());
+        assert_eq!(first.sequence(), 0);
+        assert_eq!(first.issued_update_index(), 0);
+        app.world_mut().trigger(ReadbackComplete {
+            entity: first.entity,
+            data: vec![1; 256],
+        });
+        let capture = try_take_stamped(app.world_mut(), first).expect("completion");
+        assert_eq!(capture.image.data, vec![1; 256]);
+        assert_eq!(
+            capture.stamp,
+            CaptureStamp {
+                sequence: 0,
+                issued_update_index: 0,
+                completed_update_index: 0,
+                completed_render_frame: None,
+            }
+        );
+        // 跑过两次 update 后：序列继续，issued 反映主世界时钟。
+        app.update();
+        app.update();
+        let second = request_capture(app.world_mut(), target());
+        assert_eq!(second.sequence(), 1);
+        assert_eq!(second.issued_update_index(), 2);
+    }
+
+    #[test]
+    fn cancelled_request_ignores_late_completion_and_keeps_later_identities() {
+        let mut app = App::new();
+        install(&mut app);
+        let target = || CaptureTarget {
+            image: Handle::default(),
+            width: 64,
+            height: 1,
+        };
+        let cancelled = request_capture(app.world_mut(), target());
+        cancel_capture(app.world_mut(), cancelled.clone());
+        // 晚到的完成被忽略：无可取结果，inbox 不留数据。
+        app.world_mut().trigger(ReadbackComplete {
+            entity: cancelled.entity,
+            data: vec![9; 256],
+        });
+        assert!(try_take(app.world_mut(), cancelled).is_none());
+        let inbox = app.world().resource::<CaptureInbox>();
+        assert!(inbox.pending.is_empty() && inbox.frames.is_empty());
+        // 后续请求身份不回绕、内容正常。
+        let next = request_capture(app.world_mut(), target());
+        assert_eq!(next.sequence(), 1);
+        app.world_mut().trigger(ReadbackComplete {
+            entity: next.entity,
+            data: vec![2; 256],
+        });
+        let capture = try_take_stamped(app.world_mut(), next).expect("completion");
+        assert_eq!(capture.image.data, vec![2; 256]);
+        assert_eq!(capture.stamp.sequence, 1);
+    }
 
     #[test]
     fn duplicate_completions_cannot_replace_or_recreate_consumed_frames() {
@@ -295,7 +526,7 @@ pub fn try_take_linear_resolved(
     request: CaptureRequest,
     scale: u32,
 ) -> Result<Option<CapturedImage>, String> {
-    let Some(data) = world
+    let Some((data, _mark)) = world
         .resource_mut::<CaptureInbox>()
         .frames
         .remove(&request.entity)

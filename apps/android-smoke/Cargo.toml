@@ -12,10 +12,14 @@ crate-type = ["cdylib", "rlib"]
 [target.'cfg(target_os = "android")'.dependencies]
 bevy = { workspace = true, features = ["std", "async_executor", "multi_threaded", "bevy_winit", "bevy_pbr", "android-game-activity"] }
 bevy-stylized = { path = "../../crates/bevy-stylized", default-features = false, features = ["render"] }
-serde_json = { workspace = true, optional = true }
+scene-runtime = { path = "../../labs/scene-runtime" }
+scenes = { path = "../../labs/scenes", features = ["build"] }
+scenario-model = { path = "../../labs/scenario-model" }
+golden-harness = { path = "../../tests/harness" }
+serde_json = { workspace = true }
 
 [features]
-character = ["bevy-stylized/gltf", "bevy/bevy_gltf", "bevy/bevy_scene", "bevy/png", "bevy/reflect_auto_register", "dep:serde_json"]
+character = ["bevy-stylized/gltf", "bevy/bevy_gltf", "bevy/bevy_scene", "bevy/png", "bevy/reflect_auto_register"]
 
 [lints]
 workspace = true

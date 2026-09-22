@@ -11,6 +11,16 @@
 //! （不引入不稳定 API；如实记录为 None）。
 //!
 //! 输出 JSON 遵循 docs/performance/targets.md 的 target record 字段。
+//!
+//! 职责（docs/showcase/01：测量归 benchmark 所有者并脱离 UI）：
+//!
+//! - [`measurement`]：渲染图时间戳测量插件与百分比统计的唯一实现
+//!   （诊断路径 `render/inspector_frame/elapsed_gpu` 是数值身份，不改名）；
+//! - [`workloads`]：固定 workload 配方与 runner（9 workloads × 3 repeats，
+//!   512²、600 帧；headless 运行，不依赖 egui/Inspector/桌面窗口）。
+
+pub mod measurement;
+pub mod workloads;
 
 use std::time::Instant;
 
@@ -20,12 +30,10 @@ use bevy::{
     asset::{AssetPlugin, Assets},
     color::LinearRgba,
     image::Image,
-    math::{Vec3, primitives::Sphere},
-    pbr::MeshMaterial3d,
-    prelude::{Camera3d, Mesh, Mesh3d, Transform},
+    math::Vec3,
+    prelude::{Camera3d, Transform},
     render::{
         RenderPlugin,
-        render_resource::{Extent3d, TextureDimension, TextureFormat},
         renderer::RenderAdapterInfo,
         settings::{RenderCreation, RenderResources},
     },
@@ -33,6 +41,9 @@ use bevy::{
 };
 use bevy_stylized::prelude::*;
 use golden_harness::capture;
+// 场景内容构建器归 `labs/scenes`（docs/showcase/01：内容归场景库，测量归
+// benchmark 所有者）；此处保留路径别名，不复制实现。
+pub use scenes::builders::{build_hero_1, build_portable_instances};
 
 /// 固定测量分辨率。
 pub const WIDTH: u32 = 1280;
@@ -162,103 +173,6 @@ fn spawn_camera(app: &mut App) {
         capture::capture_target_bundle(&target),
         Transform::from_xyz(0.0, 2.0, 18.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
-}
-
-fn ramp_image(rows: &[[u8; 4]]) -> Image {
-    let mut data = Vec::new();
-    for row in rows {
-        for col in 0..64 {
-            let px = if col >= 32 {
-                [245, 245, 245, 255]
-            } else {
-                *row
-            };
-            data.extend_from_slice(&px);
-        }
-    }
-    let mut image = Image::new_fill(
-        Extent3d {
-            width: 64,
-            height: rows.len() as u32,
-            depth_or_array_layers: 1,
-        },
-        TextureDimension::D2,
-        &[0, 0, 0, 255],
-        TextureFormat::Rgba8UnormSrgb,
-        bevy::asset::RenderAssetUsages::default(),
-    );
-    image.data = Some(data);
-    image
-}
-
-/// `hero_1`：1 个 Hero 材质球（全特性开）。
-///
-/// `pub`：showcase 的 stress/performance 用例复用（link, don't duplicate）。
-pub fn build_hero_1(app: &mut App) {
-    let mesh = app
-        .world_mut()
-        .resource_mut::<Assets<Mesh>>()
-        .add(Sphere::new(1.2));
-    let ramp = app
-        .world_mut()
-        .resource_mut::<Assets<Image>>()
-        .add(ramp_image(&[[120, 120, 200, 255]]));
-    let material = app
-        .world_mut()
-        .resource_mut::<Assets<StylizedHeroMaterial>>()
-        .add(StylizedHeroMaterial {
-            params: StylizedHeroParams::default().with_ramp_rows(1.0),
-            ramp_texture: Some(ramp),
-            ..StylizedHeroMaterial::default()
-        });
-    app.world_mut().spawn((
-        Mesh3d(mesh),
-        MeshMaterial3d(material),
-        Transform::from_xyz(0.0, 1.2, 0.0),
-    ));
-}
-
-/// portable_N：N 个 Cel 实例（同 mesh+material，MeshTag 差异）。
-///
-/// `pub`：showcase 的 stress/performance 用例复用。
-pub fn build_portable_instances(app: &mut App, n: u32) {
-    let mesh = app
-        .world_mut()
-        .resource_mut::<Assets<Mesh>>()
-        .add(Sphere::new(0.3));
-    let ramp = app
-        .world_mut()
-        .resource_mut::<Assets<Image>>()
-        .add(ramp_image(&[
-            [80, 80, 220, 255],
-            [220, 80, 80, 255],
-            [80, 200, 80, 255],
-            [220, 200, 80, 255],
-        ]));
-    let material = app
-        .world_mut()
-        .resource_mut::<Assets<StylizedCelMaterial>>()
-        .add(StylizedCelMaterial {
-            params: StylizedCelParams::default().with_ramp_rows(4.0),
-            ramp_texture: Some(ramp),
-            ..StylizedCelMaterial::default()
-        });
-    let cols = (n as f32).sqrt().ceil() as u32;
-    for i in 0..n {
-        let x = (i % cols) as f32 - cols as f32 * 0.5;
-        // Diameter is 0.6: leave a gap so instanced draw ordering cannot
-        // choose different surfaces at equal-depth sphere intersections.
-        let y = (i / cols) as f32 * 0.65;
-        app.world_mut().spawn((
-            Mesh3d(mesh.clone()),
-            MeshMaterial3d(material.clone()),
-            StylizedInstanceData {
-                profile_index: i % 4,
-                ..StylizedInstanceData::default()
-            },
-            Transform::from_xyz(x * 0.85, y, 0.0),
-        ));
-    }
 }
 
 /// 运行单个场景：warm-up + 测量，返回帧统计。

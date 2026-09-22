@@ -10,8 +10,9 @@ pub mod golden;
 pub mod tier2;
 
 pub use capture::{
-    CaptureRequest, CaptureTarget, CapturedImage, capture_target_bundle, create_capture_target,
-    depad_rgba8, install, probe_render_resources, request_capture, try_take,
+    CaptureRequest, CaptureStamp, CaptureTarget, CapturedImage, StampedCapture, cancel_capture,
+    capture_target_bundle, create_capture_target, depad_rgba8, install, probe_render_resources,
+    request_capture, try_take, try_take_stamped,
 };
 pub use diff::{DiffReport, DiffStats, Tolerance, diff_rgba8, evaluate};
 pub use golden::{

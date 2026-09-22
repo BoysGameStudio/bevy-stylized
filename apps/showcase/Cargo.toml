@@ -19,6 +19,9 @@ bevy = { workspace = true, features = [
 ] }
 bevy-stylized = { path = "../../crates/bevy-stylized" }
 benchmarks = { path = "../../labs/benchmarks" }
+scenes = { path = "../../labs/scenes", features = ["build"] }
+scene-runtime = { path = "../../labs/scene-runtime" }
+scenario-model = { path = "../../labs/scenario-model" }
 golden-harness = { path = "../../tests/harness" }
 
 serde.workspace = true

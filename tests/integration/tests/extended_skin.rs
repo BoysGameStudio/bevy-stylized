@@ -2,7 +2,6 @@
 #[path = "support/render_app.rs"]
 mod render_app;
 use bevy::{
-    core_pipeline::prepass::{DepthPrepass, MotionVectorPrepass, NormalPrepass},
     mesh::{
         VertexAttributeValues,
         morph::{MeshMorphWeights, MorphAttributes},
@@ -168,31 +167,24 @@ fn image<M: Material + Default>(
                 .insert(MeshMorphWeights::Value { weights: vec![1.0] });
         }
     }
-    let target = capture::create_capture_target(
-        &mut app.world_mut().resource_mut::<Assets<Image>>(),
-        256,
-        256,
-    );
-    app.world_mut().spawn((
-        Camera3d::default(),
-        capture::capture_target_bundle(&target),
-        bevy::core_pipeline::tonemapping::Tonemapping::None,
-        DepthPrepass,
-        NormalPrepass,
-        MotionVectorPrepass,
-        Transform::from_xyz(0.0, 0.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
-    ));
-    for _ in 0..32 {
-        app.update();
-    }
-    let request = capture::request_capture(app.world_mut(), target);
-    for _ in 0..600 {
-        app.update();
-        if let Some(image) = capture::try_take(app.world_mut(), request.clone()) {
-            return image;
-        }
-    }
-    panic!("extended skin capture timeout")
+    scene_runtime::capture_in_app(
+        &mut app,
+        &scenario_model::ident::SessionId::new("extended-skin").expect("session id"),
+        &scenes::CameraRecipe::with_attachment(
+            Vec3::new(0.0, 0.0, 5.0),
+            Vec3::ZERO,
+            scenes::CameraAttachment::Prepass {
+                depth: true,
+                normal: true,
+                motion_vector: true,
+            },
+        ),
+        (256, 256),
+        scene_runtime::Settle::Frames(32),
+        false,
+        640,
+    )
+    .expect("extended skin capture timed out")
 }
 
 #[test]

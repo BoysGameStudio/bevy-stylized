@@ -1,8 +1,38 @@
 # Showcase、Examples 与 Fixtures
 
-> **Status:** 职责与资产纪律继续有效；跨平台重构为 **Proposed design，完整目标架构评审版（2026-09-21，尚未实现）**。
-> 当前可执行入口见[运行手册](02-running-the-showcase-suite.md)。本设计不改变既有
-> Golden、性能、参考验收规则，也不表示新增平台已通过验证。
+> **Status:** 职责与资产纪律继续有效；跨平台重构为 **Proposed design，完整目标架构评审版
+> （2026-09-21）**。其开发层已大部落地，以下为合并后的实施与证据摘要（2026-09-22）。
+>
+> **已落地层：** `labs/scenario-model`（目录/配方/动作/会话/判定 schema、两层规范化、
+> 身份 hash、合同向量、覆盖映射 `coverage`）；`labs/validation`（自 `tests/harness`
+> 提取的纯 CPU diff/Tier-2 判定，阈值与数值行为不变）；`labs/scenes`（内容构建器、
+> 绑定表、catalog 参数 schema、`SceneTarget` 稳定逻辑 ID）；`labs/benchmarks`（测量
+> 实现与 workload runner，`workloads` 子命令 headless、不依赖 egui/Inspector）；
+> `tests/harness` 证据层（中性 `CaptureStamp`、时钟域、GPU 证据测试）；
+> `labs/scene-runtime`（非阻塞 CaseDriver、ExperimentClock、会话重配置事务、平台无关
+> controller、配方编译器 compiler、命令日志 journal）。消费侧迁移：showcase 经 driver
+> 驱动（交互 ←/→ 同会话切换）、tests/integration 经 `CaptureCycle`、labs/regression
+> cell 生命周期经 driver、Android 宿主 `driver_host` 逐帧推进与设备端配方重放、
+> Inspector 读回 stamp 对齐。
+>
+> **本地证据状态（2026-09-22，macOS/Metal 主机）：** showcase 17/17 捕获迁移前后逐字节
+> 一致；A→B→A 切换捕获身份逐字节一致；tests/integration 19 个测试二进制 pre/post 逐项
+> 一致（预存在失败的身份不变）；regression golden 子集逐字节一致；PC 与 Android
+> （API-35 模拟器，-gpu host）对同一 outline 配方编译出相同的 recipe hash 与 Execution
+> 域计划摘要，设备端捕获带完整 stamp、非黑帧，报告候选→原子发布；journal 录制后新鲜
+> 会话重放末次捕获逐字节一致；scene-runtime 全栈 wasm32 编译证明通过。覆盖映射：PC
+> 7 已有验证 / 10 仅展示，Android 1 已有验证 / 16 待实现，Browser 17 待实现。
+>
+> **未关闭项（所有者 / 阻塞条件）：** 产品公共重配置 API（产品所有者；阻塞会话内 tier
+> 变更）；wasm-bindgen-cli 装配与实时 Chromium 运行（阻塞全量 webgpu lane）；浏览器
+> 宿主接入与 APK/浏览器资产字节闭包桥接（宿主工作）；扩大"已有验证"覆盖格（终跑属
+> 合格 Linux GPU 主机；本 Metal 主机有预存在限制：golden 增量、readiness 停滞、
+> workloads GPU 时间戳读回失败）；控制协议传输与 adb 取回编排进 dev.py（宿主工具）；
+> 交互式部分提交的完整撤销。
+>
+> 当前可执行入口见[运行手册](02-running-the-showcase-suite.md)。以上为本地证据，不构成
+> V1 就绪或新平台合格声明；[SUPPORT_MATRIX](../platforms/SUPPORT_MATRIX.md) 不变。
+> 本设计不改变既有 Golden、性能、参考验收规则。
 
 ## 目标与边界
 
@@ -76,19 +106,19 @@ P1 表示全量迁移前必须解决，P2 表示应在相应模块迁移前明�
 
 | 编号 | 级别 | 初稿问题及具体后果 | 修订与验证要求 |
 |---|---|---|---|
-| R1 | P1 | 统一 runtime 未明确由谁推进 App；现有 harness 的 GPU probe 使用线程/block_on，readiness 有 `while app.update()`，不能直接作为 Android/Web runner | 共享非阻塞状态推进；事件循环归宿主；仅桌面 headless 包装允许 pump。验证恢复/读回时事件循环保持响应 |
-| R2 | P1 | 初稿允许任意 preset 同会话切换，但 `StylizedPlugin::finish` 只初始化能力结果；改 recipe 不会重建 Device 或上调已解析能力 | 定义 SessionPlan 和会话重配置事务；产品所有者补齐公共配置接口，设备能力变化由宿主重建设备会话。不能直接写 resolved 资源 |
-| R3 | P1 | 原方案仅标记 generation/tick；现有 `CaptureRequest` 只有 entity/target，Probe 的 frame 在 Render Cleanup 自增，不能证明图像属于该 tick 或 GPU 已完成 | 定义跨提取/提交/读回的 CaptureStamp 和快照保留；单步屏障与连续流水线捕获均必须证明逐帧身份 |
-| R4 | P1 | 初稿让 APK 在一个进程内运行所有严格用例，弱化现有每用例独立进程合同；全局 PipelineCache 的错误会污染后续 readiness，资源和质量状态也会串场 | 既有严格 GPU gate 保留每用例新进程；共享会话只用于交互和明确的生命周期测试。失败用例不能阻止下一隔离用例被核对 |
+| R1 | P1 | 统一 runtime 未明确由谁推进 App；现有 harness 的 GPU probe 使用线程/block_on，readiness 有 `while app.update()`，不能直接作为 Android/Web runner | 共享非阻塞状态推进；事件循环归宿主；仅桌面 headless 包装允许 pump。验证恢复/读回时事件循环保持响应。**本地证据（2026-09-22）**：`labs/scene-runtime` 的 `CaseDriver` 为非阻塞状态机（宿主每帧推进一次，自身不 pump、不忙等），桌面 headless 包装是唯一泵送实现；`android-smoke` 的 `driver_host` 以 Update 系统逐帧推进 driver（无第二事件循环、无阻塞接收），API-35 模拟器 -gpu host 实测通过；浏览器宿主接入属后续工作 |
+| R2 | P1 | 初稿允许任意 preset 同会话切换，但 `StylizedPlugin::finish` 只初始化能力结果；改 recipe 不会重建 Device 或上调已解析能力 | 定义 SessionPlan 和会话重配置事务；产品所有者补齐公共配置接口，设备能力变化由宿主重建设备会话。不能直接写 resolved 资源。**本地证据（2026-09-22）**：`labs/scene-runtime::session` 定义了重配置事务状态机与 `SessionHost` 接口；接管失败只清理候选、device loss 后旧回执不能命中新槽位等验收行经 fake host 单测验证。产品公共重配置 API 仍是未关闭的产品侧缺口 |
+| R3 | P1 | 原方案仅标记 generation/tick；现有 `CaptureRequest` 只有 entity/target，Probe 的 frame 在 Render Cleanup 自增，不能证明图像属于该 tick 或 GPU 已完成 | 定义跨提取/提交/读回的 CaptureStamp 和快照保留；单步屏障与连续流水线捕获均必须证明逐帧身份。**本地证据（2026-09-22）**：`tests/harness` 已落地中性 `CaptureStamp`（请求序列 + 主世界 update 序号 + 渲染帧镜像 + 首次完成接受），GPU 证据测试见 `tests/harness/tests/capture_stamp.rs`；实验 tick 映射已由 `labs/scene-runtime` 的 ExperimentClock 落地（2026-09-22） |
+| R4 | P1 | 初稿让 APK 在一个进程内运行所有严格用例，弱化现有每用例独立进程合同；全局 PipelineCache 的错误会污染后续 readiness，资源和质量状态也会串场 | 既有严格 GPU gate 保留每用例新进程；共享会话只用于交互和明确的生命周期测试。失败用例不能阻止下一隔离用例被核对。**本地证据（2026-09-22）**：tests/integration 迁移到 `CaptureCycle` 后每用例仍是独立 App/driver 实例，19 个测试二进制 pre/post 逐项一致（含 8 个预存在失败的身份不变），严格 gate 的进程模型未动 |
 | R5 | P1 | “同等级 bundle 检查”未定义跨平台字节来源；Inspector 用文件路径与 canonicalize，APK 无对应语义；检查后再加载也可能读到不同内容 | 逻辑路径校验与资源适配分离，固定内容身份，校验实际送入 loader 的字节；参考输入域继续独立 |
 | R6 | P1 | 仅按路径或内容哈希复用贴图会忽略 sRGB/data 与 sampler；不同 bundle 都叫 character.glb 时还会串缓存 | 命名空间包含 bundle 身份，纹理绑定包含解释语义；冲突显式拒绝或使用已声明独立逻辑资产，不改色彩合同 |
 | R7 | P2 | “删除根实体”不足以撤销全局设置和异步工作；设备失效时等待所有回调又可能无法退出 | 定义分区资源账本和有界退役；晚到事件隔离，超期或 device loss 由宿主撤销设备会话；覆盖失败中的部分构建 |
 | R8 | P2 | 初稿可移植测试 library 仅说明目录迁移；当前 package 普通依赖含 tempfile/naga 等，许多测试自行构建 App 并同步捕获 | 分离可移植场景驱动、纯观测判定和主机工具依赖；保留桌面测试 ID/断言，独立检查各平台依赖图 |
-| R9 | P2 | “配方 hash”未规定默认值、浮点、顺序与 schema；相同参数可能跨语言产生不同 ID，旧报告又可能被误收 | 语义编译与 JCS 编码分层，版本化 hash 域；主机核对 run/case/request/recipe/artifact 身份和原子完成记录 |
+| R9 | P2 | “配方 hash”未规定默认值、浮点、顺序与 schema；相同参数可能跨语言产生不同 ID，旧报告又可能被误收 | 语义编译与 JCS 编码分层，版本化 hash 域；主机核对 run/case/request/recipe/artifact 身份和原子完成记录。**本地证据（2026-09-22）**：`scene-runtime::compiler` 的计划摘要使用 Execution 域（JCS 载荷 = 配方 hash + RunSpec 字段 + 会话 hash），同一配方 → 同一摘要的稳定性与域分离有单测覆盖 |
 | R10 | P2 | 以新增 crate 数量和最小原型约束架构，内容、执行、UI、判定仍可能聚集在一个共享包 | 按依赖方向与独立验证边界拆分开发层；现有文件位置不决定最终所有权 |
 | R11 | P2 | 只列代表性设备和现有场景，无法说明组合覆盖缺口，也没有统一交互/恢复目标 | 增加完整目标平台、约束矩阵、动作回放、诊断控制和会话恢复合同；实测状态另记 |
 | R12 | P1 | 多视图只规定相机/target 隔离；当前 view 设置与托管灯光全局同步，LOD 又读取所有 Camera，预览相机可能改变测试结果 | 明确实验分区、观察相机集合、独立光照/材质变更所有权；区分同场景多机位与独立 A/B 实验 |
-| R13 | P1 | 逻辑 tick 未绑定引擎/着色器时钟、最终姿态同步及暂停后的期限；固定 seed 也未消除构建顺序影响 | 明确时钟域、稳定逻辑 ID、随机子流与提取前屏障，等待不推进实验状态，主机总期限独立计时 |
+| R13 | P1 | 逻辑 tick 未绑定引擎/着色器时钟、最终姿态同步及暂停后的期限；固定 seed 也未消除构建顺序影响 | 明确时钟域、稳定逻辑 ID、随机子流与提取前屏障，等待不推进实验状态，主机总期限独立计时。**本地证据（2026-09-22）**：harness 时钟域已定义（主世界 update 序号 / 渲染世界 Cleanup 帧计数 / 墙钟分列），"等待中的额外 update 不改变捕获 stamp↔帧绑定"已由 GPU 证据测试证明；`labs/scene-runtime` 的 ExperimentClock 只由 fixed_step 推进，泵送节奏不改变实验 tick/采样身份/像素的证据见 `labs/scene-runtime/tests/driver_evidence.rs`；随机子流与提取前屏障仍属 runtime 层后续工作 |
 | R14 | P1 | 捕获有身份但缺完整像素合同；现有 RGBA8 与线性 HDR resolve 是不同路径 | 引入捕获描述符与比较域，固定格式/采样/转换链；去 padding 不改变数值，禁止隐式重采样或重复 sRGB 编码 |
 | R15 | P1 | 配方/产物 hash 未锁定判定器、基线、mask/ROI 和阈值；同一图可能按不同规则被宣称同一 PASS | RunSpec 绑定独立 EvaluationSpec，计划冻结全部验收输入，报告区分捕获成功与验证成功 |
 | R16 | P2 | 完整目录可能随 feature 消失；“所有组合”又未定义有限覆盖域及未实现项如何计数 | 元数据与构建器绑定分开编译；版本化有限 CoveragePlan，必需缺项不可归类为普通设备缺能力 |
@@ -128,12 +158,12 @@ schema、能力需求、确定性规则和生命周期所有权。动态加载�
 
 | 当前所有者 | 问题 | 迁移方向 |
 |---|---|---|
-| [Showcase](../../apps/showcase/src/lib.rs) 与 [cases](../../apps/showcase/src/cases.rs) | 17 个注册项混合内容、相机与输出；交互入口另建窗口相机，没有沿用 case 的全部离屏配置和 tier | 场景返回内容与相机配方，宿主绑定输出；同一会话切换 |
+| [Showcase](../../apps/showcase/src/lib.rs) 与 ~~cases~~（2026-09-22 已迁 [labs/scenes](../../labs/scenes/src/lib.rs)） | ~~17 个注册项混合内容、相机与输出；交互入口另建窗口相机，没有沿用 case 的全部离屏配置和 tier~~（2026-09-22 已统一：内容/相机配方归 scenes，showcase 经 scene-runtime driver 同会话切换） | 场景返回内容与相机配方，宿主绑定输出；同一会话切换 |
 | [Android](../../apps/android-smoke/src/lib.rs) | 独立程序化场景；角色模式通过 feature 切换并编译嵌入描述符 | 同一目录与运行时选择；feature 仅控制可编译能力 |
-| [回归实验](../../labs/regression/src/lib.rs) | `build_strip` 明确复制 Showcase 双骨骼条带，只为控制相机/姿态 | 提取无相机的条带构建器，保留各自姿态与采样参数 |
-| [benchmarks](../../labs/benchmarks/src/lib.rs) 与 [workloads](../../apps/showcase/src/workloads.rs) | 部分实例已复用，但内容与采集混合；workloads 依赖 Inspector 测量模块和 feature | 内容归场景库，测量归 benchmark 所有者并脱离 UI |
+| [回归实验](../../labs/regression/src/lib.rs) | ~~`build_strip` 明确复制 Showcase 双骨骼条带，只为控制相机/姿态~~（2026-09-22 已统一：条带构建器归 scenes，regression 委托调用并保留各自姿态/采样参数） | 提取无相机的条带构建器，保留各自姿态与采样参数 |
+| [benchmarks](../../labs/benchmarks/src/lib.rs) 与 [workloads](../../labs/benchmarks/src/workloads.rs) | ~~部分实例已复用，但内容与采集混合；workloads 依赖 Inspector 测量模块和 feature~~（2026-09-22 已归位：内容归 scenes，测量/workload runner 归 benchmarks，headless 运行） | 内容归场景库，测量归 benchmark 所有者并脱离 UI |
 | [Inspector](../../apps/showcase/src/inspector/runtime.rs)、[Android 角色](../../apps/android-smoke/src/character.rs)、[浏览器](../../tests/browser/smoke.rs) | 各自装配角色、视图和接管完成条件 | 共享已验证输入的场景装配与就绪状态 |
-| [测试 support](../../tests/integration/tests/support/render_scene.rs) 与 GPU 用例 | 多套 App/相机/等待循环，固定 update 次数与真实 render 就绪混用 | 中性捕获探针保留在 harness；统一场景生命周期，断言留在测试 |
+| [测试 support](../../tests/integration/tests/support/render_scene.rs) 与 GPU 用例 | ~~多套 App/相机/等待循环~~（2026-09-22 已统一：11 个测试文件经 `CaptureCycle`，断言与身份不变） | 中性捕获探针保留在 harness；统一场景生命周期，断言留在测试 |
 | [参考捕获](../../labs/reference/src/character/scene.rs) | 装配相似，但校准、输入和采样有独立合同 | 仅共享合同一致的装配，不合并参考与 Inspector 的输入验收 |
 
 相似外观不等于相同负载：旧 `hero_1`、完整纹理 Hero、浏览器组合角色与 Android
@@ -797,14 +827,14 @@ face-SDF head、two-bone、morph cube、hair strip 可用确定性原语表达�
 |---|---|---|
 | 事件推进与 Surface 时序 | winit 的生命周期约束明确；宿主拥有事件循环，runtime 非阻塞 | Bevy 当前 Android 回调/渲染线程时序、暂停中读回及重复恢复的实测；引擎/平台宿主负责 |
 | 会话重配置与 device loss | Device 请求能力不能原地增加；目标采用重配置事务与检查点重放 | 产品公共重配置 API、宿主设备重建入口、各平台失败恢复语义；产品/引擎/宿主负责 |
-| 精确帧与连续捕获 | 当前读回没有 tick；目标 stamp 跨提取/提交/完成，快照不可变 | 多在途/乱序/重复/取消/多 view/temporal history 的身份与像素一致性；harness/runtime 负责 |
+| 精确帧与连续捕获 | 当前读回没有 tick；目标 stamp 跨提取/提交/完成，快照不可变 | 多在途（不同 tick/同 tick 多 target）、重复完成、取消、编辑后新鲜内容的身份与像素一致性已由 `tests/harness/tests/capture_stamp.rs` 本地证明（2026-09-22，Metal）；乱序强制构造、多 view 组合与 temporal history 仍缺；harness/runtime 负责 |
 | 资产身份与缓存 | APK 非文件系统，同路径加载设置可能复用首次值 | 实际 loader 字节核验、同名包隔离、多语义绑定、重载与资源稳定；资产适配/runtime 负责 |
 | 共享 UI 与声明模型 | 场景语义可与输入/布局分离；模型是目录/控件/回放的共同来源 | 全部旧场景能无丢失表达，触摸/键鼠操作得到等价配方，事务/撤销可重放；model/content/UI 负责 |
 | 参数化覆盖与独立判定 | CTS 展示参数生成与 case/subcase 的组织方式，不证明本项目覆盖完整 | 旧身份到新配方映射、约束理由、独立期望与未实现组合清单；validation/合同所有者负责 |
 | 规范身份与控制协议 | JCS 解决规范编码，不解决语义默认值或执行一致性 | 规范化向量、协议幂等/取消/崩溃、正式包导入导出、产物闭包；model/宿主工具负责 |
 | 可移植依赖与观测开销 | 当前 integration 和 Inspector 存在主机/UI 耦合 | 各目标独立依赖图、纯判定无设备、采样来源及扰动测量；各开发库/benchmark 所有者负责 |
 | 实验分区 | 当前全局 view 和全 Camera LOD 不等于独立多实验 | 预览/光照/材质/LOD/时间相互不干扰，跨分区资源清理正确；产品/runtime 负责 |
-| 时钟与像素 | Bevy 默认 Time/FrameCount 与自定义 tick 不自动一致；既有两类 capture profile 不等价 | 调度/舍入/随机流、额外 update 不推进实验、奇数行宽/格式/resolve/色彩向量；runtime/harness 负责 |
+| 时钟与像素 | Bevy 默认 Time/FrameCount 与自定义 tick 不自动一致；既有两类 capture profile 不等价 | harness 时钟域已定义、"额外 update 不改变捕获绑定"已本地证明（2026-09-22）；实验调度/舍入/随机流、奇数行宽/格式/resolve/色彩向量仍缺；runtime/harness 负责 |
 | 判定与恢复身份 | 图像 hash 不能标识判定规则，进程内去重不能证明崩溃后的恰好一次 | 冻结 EvaluationSpec、负向用例边界、日志确认/产物提交故障窗口；validation/协议所有者负责 |
 
 这些缺口不会被“保持旧实现更便宜”关闭，也不能靠扩张场景库职责绕开。若证据

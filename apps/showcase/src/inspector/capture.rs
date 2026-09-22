@@ -1,6 +1,20 @@
+//! 捕获生命周期：双目标同步读回 + 代次/修订身份（generation/revision
+//! 与 scenario-model 的 Generation/Revision 一一对应）+ 晚到结果排空。
+//!
+//! 共享运行时对齐（H4b）：读回一律经 harness 的 stamp 回执
+//! （`try_take_stamped`，phase E 的 CaptureStamp——请求序列/主世界 update
+//! 序号/渲染帧），capture.json 以 additive `stamps` 字段携带两侧 stamp。
+//! 保留本模块语义的明确理由：
+//!
+//! - 双目标（A/B 两侧）同步捕获不是单相机 CaptureCycle 的形态；
+//! - retire + 排空（晚到结果**可取回并计数**）是 Inspector 的既有验收
+//!   合同（`retired_captures` 度量依赖它），与 harness `cancel_capture`
+//!   的丢弃语义不同——不替换；
+//! - capture.json 的既有身份键是 dev.py inspector lane 的验收产物，
+//!   只做 additive 扩展。
 use super::{Recipe, Runtime, State, asset};
 use bevy::prelude::*;
-use golden_harness::{CapturedImage, capture as gpu};
+use golden_harness::{CaptureStamp, CapturedImage, capture as gpu};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 pub(super) struct Pending {
@@ -9,6 +23,7 @@ pub(super) struct Pending {
     recipe: Recipe,
     requests: [Option<gpu::CaptureRequest>; 2],
     images: [Option<CapturedImage>; 2],
+    stamps: [Option<CaptureStamp>; 2],
     started: Instant,
 }
 fn retire_requests(pending: &mut Option<Pending>, retired: &mut Vec<gpu::CaptureRequest>) -> bool {
@@ -60,6 +75,7 @@ pub(super) fn update(
             recipe: state.recipe.clone(),
             requests,
             images: [None, None],
+            stamps: [None, None],
             started: Instant::now(),
         });
         state.status = "Capturing current A/B generation…".into();
@@ -72,9 +88,10 @@ pub(super) fn update(
     }
     for i in 0..2 {
         if let Some(request) = &p.requests[i]
-            && let Some(image) = gpu::try_take(world, request.clone())
+            && let Some(capture) = gpu::try_take_stamped(world, request.clone())
         {
-            p.images[i] = Some(image);
+            p.images[i] = Some(capture.image);
+            p.stamps[i] = Some(capture.stamp);
             p.requests[i] = None;
         }
     }
@@ -110,7 +127,20 @@ pub(super) fn update(
         serde_json::to_vec_pretty(&p.recipe).map_err(|e| e.to_string())?,
     )
     .map_err(|e| e.to_string())?;
-    let report = serde_json::json!({"schema":"bevy_stylized.inspector-capture/v1","status":"PASS","scope":"current live A/B capture, not upstream parity or an accepted baseline","generation":p.generation,"revision":p.revision,"retired_captures":state.retired,"ready_render_frames":state.stable,"material_primitives_per_view":runtime.input.meshes,"msaa":4,"supersampling":false,"images":image_hashes,"files":p.recipe.files,"renderer_version":env!("CARGO_PKG_VERSION"),"device":world.get_resource::<bevy::render::renderer::RenderAdapterInfo>().map(|info|format!("{:?}",info.0)),"inspector_source_sha256":super::source_sha256(),"inspector_source_policy":"module-sources/v2"});
+    let stamps: Vec<serde_json::Value> = p
+        .stamps
+        .into_iter()
+        .flatten()
+        .map(|stamp| {
+            serde_json::json!({
+                "sequence": stamp.sequence,
+                "issued_update_index": stamp.issued_update_index,
+                "completed_update_index": stamp.completed_update_index,
+                "completed_render_frame": stamp.completed_render_frame,
+            })
+        })
+        .collect();
+    let report = serde_json::json!({"schema":"bevy_stylized.inspector-capture/v1","status":"PASS","scope":"current live A/B capture, not upstream parity or an accepted baseline","generation":p.generation,"revision":p.revision,"retired_captures":state.retired,"ready_render_frames":state.stable,"material_primitives_per_view":runtime.input.meshes,"msaa":4,"supersampling":false,"images":image_hashes,"files":p.recipe.files,"renderer_version":env!("CARGO_PKG_VERSION"),"device":world.get_resource::<bevy::render::renderer::RenderAdapterInfo>().map(|info|format!("{:?}",info.0)),"inspector_source_sha256":super::source_sha256(),"inspector_source_policy":"module-sources/v2","stamps":stamps});
     std::fs::write(
         directory.join("capture.json"),
         serde_json::to_vec_pretty(&report).map_err(|e| e.to_string())?,
@@ -204,6 +234,7 @@ mod tests {
             recipe,
             requests,
             images: [None, None],
+            stamps: [None, None],
             started: Instant::now(),
         });
         let mut retired = Vec::new();

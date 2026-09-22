@@ -12,12 +12,11 @@ use bevy::{
     app::{App, PluginGroup},
     asset::{AssetPlugin, Assets},
     color::LinearRgba,
-    core_pipeline::tonemapping::Tonemapping,
     image::{Image, ImageSampler},
     math::primitives::Sphere,
     mesh::MeshTag,
     pbr::MeshMaterial3d,
-    prelude::{Camera3d, Mesh, Mesh3d, Resource, Transform, Vec3},
+    prelude::{Mesh, Mesh3d, Transform, Vec3},
     render::{
         RenderPlugin,
         render_resource::{Extent3d, TextureDimension, TextureFormat},
@@ -31,6 +30,9 @@ use bevy_stylized::stylized_render::{StylizedOutlineParams, StylizedRenderCapabi
 use golden_harness::{
     CapturedImage, GoldenPaths, GoldenProvenance, Tolerance, capture, diff_rgba8,
 };
+use scenario_model::ident::SessionId;
+use scene_runtime::{Settle, capture_in_app};
+use scenes::CameraRecipe;
 
 const WIDTH: u32 = 512;
 const HEIGHT: u32 = 512;
@@ -41,10 +43,7 @@ fn golden_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/golden/cel-portable")
 }
 
-#[derive(Resource, Clone)]
-struct CaseTarget(capture::CaptureTarget);
-
-fn headless_app(resources: RenderResources) -> (App, capture::CaptureTarget) {
+fn headless_app(resources: RenderResources) -> App {
     let mut app = App::new();
     app.add_plugins(
         DefaultPlugins
@@ -66,23 +65,9 @@ fn headless_app(resources: RenderResources) -> (App, capture::CaptureTarget) {
     );
     app.add_plugins(StylizedPlugin::default());
     capture::install(&mut app);
-    let target = {
-        let mut images = app.world_mut().resource_mut::<Assets<Image>>();
-        capture::create_capture_target(&mut images, WIDTH, HEIGHT)
-    };
-    app.insert_resource(CaseTarget(target.clone()));
     app.finish();
     app.cleanup();
-    (app, target)
-}
-
-fn spawn_capture_camera(app: &mut App, target: &capture::CaptureTarget, eye: Vec3, look: Vec3) {
-    app.world_mut().spawn((
-        Camera3d::default(),
-        capture::capture_target_bundle(target),
-        Tonemapping::None,
-        Transform::from_translation(eye).looking_at(look, Vec3::Y),
-    ));
+    app
 }
 
 fn set_key_light(app: &mut App, direction: Vec3, color: LinearRgba) {
@@ -96,28 +81,29 @@ fn set_key_light(app: &mut App, direction: Vec3, color: LinearRgba) {
     *app.world_mut().resource_mut::<StylizedViewSettings>() = StylizedViewSettings(descriptor);
 }
 
-fn capture_frame(app: &mut App, target: &capture::CaptureTarget) -> CapturedImage {
-    let request = capture::request_capture(app.world_mut(), target.clone());
-    for _ in 0..MAX_WAIT_FRAMES {
-        app.update();
-        if let Some(frame) = capture::try_take(app.world_mut(), request.clone()) {
-            return frame;
-        }
-    }
-    panic!("capture readback timed out");
+/// 经 CaseDriver 观测周期捕获（settle→observe；帧语义与旧手写
+/// "SETTLE_FRAMES 次 update 后请求、下一帧提取"逐帧一致）。
+fn capture_frame(app: &mut App, eye: Vec3, look: Vec3) -> CapturedImage {
+    capture_in_app(
+        app,
+        &SessionId::new("golden-cel").expect("session id"),
+        &CameraRecipe::new(eye, look),
+        (WIDTH, HEIGHT),
+        Settle::Frames(SETTLE_FRAMES as u64),
+        false,
+        MAX_WAIT_FRAMES as usize + 40,
+    )
+    .expect("capture readback timed out")
 }
 
-fn run_case(name: &str, build: impl FnOnce(&mut App)) -> bool {
+fn run_case(name: &str, eye: Vec3, look: Vec3, build: impl FnOnce(&mut App)) -> bool {
     let Some(resources) = capture::probe_render_resources() else {
         eprintln!("golden-cel: no GPU adapter available; skipping");
         return true;
     };
-    let (mut app, target) = headless_app(resources);
+    let mut app = headless_app(resources);
     build(&mut app);
-    for _ in 0..SETTLE_FRAMES {
-        app.update();
-    }
-    let captured = capture_frame(&mut app, &target);
+    let captured = capture_frame(&mut app, eye, look);
     let (gpu, driver) = app
         .world()
         .get_resource::<RenderAdapterInfo>()
@@ -187,8 +173,6 @@ fn analytic_ramp_scene(app: &mut App) {
         Vec3::new(0.9, 0.15, 0.15).normalize(),
         LinearRgba::WHITE,
     );
-    let target = app.world().resource::<CaseTarget>().0.clone();
-    spawn_capture_camera(app, &target, Vec3::new(0.0, 0.4, 3.2), Vec3::ZERO);
     let mut meshes = app.world_mut().resource_mut::<Assets<Mesh>>();
     let sphere = meshes.add(Sphere::new(1.0));
     let mut materials = app
@@ -247,9 +231,6 @@ fn make_ramp_texture() -> Image {
 
 fn textured_ramp_scene(app: &mut App) {
     set_key_light(app, Vec3::new(0.0, 1.0, 0.0), LinearRgba::WHITE);
-    let target = app.world().resource::<CaseTarget>().0.clone();
-    spawn_capture_camera(app, &target, Vec3::new(0.0, 0.0, 5.0), Vec3::ZERO);
-
     let ramp = app
         .world_mut()
         .resource_mut::<Assets<Image>>()
@@ -278,8 +259,6 @@ fn textured_ramp_scene(app: &mut App) {
 
 fn outline_scene(app: &mut App) {
     set_key_light(app, Vec3::new(0.5, 0.8, 0.6).normalize(), LinearRgba::WHITE);
-    let target = app.world().resource::<CaseTarget>().0.clone();
-    spawn_capture_camera(app, &target, Vec3::new(0.0, 0.4, 3.2), Vec3::ZERO);
     let sphere = app
         .world_mut()
         .resource_mut::<Assets<Mesh>>()
@@ -308,14 +287,29 @@ fn outline_scene(app: &mut App) {
 #[test]
 #[ignore = "requires GPU; run the explicit GPU lane"]
 fn cel_portable_golden_cases() {
-    let cases: [(&str, fn(&mut App)); 3] = [
-        ("sphere_analytic_ramp", analytic_ramp_scene),
-        ("sphere_textured_ramp", textured_ramp_scene),
-        ("sphere_outline", outline_scene),
+    let cases: [(&str, Vec3, Vec3, fn(&mut App)); 3] = [
+        (
+            "sphere_analytic_ramp",
+            Vec3::new(0.0, 0.4, 3.2),
+            Vec3::ZERO,
+            analytic_ramp_scene,
+        ),
+        (
+            "sphere_textured_ramp",
+            Vec3::new(0.0, 0.0, 5.0),
+            Vec3::ZERO,
+            textured_ramp_scene,
+        ),
+        (
+            "sphere_outline",
+            Vec3::new(0.0, 0.4, 3.2),
+            Vec3::ZERO,
+            outline_scene,
+        ),
     ];
     let mut failures = Vec::new();
-    for (name, build) in cases {
-        if !run_case(name, build) {
+    for (name, eye, look, build) in cases {
+        if !run_case(name, eye, look, build) {
             failures.push(name);
         }
     }

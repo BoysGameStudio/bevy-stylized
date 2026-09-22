@@ -12,32 +12,16 @@ use bevy_stylized_render::{
 use golden_harness::{CapturedImage, capture};
 
 fn image(app: &mut App) -> CapturedImage {
-    let target = capture::create_capture_target(
-        &mut app.world_mut().resource_mut::<Assets<Image>>(),
-        256,
-        256,
-    );
-    let camera = app
-        .world_mut()
-        .spawn((
-            Camera3d::default(),
-            capture::capture_target_bundle(&target),
-            bevy::core_pipeline::tonemapping::Tonemapping::None,
-            Transform::from_xyz(0., 0., 5.).looking_at(Vec3::ZERO, Vec3::Y),
-        ))
-        .id();
-    for _ in 0..32 {
-        app.update();
-    }
-    let request = capture::request_capture(app.world_mut(), target);
-    for _ in 0..600 {
-        app.update();
-        if let Some(result) = capture::try_take(app.world_mut(), request.clone()) {
-            app.world_mut().despawn(camera);
-            return result;
-        }
-    }
-    panic!("physical material capture timed out");
+    scene_runtime::capture_in_app(
+        app,
+        &scenario_model::ident::SessionId::new("physical-material").expect("session id"),
+        &scenes::CameraRecipe::new(Vec3::new(0., 0., 5.), Vec3::ZERO),
+        (256, 256),
+        scene_runtime::Settle::Frames(32),
+        false,
+        640,
+    )
+    .expect("physical material capture timed out")
 }
 
 fn same(a: &CapturedImage, b: &CapturedImage) {

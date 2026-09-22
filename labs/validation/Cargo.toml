@@ -1,0 +1,21 @@
+[package]
+name = "validation"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+readme = "../../README.md"
+publish = false
+description = "Pure-CPU observation assertion layer for the unified scene workbench (per-pixel diff and Tier-2 cross-layer metrics; no App/Device/GPU)."
+
+# 依赖边界（docs/showcase/01 §依赖与代码所有权）：只依赖纯数据与 CPU 算法；
+# 不引用产品/场景类型，不要求 App/Device，无文件系统/GPU 依赖。
+[dependencies]
+serde.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,61 @@
+//! 内容级视图 preset（无 Bevy App 依赖；只操作产品纯数据
+//! `StylizedViewDescriptor`）。输出绑定（把 preset 应用到哪台相机）
+//! 归宿主。
+
+use bevy_color::LinearRgba;
+use bevy_stylized_core::{
+    StylizedEnvironment, StylizedFog, StylizedShadowTint, StylizedViewDescriptor,
+};
+
+/// 昼：浅蓝灰雾 + 淡蓝天色 + 轻阴影染色。
+pub fn environment_day(view: &mut StylizedViewDescriptor) {
+    view.environment = StylizedEnvironment {
+        fog: StylizedFog {
+            enabled: true,
+            color: LinearRgba::new(0.58, 0.68, 0.84, 1.0),
+            start: 14.0,
+            end: 80.0,
+        },
+        shadow_tint: StylizedShadowTint {
+            color: LinearRgba::new(0.6, 0.68, 0.95, 1.0),
+            strength: 0.5,
+        },
+        zenith_tint: Some(LinearRgba::new(0.45, 0.6, 0.85, 1.0)),
+    };
+}
+
+/// 黄昏：暖橙雾 + 紫红天色 + 紫色阴影染色 + 暖 key light。
+pub fn environment_dusk(view: &mut StylizedViewDescriptor) {
+    view.key_light_color = LinearRgba::new(1.0, 0.75, 0.55, 1.0);
+    view.environment = StylizedEnvironment {
+        fog: StylizedFog {
+            enabled: true,
+            color: LinearRgba::new(0.85, 0.55, 0.38, 1.0),
+            start: 6.0,
+            end: 45.0,
+        },
+        shadow_tint: StylizedShadowTint {
+            color: LinearRgba::new(0.55, 0.4, 0.7, 1.0),
+            strength: 0.5,
+        },
+        zenith_tint: Some(LinearRgba::new(0.4, 0.25, 0.45, 1.0)),
+    };
+}
+
+/// 夜：深蓝雾 + 深蓝天色 + 强冷色阴影染色 + 夜间 ambient。
+pub fn environment_night(view: &mut StylizedViewDescriptor) {
+    view.day_night_factor = 0.0;
+    view.environment = StylizedEnvironment {
+        fog: StylizedFog {
+            enabled: true,
+            color: LinearRgba::new(0.08, 0.1, 0.2, 1.0),
+            start: 5.0,
+            end: 40.0,
+        },
+        shadow_tint: StylizedShadowTint {
+            color: LinearRgba::new(0.45, 0.5, 0.85, 1.0),
+            strength: 0.7,
+        },
+        zenith_tint: Some(LinearRgba::new(0.03, 0.05, 0.12, 1.0)),
+    };
+}

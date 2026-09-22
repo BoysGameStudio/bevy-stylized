@@ -16,11 +16,11 @@ use bevy::{
     DefaultPlugins,
     app::{App, PluginGroup},
     asset::{AssetPlugin, Assets},
-    core_pipeline::{core_3d::Opaque3d, tonemapping::Tonemapping},
+    core_pipeline::core_3d::Opaque3d,
     image::Image,
     math::primitives::Sphere,
     pbr::MeshMaterial3d,
-    prelude::{Camera3d, Mesh, Mesh3d, Transform, Vec3},
+    prelude::{Mesh, Mesh3d, Transform, Vec3},
     render::{
         RenderApp, RenderPlugin,
         render_phase::ViewBinnedRenderPhases,
@@ -35,7 +35,7 @@ use golden_harness::{GoldenPaths, GoldenProvenance, Tolerance, capture, diff_rgb
 const WIDTH: u32 = 512;
 const HEIGHT: u32 = 512;
 
-fn headless_app(resources: RenderResources) -> (App, capture::CaptureTarget) {
+fn headless_app(resources: RenderResources) -> App {
     let mut app = App::new();
     app.add_plugins(
         DefaultPlugins
@@ -57,10 +57,6 @@ fn headless_app(resources: RenderResources) -> (App, capture::CaptureTarget) {
     );
     app.add_plugins(StylizedPlugin::default());
     capture::install(&mut app);
-    let target = {
-        let mut images = app.world_mut().resource_mut::<Assets<Image>>();
-        capture::create_capture_target(&mut images, WIDTH, HEIGHT)
-    };
     *app.world_mut().resource_mut::<StylizedViewSettings>() =
         StylizedViewSettings(StylizedViewDescriptor {
             key_light_direction: Vec3::new(0.0, 1.0, 0.2).normalize(),
@@ -71,7 +67,7 @@ fn headless_app(resources: RenderResources) -> (App, capture::CaptureTarget) {
         });
     app.finish();
     app.cleanup();
-    (app, target)
+    app
 }
 
 /// 4 行 ramp：每行一种阴影色（行 = profile_index）。
@@ -104,7 +100,7 @@ fn ramp_texture_4rows() -> Image {
     image
 }
 
-fn spawn_instances(app: &mut App, n: u32) {
+fn spawn_instances(app: &mut App, n: u32) -> f32 {
     let ramp = app
         .world_mut()
         .resource_mut::<Assets<Image>>()
@@ -138,23 +134,8 @@ fn spawn_instances(app: &mut App, n: u32) {
             Transform::from_xyz(x * 0.9, y * 0.9, 0.0),
         ));
     }
-    let half = cols as f32 * 0.45;
-    let target = app
-        .world()
-        .get_resource::<BatchTarget>()
-        .expect("target")
-        .0
-        .clone();
-    app.world_mut().spawn((
-        Camera3d::default(),
-        capture::capture_target_bundle(&target),
-        Tonemapping::None,
-        Transform::from_xyz(0.0, 0.0, half * 2.6).looking_at(Vec3::ZERO, Vec3::Y),
-    ));
+    cols as f32 * 0.45
 }
-
-#[derive(bevy::prelude::Resource, Clone)]
-struct BatchTarget(capture::CaptureTarget);
 
 /// 数 Opaque3d binned phase 的 draw 数（spike 同款口径）。
 fn count_draws(app: &mut App) -> usize {
@@ -181,13 +162,49 @@ fn instances_batch_with_per_instance_variation() {
     };
     let mut first_capture = None;
     for n in [100u32, 1000] {
-        let (mut app, target) = headless_app(resources.clone());
-        app.insert_resource(BatchTarget(target.clone()));
-        spawn_instances(&mut app, n);
-        for _ in 0..24 {
-            app.update();
+        let mut app = headless_app(resources.clone());
+        let half = spawn_instances(&mut app, n);
+        // CaseDriver 观测周期：Build 泵 + 调度泵 + 22 tick 恰好 24 帧暖场，
+        // 第 24 帧时点（与旧流程相同）做 draw 计数内省，随后完成观测。
+        app.insert_resource(scene_runtime::CycleResource(
+            scene_runtime::CaptureCycle::new(
+                scenario_model::ident::SessionId::new("instance-batching").expect("session id"),
+                scenes::CameraRecipe::new(Vec3::new(0.0, 0.0, half * 2.6), Vec3::ZERO),
+                (WIDTH, HEIGHT),
+                false,
+                660,
+            ),
+        ));
+        app.world_mut()
+            .resource_scope(
+                |world, mut cycle: bevy::prelude::Mut<scene_runtime::CycleResource>| {
+                    cycle.begin_capture(world, scene_runtime::Settle::Frames(24))
+                },
+            )
+            .expect("capture profile must be a valid plan");
+        let mut draws = 0;
+        let mut done = false;
+        for i in 0..660 {
+            let status = app.world_mut().resource_scope(
+                |world, mut cycle: bevy::prelude::Mut<scene_runtime::CycleResource>| {
+                    cycle.pump(world)
+                },
+            );
+            match status {
+                scene_runtime::DriverStatus::Running => {
+                    app.update();
+                    if i == 23 {
+                        draws = count_draws(&mut app);
+                    }
+                }
+                scene_runtime::DriverStatus::Done => {
+                    done = true;
+                    break;
+                }
+                scene_runtime::DriverStatus::Failed(error) => panic!("capture timed out: {error}"),
+            }
         }
-        let draws = count_draws(&mut app);
+        assert!(done, "capture timed out");
         assert_eq!(
             draws, 1,
             "{n} instances of same mesh+material must stay at 1 draw call"
@@ -195,14 +212,16 @@ fn instances_batch_with_per_instance_variation() {
 
         if n == 100 {
             // 捕获：ramp 行可见差异（4 色条纹）。
-            let request = capture::request_capture(app.world_mut(), target.clone());
-            for _ in 0..600 {
-                app.update();
-                if let Some(frame) = capture::try_take(app.world_mut(), request.clone()) {
-                    first_capture = Some(frame);
-                    break;
-                }
-            }
+            first_capture = Some(
+                app.world_mut()
+                    .resource_scope(
+                        |_world, mut cycle: bevy::prelude::Mut<scene_runtime::CycleResource>| {
+                            cycle.take_receipt()
+                        },
+                    )
+                    .expect("100-instance capture")
+                    .image,
+            );
         }
     }
     let captured = first_capture.expect("100-instance capture");

@@ -9,6 +9,9 @@ bevy = { workspace = true, features = ["bevy_animation", "bevy_gltf", "bevy_scen
 bevy-stylized = { path = "../../crates/bevy-stylized" }
 bevy-stylized-gltf = { path = "../../crates/bevy-stylized-gltf" }
 golden-harness = { path = "../harness" }
+scenes = { path = "../../labs/scenes", features = ["build"] }
+scene-runtime = { path = "../../labs/scene-runtime" }
+scenario-model = { path = "../../labs/scenario-model" }
 serde_json.workspace = true
 sha2.workspace = true
 serde.workspace = true
