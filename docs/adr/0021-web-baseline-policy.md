@@ -49,3 +49,20 @@ untested features. This satisfies the requested initial WebGPU verification.
 The remaining decision is release-wide browser/version/feature qualification and
 formal ADR acceptance; this result does not promise default-browser operation,
 WebGL2 support or every material/pass combination.
+
+## Evidence update, 2026-09-22
+
+Chrome 153.0.8010.52 on Linux (NVIDIA 615.71.09, hardware Blackwell adapter,
+X11/XWayland invocation — see CONTRIBUTING for the working flag set): the
+`webgpu` lane now runs end-to-end (real BrowserWebGpu adapter, shader/pipeline
+creation, fixture adoption and capture), but the exact-match gate FAILS on 6
+deterministic pixels / 18 channels (max channel delta 31/255, hair specular
+highlights of the genshin-odette fixture) from a Dawn (Tint) vs wgpu (naga)
+shader divergence. The same fixture is pixel-exact on macOS Chrome 153
+(Dawn/Metal vs wgpu/Metal).
+
+Browser-version drift broke the 2026-09-21 exact record above. Acceptance
+therefore additionally requires a version-qualification or tolerance policy via
+[docs/reference/08](../reference/08-golden-tolerance-and-cross-layer-criteria.md);
+that decision stays open and this ADR remains a V1 Blocker. The failure is
+retained per policy — no tolerance was widened to pass it.

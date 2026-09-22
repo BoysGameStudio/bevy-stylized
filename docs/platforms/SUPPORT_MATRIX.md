@@ -179,3 +179,17 @@ configuration nor another device/OS. WebGPU shadow/prepass, instance tables,
 deformation, performance and mobile browsers remain untested. WebGL2 is outside
 the owner's current support promise. Native screenshot parity does not establish
 upstream Blender parity; that uses the separate strict character lane.
+
+### WebGPU record addendum, 2026-09-22
+
+Re-run on Chrome 153.0.8010.52 / Linux (NVIDIA 615.71.09, hardware Blackwell
+adapter) with the working X11/XWayland flag set documented in
+[Contributing](../../CONTRIBUTING.md#browser-webgpu): the lane completes
+end-to-end (adapter, pipeline, fixture adoption, capture), but the exact-match
+gate FAILS on 6 deterministic pixels / 18 channels (max channel delta 31/255,
+hair specular highlights) from a Dawn (Tint) vs wgpu (naga) divergence. The same
+fixture is pixel-exact on macOS Chrome 153 (Dawn/Metal vs wgpu/Metal). The
+2026-09-21 "identical" record therefore no longer holds on the current browser;
+a version-qualification or tolerance decision stays open in ADR-0021, which
+remains a V1 Blocker. No row above changes; this addendum makes no new support
+claim.
