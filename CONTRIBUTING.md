@@ -247,3 +247,22 @@ report; the qualified Linux/Wayland invocation used
 Native X11 requires working `DISPLAY`/`XAUTHORITY`. The lane uses no personal
 browser session, remote runner or WebGL2 fallback. See the
 [support matrix](docs/platforms/SUPPORT_MATRIX.md) for the exact measured scope.
+
+Measured with Chrome 153.0.8010.52 (2026-09-22, NVIDIA 615.71.09):
+
+- Chrome 153 rejects `--ozone-platform=wayland` combined with `--use-angle=vulkan`
+  (`--ozone-platform=wayland is not compatible with Vulkan`). The working hardware
+  invocation is
+  `["--ozone-platform=x11","--enable-unsafe-webgpu","--enable-features=Vulkan","--use-angle=vulkan"]`
+  on an XWayland `DISPLAY`. Wayland without the Vulkan pair falls back to
+  SwiftShader (`adapter: google/swiftshader`) and fails the exact comparison.
+- When launched from SSH or another session without a user bus, Chrome navigation
+  stalls before any fetch (pages never load). Export the session bus, e.g.
+  `DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus`, in addition to
+  `DISPLAY`/`XAUTHORITY`/`XDG_RUNTIME_DIR`.
+- With hardware WebGPU on this combination, Dawn (Tint) and wgpu 29 (naga)
+  diverge deterministically on 6 pixels / 18 channels (max channel delta 31/255,
+  hair specular highlights of the genshin-odette fixture); the exact-match gate
+  therefore reports FAIL on Chrome 153. The failure is retained per policy;
+  cross-layer tolerance changes follow
+  [docs/reference/08](docs/reference/08-golden-tolerance-and-cross-layer-criteria.md).
