@@ -16,7 +16,7 @@ owns procedures; linked evidence retains its measured scope and limitations.
 | View, lighting, environment | [view](../../crates/bevy-stylized-render/src/view.rs), [post](../../crates/bevy-stylized-render/src/post.rs) | ADR-0009; authored mappings and environment limitations remain explicit |
 | Outline | [replica synchronization](../../crates/bevy-stylized-render/src/outline.rs), [screen outline](../../crates/bevy-stylized-render/src/screen_outline.rs) | ADR-0008; updated/removed producer bounds and deformation compatibility are tested, not a general deformation solver |
 | External face input | [adapter](../../crates/bevy-stylized-render/src/face_input.rs), [rendering-input contract](../showcase/04-realtime-validation.md) | External propagated head pose drives existing quantized instance input; no animation controller or general table support |
-| Alpha/prepass/shadows | [semantic matrix](../../tests/integration/tests/semantics_matrix.rs) | ADR-0023; supported combinations stay explicitly bounded |
+| Alpha/prepass/shadows | [semantic matrix](../../tests/integration/tests/semantics_matrix.rs) | ADR-0023 Accepted 2026-09-22; supported combinations stay explicitly bounded (masked screen-edge appearance and masked shadow casting remain unqualified) |
 | Profile and texture interpretation | [Genshin mapping](../../crates/bevy-stylized-profile-genshin/src/mapping.rs), [Hero](../../crates/bevy-stylized-render/src/hero.rs) | ADR-0005/0006; current static qualification does not establish every family effect |
 | glTF metadata and setup | [metadata](../../crates/bevy-stylized-gltf/src/metadata.rs), [setup](../../crates/bevy-stylized-gltf/src/setup.rs) | ADR-0020/0028; conflict rejection and pre-registration are implemented, final API decisions remain separate |
 | Reference chain | [current authoring qualification](../reference/01-reference-authoring-workflow.md), [current source lock](../../assets/sources/gacha-authoring.json) | ADR-0007/0011/0012/0015; only qualified current static scope, no historical release lane |
@@ -366,9 +366,10 @@ and clippy were rerun; the final isolated snapshot uses the latter identity.
 - ADR-0001/0002/0003/0005/0006/0008/0009/0020/0026/0028: existing implementation,
   resource/feature tests and current contracts provide review inputs; their
   proposed API/budget/ownership policies are not auto-accepted by green tests.
-- ADR-0023: the owning matrix now lists actual native opaque/mask, scoped Blend,
-  prepass and outline evidence. Optional runtime shadows and masked/transparent
-  outline policy still need their named evidence/decisions.
+- ADR-0023 (Accepted 2026-09-22): optional runtime Hero shadow casting and the
+  masked hull/edge policy landed with GPU evidence (`shadow_casting.rs`,
+  `masked_outline.rs`); masked screen-edge appearance (wide boundary band) and
+  masked shadow casting remain explicitly unqualified cells.
 - ADR-0010/0021: initial WebGPU verification is complete for the recorded adapter;
   release-wide browser/version requirements remain open. WebGL2 is not promised.
   Windows/D3D12, Metal, mobile devices and Linux/GLES have no equivalent local

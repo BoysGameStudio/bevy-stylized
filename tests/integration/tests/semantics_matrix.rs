@@ -1,4 +1,4 @@
-//! ADR-0023 增量：渲染语义矩阵测试（provisional，pending ADR-0023）。
+//! ADR-0023（Accepted 2026-09-22）：渲染语义矩阵测试。
 //!
 //! 当前切片支持的组合作为数据驱动用例钉死：
 //!
@@ -72,7 +72,7 @@ fn alpha_cull_matrix_semantics_hold() {
     }
 }
 
-/// Hero 语义矩阵行（provisional pending ADR-0023）：packed normal ×
+/// Hero 语义矩阵行（ADR-0023）：packed normal ×
 /// matcap × alpha mode 的标志位/pipeline-key 语义。
 #[derive(Clone, Copy, Debug)]
 struct HeroMatrixCase {
@@ -220,7 +220,7 @@ fn no_per_frame_material_mutation_with_shared_material() {
     assert_eq!(distinct.len(), 100, "every instance got its own MeshTag");
 }
 
-/// Alpha/Blend 契约（provisional pending ADR-0023）：**Blend 在 V1 不可达**
+/// Alpha/Blend 契约（ADR-0023）：**Blend 在 V1 不可达**
 /// ——四个材质的 `alpha_mode()` 类型层面只能返回 Opaque/Mask；本测试钉死
 /// "任何路径都不得静默产生 Blend"。
 #[test]
@@ -244,25 +244,34 @@ fn blend_is_unreachable_in_v1_materials() {
     }
 }
 
-/// Shadow/prepass/outline 契约（provisional pending ADR-0023；V2-a 修订）：
+/// Shadow/prepass/outline 契约（ADR-0023；V2-a 修订）：
 ///
 /// - 主材质 `enable_prepass() == true`（**能力**开启；成本门控在相机——
 ///   只有带 DepthPrepass/NormalPrepass 组件的相机产生 prepass 开销，
 ///   见 `StylizedScreenOutline` 的 per-camera opt-in）；
-/// - `enable_shadows() == false` 不变（V1 无阴影投射）；
+/// - 阴影投射默认关闭；`shadow-casting` feature 只开启 Hero 材质的投射
+///   （ADR-0023 已资格化，运行时证据见 `shadow_casting.rs`），其余材质
+///   恒为 false；
 /// - hull outline 不依赖任何 prepass（golden 用例已证）；
 /// - overlay 材质自身不进 prepass。
 #[test]
 fn prepass_and_shadow_contract_is_explicit() {
     use bevy::pbr::Material;
+    // 默认构建：全部关闭；shadow-casting 构建：仅 Hero 开启（两种构建
+    // 分别钉死，默认 lane 行为不变）。
+    let hero_expected = cfg!(feature = "shadow-casting");
+    assert_eq!(
+        StylizedHeroMaterial::enable_shadows(),
+        hero_expected,
+        "hero shadow casting follows the shadow-casting feature exactly"
+    );
     for shadows in [
         StylizedCelMaterial::enable_shadows(),
         StylizedCharacterMaterial::enable_shadows(),
-        StylizedHeroMaterial::enable_shadows(),
         StylizedOutlineMaterial::enable_shadows(),
         StylizedScreenOutlineMaterial::enable_shadows(),
     ] {
-        assert!(!shadows, "V1 must not claim shadows");
+        assert!(!shadows, "only Hero may cast, and only via shadow-casting");
     }
     // 主材质 prepass 能力开启（成本由相机组件门控）；overlay 关闭。
     assert!(StylizedCelMaterial::enable_prepass());

@@ -23,3 +23,9 @@ naga = { version = "=29.0.4", features = ["wgsl-in"] }
 
 [lints]
 workspace = true
+
+[features]
+# ADR-0023 证据通道：转发 bevy-stylized 的 opt-in 投影能力。默认关闭，
+# 默认 lane/必需套件行为不变（`shadow_casting` 测试在两种构建下分别
+# 钉死开启/关闭语义）。
+shadow-casting = ["bevy-stylized/shadow-casting"]

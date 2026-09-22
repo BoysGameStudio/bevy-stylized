@@ -35,7 +35,7 @@ pub const CEL_FLAG_ILM_TEXTURE: u32 = 1 << 1;
 pub const CEL_FLAG_RIM: u32 = 1 << 2;
 /// `params.flags` 位：alpha mask（`rim.w` 为 cutoff；对应源资产的
 /// Blend/Mask 在 Cel@Portable 切片中统一收敛为 Mask，完整 alpha 矩阵
-/// pending ADR-0023）。
+/// ADR-0023）。
 pub const CEL_FLAG_ALPHA_MASK: u32 = 1 << 3;
 
 /// Cel 材质的 GPU uniform（单个 64 字节 UBO，packed by Class×Tier，
@@ -260,7 +260,7 @@ impl Material for StylizedCelMaterial {
     }
 
     // Cel prepass 由相机选择，shadow 路径关闭；完整语义矩阵仍 pending
-    // ADR-0023，类型级可参与不等于所有组合已资格化。
+    // ADR-0023（Accepted）：类型级可参与不等于所有组合已资格化。
     // prepass 参与在类型级开启（共享裁切/完整蒙皮 shader）；**成本门控在
     // 相机**：只有带 DepthPrepass/NormalPrepass 组件的相机才产生 prepass
     // 开销（StylizedScreenOutline 的 per-camera opt-in），默认相机零成本。

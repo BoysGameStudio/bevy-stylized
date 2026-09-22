@@ -26,7 +26,7 @@
 | ADR-0020 | glTF Extras vs Sidecar Precedence | Proposed | [`0020-metadata-precedence.md`](0020-metadata-precedence.md) |
 | ADR-0021 | Web Baseline Policy | V1 Blocker | [`0021-web-baseline-policy.md`](0021-web-baseline-policy.md) |
 | ADR-0022 | RenderDevice Capability Lifecycle | Accepted | [`0022-render-device-capability-lifecycle.md`](0022-render-device-capability-lifecycle.md) |
-| ADR-0023 | Render Semantics Matrix | V1 Blocker | [`0023-render-semantics-matrix.md`](0023-render-semantics-matrix.md) |
+| ADR-0023 | Render Semantics Matrix | Accepted | [`0023-render-semantics-matrix.md`](0023-render-semantics-matrix.md) |
 | ADR-0024 | Cargo Feature Policy | Accepted | [`0024-cargo-feature-policy.md`](0024-cargo-feature-policy.md) |
 | ADR-0025 | Profile API and Schema Stability | Accepted | [`0025-profile-api-and-schema-stability.md`](0025-profile-api-and-schema-stability.md) |
 | ADR-0026 | Disabled Feature Cost Policy | Proposed | [`0026-disabled-feature-cost-policy.md`](0026-disabled-feature-cost-policy.md) |

@@ -298,7 +298,7 @@ fn adr_0001_backend_comparison_spike() {
            base 纹理槽位，代价是 base 绑定成本与 per-material 更大的\n\
            bind group；扩展数学挂在 PBR 输入之后，组合自由度受 pbr_input 约束。\n\
          - B 完全控制绑定布局与 shader（budget 纪律、NPR 语义纯净），代价是\n\
-           shadow/fog 等需要自接（当前切片显式关闭，pending ADR-0023 矩阵）。\n\
+           shadow/fog 等需要自接（当前切片显式关闭，矩阵见 ADR-0023）。\n\
          - C（custom render pipeline）未原型化：需要自建 render phase、draw\n\
            function、queue/bin 逻辑与绑定管理，失去 Bevy Material 管线的全部\n\
            复用；仅在 A/B 都被测量证明不足时才值得投入。\n\n\

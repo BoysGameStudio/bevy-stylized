@@ -15,7 +15,7 @@
 //!   ID**（ramp 分带阈值 0.2/0.4/0.6/0.8）；顶点色层：R = vertex AO、
 //!   G = ramp 阴影宽度缩放。Emission mask 走 base color alpha（上游经
 //!   alpha switch `0=Emission,1=Transparency` 路由——我们没有 ILM
-//!   emission 通道；此决策为 provisional，pending ADR-0023 矩阵）；
+//!   emission 通道；矩阵语义见 ADR-0023）；
 //! - **Character@Portable fallback**（显式降级定义，非静默）：
 //!   - Face SDF 缺失或 fallback 标志 → 半兰伯特 step 近似（复用 Cel 阴影）；
 //!   - Hair 高光缺失/关闭 → rim 近似（用 rim 通道补偿）。
@@ -433,7 +433,8 @@ impl Material for StylizedCharacterMaterial {
         }
     }
 
-    // 与 Cel 一致：prepass 由相机选择，shadow 关闭（pending ADR-0023）。
+    // 与 Cel 一致：prepass 由相机选择，shadow 关闭（ADR-0023：投射为 Hero 的
+    // shadow-casting feature 专属）。
     // prepass 参与在类型级开启（共享裁切/完整蒙皮 shader）；**成本门控在
     // 相机**：只有带 DepthPrepass/NormalPrepass 组件的相机才产生 prepass
     // 开销（StylizedScreenOutline 的 per-camera opt-in），默认相机零成本。
