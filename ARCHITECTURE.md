@@ -5,19 +5,19 @@
 
 ## Architecture status
 
-- Current state: **Independent implementation; supported static scope qualified, broader visual/release decisions remain open**
+- Current state: **Independent implementation; declared static scope qualified; private proprietary project, publication out of scope (owner decision 2026-09-23)**
 - Bevy baseline: **0.19.1**
 - Reference family currently targeted for V1: **Genshin / Gacha Setup locked reference family**
-- Facade Cargo package: **`bevy-stylized`**
+- Facade Cargo package: **`bevy-stylized`**（programmatic/glTF 基础接入目标 ≤10 行；renderer internal 不成为稳定公共 API）
 - Canonical GitHub repository: **`BoysGameStudio/bevy-stylized`**
 - Project/workspace directory: **`bevy-stylized/`**
 - Rust crate identifier: **`bevy_stylized`**
-- Public license: **Pending ADR-0017 / provenance review**
+- License: **proprietary private, no distribution ([ADR-0017](docs/adr/0017-license-and-provenance.md))**
 
 Current evidence is linked from [README](README.md#current-qualification-scope).
-Use the [current provisional inventory](docs/release/03-provisional-inventory.md)
-for implementation locations, and individual ADRs for decision status. Dated
-history does not define current acceptance requirements.
+Individual ADRs carry decision status; [TRACEABILITY](TRACEABILITY.md) maps
+decisions to evidence. Dated history does not define current acceptance
+requirements.
 
 ## Core architecture
 
@@ -89,9 +89,7 @@ runtime behavior; this index does not define a second set of requirements.
 | Visual semantic contract | `docs/quality/semantic-contract.md` |
 | Performance target format | `docs/performance/targets.md` |
 | Showcase / fixtures | `docs/showcase/01-showcase-examples-fixtures.md` |
-| Tooling / versioning / publishing | `docs/release/01-tooling-versioning-and-publication.md` |
 | V1/V2/V3 roadmap | `docs/roadmap/01-v1-v2-v3-roadmap.md` |
-| V1 release gate | `docs/release/02-v1-release-gate.md` |
 | Invariants / risks / ADR governance | `docs/governance/01-invariants-risks-and-adrs.md` |
 | ADR index | `docs/adr/ADR_INDEX.md` |
 | Requirements traceability | `TRACEABILITY.md` |

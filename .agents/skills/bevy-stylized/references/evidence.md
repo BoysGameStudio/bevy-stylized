@@ -21,8 +21,8 @@ Current executable evidence:
   disabled networking and absence of sibling projects, including rebuilding the
   external source case. This is engineering independence, not parity acceptance.
 
-Inspect current task reports and docs/release/V1_RELEASE_CHECKLIST.md for the
-latest completed checks. Do not treat dated measurements as current-device results.
+Inspect docs/platforms/SUPPORT_MATRIX.md and docs/performance/targets.md for the
+latest recorded checks. Do not treat dated measurements as current-device results.
 GPU verification requires a locally available device and the declared inputs.
 
 Primary sources inside the discovered checkout:

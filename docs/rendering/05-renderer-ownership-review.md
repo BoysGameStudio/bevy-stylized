@@ -28,7 +28,7 @@ The large capability/governor files include requirement tables, pure policy stat
 and test matrices. File length does not establish a missing runtime boundary.
 Public exports, flags, layouts, resource bindings and embedded WGSL stay intact.
 Existing limitations such as precision/transport restrictions and open ADRs remain
-visible in the [current inventory](../release/03-provisional-inventory.md).
+visible in [TRACEABILITY](../../TRACEABILITY.md) and the [ADR index](../adr/ADR_INDEX.md).
 
 ## Scheduling and lifecycle evidence
 

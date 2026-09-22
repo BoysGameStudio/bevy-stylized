@@ -138,8 +138,8 @@ does not imply the full independence/visual/parity lanes ran.
 Identify the affected contract, profile/capability scope and source lock. Change
 its owner and actual consumers together. Select affected local checks; rendering
 or authoring changes additionally need the corresponding GPU/asset/character scope.
-Report results against [release criteria](docs/release/02-v1-release-gate.md) and
-existing ADRs. Implementation and engineering independence do not accept open
+Report results against the owning quality/testing contracts
+([validation](docs/testing/01-validation-golden-and-performance.md)) and existing ADRs. Implementation and engineering independence do not accept open
 visual, platform or publication decisions.
 
 For documentation only, run `python3 tools/checks/check_docs.py` and verify moved

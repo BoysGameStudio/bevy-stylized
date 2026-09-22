@@ -102,7 +102,6 @@ for f in MARKDOWN_FILES:
 # maintained entrypoints, not historical examples or arbitrary Markdown snippets.
 current_navigation = [
     ROOT/'README.md', ROOT/'ARCHITECTURE.md',
-    ROOT/'docs/release/03-provisional-inventory.md',
 ]
 for f in current_navigation:
     for target in re.findall(r"\[[^\]]*\]\(([^)]+)\)", text(f)):
@@ -144,7 +143,7 @@ required = [
     "ARCHITECTURE.md","GLOSSARY.md","TRACEABILITY.md",
     "THIRD_PARTY_NOTICES.md","docs/adr/ADR_INDEX.md",
     "docs/quality/semantic-contract.md","docs/performance/targets.md",
-    "docs/platforms/SUPPORT_MATRIX.md","docs/release/V1_RELEASE_CHECKLIST.md",
+    "docs/platforms/SUPPORT_MATRIX.md",
 ]
 for p in required:
     if not (ROOT/p).exists():

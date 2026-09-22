@@ -1,6 +1,6 @@
 //! 固定 benchmark 场景（It-8；ADR-0029 证据格式）。
 //!
-//! Release gate 的 4 个固定场景（docs/release/02）：
+//! 性能合同的固定场景（docs/performance/targets.md）：
 //!
 //! - `hero_1`：1 个 Hero 材质球（authored ramp + face SDF + matcap 全开）；
 //! - `portable_100` / `portable_500` / `portable_1000`：StylizedCelMaterial

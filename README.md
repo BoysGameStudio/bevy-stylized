@@ -43,11 +43,10 @@ Raw and derived third-party art stays under ignored `assets/local`; the
 [export contract](docs/reference/03-blender-export-contract.md) defines the
 material semantics and reduced-feature regression recipes.
 
-This is a development release. Public API/profile decisions, broader upstream
-parity and publication gates remain open. Current checks do not qualify every
-platform or upstream effect. See the [support matrix](docs/platforms/SUPPORT_MATRIX.md),
-[provisional inventory](docs/release/03-provisional-inventory.md) and
-[release checklist](docs/release/V1_RELEASE_CHECKLIST.md).
+Current checks do not qualify every platform or upstream effect; see the
+[support matrix](docs/platforms/SUPPORT_MATRIX.md). This is a private
+proprietary project: publication is out of scope per the owner decision of
+2026-09-23 ([ADR-0017](docs/adr/0017-license-and-provenance.md)).
 
 ## Documentation
 
@@ -58,4 +57,4 @@ platform or upstream effect. See the [support matrix](docs/platforms/SUPPORT_MAT
 - [Asset build recovery](docs/authoring/06-build-attempts.md).
 - [Third-party notices](THIRD_PARTY_NOTICES.md).
 
-Publication remains disabled pending license/provenance and release decisions.
+Publication is out of scope: private proprietary project, owner decision 2026-09-23.
