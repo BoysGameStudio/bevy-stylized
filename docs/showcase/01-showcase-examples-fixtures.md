@@ -371,7 +371,7 @@ debug QA 可通过 adb `run-as` 访问应用专属输入/输出目录；正式�
 |---|---|---|
 | `overview` | class 对照、可选 Standard、显式布局 | overview、Android 程序化、浏览器 class 样本；先保留原布局 |
 | `ramp` | analytic / texture、行、bands、昼夜、smoothing | ramp、Cel Golden、profile ramp 输入 |
-| `lighting` | authored / physical / hybrid、光向、palette | lighting、physical material、光照扫描 |
+| `lighting` | authored / physical / hybrid、光向、palette | lighting、physical material、光照扫描、effects 光照基覆盖 |
 | `face` | SDF、阈值/侧向、外部 head basis | face、Character Golden、head-pose 输入 |
 | `hair` / `metal` | 各自参数、贴图和开关 | hair、metal、profile 高光/金属输入 |
 | `outline` | hull / screen / hybrid、宽度、alpha class | outline、outline-advanced、alpha/prepass 输入 |
