@@ -39,8 +39,13 @@ the six calibrated full-body/face lighting cases over the current static
 material variants (source outlines, metal/specular ramps, optimized normals,
 emission), per ADR-0019's family scoping. Full rigs, secondary physics,
 animated deformation qualification, and the excluded `Eff_001`/`Eff_002`
-effect meshes are explicitly post-V1; their fallback shells and the documented
-authoring-gap evidence remain in place.
+effect meshes are explicitly post-V1. The effects recipe
+(`genshin-static-effects-v1`) now exports and shades them (decoded light
+basis, HASHED→Mask), but their image parity is **not** qualified: the
+full-body reference cases fail the unchanged §3 criteria in the effect region,
+attributed to the unreconstructed dissolve/noise/Fresnel alpha path (see the
+export contract's effect parity status). Their fallback shells and the
+documented authoring-gap evidence remain in place.
 
 Cross-device qualification policy is unchanged: per-version/per-device measured
 evidence only (docs/reference/08); the qualified comparison platform is

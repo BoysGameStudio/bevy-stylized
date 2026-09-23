@@ -205,6 +205,37 @@ nothing; reconstructing the source dissolve/noise alpha (the "Genshin Alpha"
 group driven by mask/noise textures) remains parity scope, together with
 transparent ordering/depth and time-dependent reference cases.
 
+### Effect parity status (2026-09-23, effects recipe)
+
+Reference comparison of the effects build's matched case (the six standard
+cases; [criteria](08-golden-tolerance-and-cross-layer-criteria.md) unchanged)
+on the qualified Linux/Vulkan platform (RTX 5090; the Metal diagnostic run
+agrees within cross-vendor rounding):
+
+- `face_closeup-{front,left,right}`: PASS — the effect meshes are out of frame;
+  metrics match the frozen scope.
+- `full_body-{front,left,right}`: FAIL — non-edge max delta 0.345 (> 16/255),
+  shadow-mask IoU ≈ 0.35 (< 0.95), silhouette IoU ≈ 0.957 (< 0.99); mean delta
+  ≈ 0.005 and PSNR ≈ 30.2 pass. Every pixel above the 16/255 threshold lies in
+  the skirt band (rows 209–320, columns 165–346 of 512²); the a-priori upper
+  region (rows < 200, head/torso/legs) stays within criteria.
+
+Attribution: the gap is confined to the effect meshes and the dress area they
+cover. The source renders the ribbons through the unreconstructed
+dissolve/noise/Fresnel alpha path (dithered see-through coverage,
+view-dependent iridescent tint); the runtime renders the implemented scope
+(decoded light basis, body-shader lighting, Mask 0.5 over uniform baked alpha).
+The effect meshes are therefore **not** Blender-parity qualified; the full-body
+effects cases are diagnostic evidence of the documented authoring gap, and the
+frozen emission scope's qualification is unchanged.
+
+Qualified for the effect meshes today: the data handoff (sidecar
+`effect_lighting`), the compile-time light-basis fold, the scoped per-material
+light-direction override (GPU evidence: an azimuth flip changes exactly the
+effect meshes' pixels), and the HASHED→Mask mapping. Not qualified: image
+parity, dissolve/noise/Fresnel alpha, transparent ordering/depth, and
+time-dependent behavior.
+
 | Surface | Current producer behavior |
 | --- | --- |
 | Container and axes | GLB, glTF Y-Up |
