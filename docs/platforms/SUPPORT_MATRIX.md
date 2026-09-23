@@ -16,7 +16,7 @@
 | Windows / D3D12 | ✅ Compatible | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | Not qualified |
 | Linux / Vulkan | ✅ Compatible | ✅ cargo test --workspace（本机） | ✅ naga 全量校验 + 真实管线创建（golden/budget 测试） | ✅ 全 class pipeline 创建（golden/budget 测试） | ✅ golden 捕获全绿（本机） | ✅ RTX 5090（本机 baseline，provenance 记录于各 `*.golden.json`） | 🧪 本地 CPU sweep 与单视图 GPU 时间戳；绝对预算未定义 | Experimental（本机证据，single-device） |
 | Linux / GLES | ✅ Compatible | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | Not qualified |
-| macOS / Metal | ✅ Compatible | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | Not qualified |
+| macOS / Metal | ✅ Compatible | ✅ cargo test --workspace（M4 Pro 本机） | ✅ naga 校验 + 真实管线创建（golden/budget 测试） | ✅ 全 class pipeline 创建（golden/budget 测试） | ✅ golden 捕获全绿（macos-metal overlay，5 图） | ✅ Apple M4 Pro（单一设备；overlay 验收记录） | ⚪ Not measured | Experimental（single device: Apple M4 Pro, Metal, macOS 27.0） |
 | iOS / Metal | ✅ Compatible | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | Not qualified |
 | Android / Vulkan | ✅ Compatible | ✅ ARM64 smoke, local Bevy fork | 🧪 SwiftShader + MoltenVK smoke | 🧪 Class/hull paths | 🧪 Procedural + static character, touch/resume | 🧪 API 35 emulator only | ⚪ Not measured | Experimental; hardware follow-up scoped below |
 | Android / GLES | ✅ Compatible | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | Not qualified |
@@ -40,7 +40,7 @@ When a cell becomes `Validated`, link or record an local evidence ID (device rec
 
 - **Bevy**: `=0.19.1`（pinned；V1 开发期锁定 0.19.x，升级走 ADR-0027 正式流程）；
 - **Rust toolchain**: stable 1.98.x（`rust-toolchain.toml` 锁定）；
-- **实测设备**：Linux x86_64 / NVIDIA RTX 5090（driver 615.71.09）；Vulkan 原生回归及以下 BrowserWebGpu 记录均来自该机；
+- **实测设备**：Linux x86_64 / NVIDIA RTX 5090（driver 615.71.09）；Vulkan 原生回归及以下 BrowserWebGpu 记录均来自该机；macOS 27.0 / Apple M4 Pro（Metal）为 golden overlay 合格的第二实测设备（2026-09-23）；
 - 其余目标一律按上表的 Not qualified / Experimental 处理。
 
 ## Android emulator local record, 2026-09-21
@@ -176,6 +176,24 @@ screen/hybrid outliers to 186 at isolated edge pixels). No shader change can
 remove these without altering the accepted Linux/Vulkan baselines, so the
 suites keep failing on Metal exactly as before; the qualified Golden
 comparison host remains Linux/Vulkan (docs/reference/08 §1).
+
+2026-09-23 macOS qualification record (owner decision 2026-09-23): macOS/Metal
+moves from Not qualified to **Experimental (single device: Apple M4 Pro, Metal,
+macOS 27.0)**. The golden baseline host stays Linux/Vulkan; macOS qualifies
+through the platform overlay mechanism
+([fixtures/README.md](../../fixtures/README.md#golden-platform-overlays),
+docs/reference/08 §1). Five overlay images (only the cases whose deltas are the
+root-caused platform truth above) are captured on the device and accepted in
+[fixtures/golden/macos-metal.acceptance.md](../../fixtures/golden/macos-metal.acceptance.md):
+`cel-portable/sphere_outline`, `character-portable/face_sdf_instances`,
+`outline-advanced/{hull_only,screen_only,hybrid}` (the earlier "three deltas"
+named suites; outline-advanced contributes three cases because its lane runs
+stopped at the first assertion). With the overlay, the local `gpu --required`
+lane passes 41/41 on the M4 Pro; removing the overlay returns exactly the three
+suite failures (negative proof). Canonical baselines are byte-untouched and the
+Linux lane is unaffected (overlay never consulted on the canonical host).
+Non-goals unchanged: no multi-device claim, no performance qualification, no
+"Supported" label.
 
 On SwiftShader, cold-launched original/fixed APK pairs were each captured after
 600 update frames at the same front pose, camera and 1080×2400 resolution.
