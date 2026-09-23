@@ -15,7 +15,7 @@ if hashlib.sha256(Path(bpy.data.filepath).read_bytes()).hexdigest()!=record['ble
 if a.out.exists():raise RuntimeError('capture candidate already exists')
 a.out.mkdir(parents=True)
 scene=bpy.context.scene;scene.frame_set(recipe['frame'])
-selected=[bpy.data.objects[name] for name in recipe['meshes']]
+selected=[bpy.data.objects[name] for name in list(recipe['meshes'])+list(recipe.get('effect_meshes',[]))]
 for obj in scene.objects:
     if obj.type=='MESH':obj.hide_render=obj not in selected
 points=[obj.matrix_world@Vector(corner) for obj in selected for corner in obj.bound_box]

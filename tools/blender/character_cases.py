@@ -13,7 +13,7 @@ if out.exists():raise RuntimeError('candidate exists')
 out.mkdir(parents=True);shutil.copytree(build/'compiled',out/'runtime')
 for name in ['authoring.json','audit.json']:shutil.copy2(build/'authoring'/name,out/name)
 scene=bpy.context.scene;scene.frame_set(recipe['frame']);bpy.context.view_layer.update()
-objects=[bpy.data.objects[n] for n in recipe['meshes']]
+objects=[bpy.data.objects[n] for n in list(recipe['meshes'])+list(recipe.get('effect_meshes',[]))]
 # Camera fitting and shader-factor audits use the base surface. Render visibility
 # stays enabled for the authored hulls in the beauty reference.
 from blender.outline_handoff import modifiers

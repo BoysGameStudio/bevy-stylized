@@ -9,7 +9,7 @@ sha=lambda p:hashlib.sha256(Path(p).read_bytes()).hexdigest()
 if sha(bpy.data.filepath)!=author['blend_sha256']:raise RuntimeError('frozen scene identity mismatch')
 if a.out.exists():raise RuntimeError('candidate exists')
 shutil.copytree(a.case.parent,a.out,ignore=shutil.ignore_patterns('case.json'))
-scene=bpy.context.scene;scene.frame_set(recipe['frame']);objects=[bpy.data.objects[n] for n in recipe['meshes']]
+scene=bpy.context.scene;scene.frame_set(recipe['frame']);objects=[bpy.data.objects[n] for n in list(recipe['meshes'])+list(recipe.get('effect_meshes',[]))]
 # Factor/coverage masks retain their existing base-surface meaning. Beauty
 # captures include the separately qualified source hulls.
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))

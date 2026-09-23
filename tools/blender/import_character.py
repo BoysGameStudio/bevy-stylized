@@ -75,8 +75,17 @@ def main():
         configure(selected, recipe)
     # This is a named, restricted portable-reference variant, not the full
     # original material. Apply exactly the same declared restrictions upstream.
+    effect_names=list(recipe.get('effect_meshes',[]))
+    effect_objects=[bpy.data.objects.get(n) for n in effect_names]
+    if any(o is None or o.type!='MESH' for o in effect_objects):raise RuntimeError(f'recipe effect mesh missing: {effect_names}')
+    effect_materials={slot.material for obj in effect_objects for slot in obj.material_slots if slot.material}
+    if any(m is None for m in effect_materials):raise RuntimeError('effect mesh has an empty material slot')
+    for material in effect_materials:
+        if material.name not in recipe['material_roles'] or recipe['material_roles'][material.name]!='effect':
+            raise RuntimeError(f'effect material {material.name!r} must be declared with role "effect" in the recipe')
     materials={slot.material for obj in selected for slot in obj.material_slots if slot.material}
-    if {m.name for m in materials} != set(recipe['material_roles']):
+    static_roles={name for name,role in recipe['material_roles'].items() if role!='effect'}
+    if {m.name for m in materials} != static_roles:
         raise RuntimeError('selected material roles differ from recipe')
     seen_overrides=set()
     for material in materials:

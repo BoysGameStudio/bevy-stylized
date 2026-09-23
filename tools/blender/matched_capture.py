@@ -11,7 +11,7 @@ if a.out.exists():raise RuntimeError('candidate exists')
 shutil.copytree(a.case.parent,a.out,ignore=shutil.ignore_patterns('case.json'))
 scene=bpy.context.scene;scene.frame_set(recipe['frame'])
 for obj in scene.objects:
- if obj.type=='MESH':obj.hide_render=obj.name not in recipe['meshes']
+ if obj.type=='MESH':obj.hide_render=obj.name not in set(list(recipe['meshes'])+list(recipe.get('effect_meshes',[])))
 scene.render.engine='BLENDER_EEVEE';scene.eevee.taa_render_samples=1;scene.render.filter_size=.01;scene.render.dither_intensity=0;scene.render.resolution_percentage=100;scene.render.pixel_aspect_x=scene.render.pixel_aspect_y=1;scene.render.film_transparent=False;scene.render.use_compositing=False
 scene.view_settings.view_transform='Standard';scene.view_settings.look='None';scene.view_settings.exposure=0;scene.view_settings.gamma=1
 world=bpy.data.worlds.new('MatchedWorld');world.use_nodes=True;world.node_tree.nodes['Background'].inputs['Color'].default_value=tuple(j['background_linear']);scene.world=world

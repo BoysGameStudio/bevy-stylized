@@ -146,14 +146,22 @@ This branch runs before the external pupil highlight layer. It retains opaque
 surface coverage and does not enable generic additive Character emission or the
 separate authored-energy policy.
 
-The two excluded Odette effect meshes remain in the source blend. In the inspected
-3.6.9 import, their materials use the GI Body group with Alpha disabled and noise
-or mask images in the diffuse slot. Their raw effect JSON declares separate
-dissolve/mask/noise/Fresnel behavior that this import does not reconstruct.
-Showing those opaque fallback materials would not qualify the original effects.
-Further effect work needs an explicit source graph and texture/control mapping,
-then transparent ordering/depth and time-dependent reference cases; it cannot be
-enabled by treating diffuse Alpha as ordinary opacity.
+The static-emission recipe excludes the two Odette effect meshes; they remain in
+the source blend. In the inspected 3.6.9 import, their materials use the GI Body
+group with Alpha disabled and noise or mask images in the diffuse slot. Their raw
+effect JSON declares separate dissolve/mask/noise/Fresnel behavior that this
+import does not reconstruct. Showing those opaque fallback materials would not
+qualify the original effects.
+
+The effects recipe (`genshin-static-effects-v1`) includes both meshes through
+the recipe's optional `effect_meshes` list with material role `effect`: they
+export as opaque evaluated surfaces, and the exporter bakes the per-mesh uniform
+"Light Vectors" GN outputs (`lightDir`, `headForward`, `headUp`) into the
+handoff and sidecar `effect_lighting` map with a fail-closed uniformity check.
+This is data handoff only. Effect shading still needs an explicit source graph
+and texture/control mapping, then transparent ordering/depth and time-dependent
+reference cases; it cannot be enabled by treating diffuse Alpha as ordinary
+opacity.
 
 | Surface | Current producer behavior |
 | --- | --- |

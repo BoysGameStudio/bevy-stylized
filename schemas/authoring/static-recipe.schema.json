@@ -56,6 +56,15 @@
       "minItems": 1,
       "uniqueItems": true
     },
+    "effect_meshes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true,
+      "default": [],
+      "description": "Optional effect meshes (skirt ribbons with \"Light Vectors\" GN modifiers); evaluated with their GN outputs baked into the handoff effect_lighting entries. Absence preserves the static body/face scope exactly."
+    },
     "material_roles": {
       "type": "object",
       "additionalProperties": {
@@ -64,7 +73,8 @@
           "hair",
           "face",
           "brow",
-          "pupil"
+          "pupil",
+          "effect"
         ]
       }
     },
