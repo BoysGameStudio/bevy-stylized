@@ -20,9 +20,7 @@ use bevy::{
     window::{ExitCondition, WindowPlugin},
 };
 use bevy_stylized::prelude::*;
-use golden_harness::{
-    CapturedImage, GoldenProvenance, Tolerance, capture, diff_rgba8,
-};
+use golden_harness::{CapturedImage, GoldenProvenance, Tolerance, capture, diff_rgba8};
 use scenario_model::ident::SessionId;
 use scene_runtime::{Settle, capture_in_app};
 use scenes::CameraRecipe;
@@ -136,7 +134,10 @@ fn evaluate_case(
         );
         let target = golden_harness::resolve_capture_paths(dir, name, platform);
         golden_harness::write_baseline(&target, captured, &mut provenance)?;
-        eprintln!("[baselined] {fixture_prefix}/{name} -> {}", target.png.display());
+        eprintln!(
+            "[baselined] {fixture_prefix}/{name} -> {}",
+            target.png.display()
+        );
         return Ok(true);
     }
     let (baseline, _) = golden_harness::read_baseline(&paths)?;
@@ -163,7 +164,9 @@ fn evaluate_case(
         // accepted (fixtures/README.md).
         let overlay = golden_harness::resolve_capture_paths(dir, name, platform);
         golden_harness::write_baseline(&overlay, captured, &mut provenance)?;
-        eprintln!("[overlay-candidate] {platform}/{fixture_prefix}/{name} (canonical baseline unchanged)");
+        eprintln!(
+            "[overlay-candidate] {platform}/{fixture_prefix}/{name} (canonical baseline unchanged)"
+        );
         return Ok(true);
     }
     Ok(report.passed)

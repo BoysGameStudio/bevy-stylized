@@ -24,9 +24,7 @@ use bevy::{
 };
 use bevy_stylized::prelude::*;
 use bevy_stylized::stylized_render::screen_outline::StylizedScreenOutlineOverlay;
-use golden_harness::{
-    CapturedImage, GoldenProvenance, Tolerance, capture, diff_rgba8,
-};
+use golden_harness::{CapturedImage, GoldenProvenance, Tolerance, capture, diff_rgba8};
 
 const SIZE: u32 = 512;
 
@@ -295,7 +293,10 @@ fn outline_advanced_hull_screen_hybrid() {
             let target = golden_harness::resolve_capture_paths(&dir, name, &platform);
             golden_harness::write_baseline(&target, &frame, &mut provenance)
                 .expect("write baseline");
-            eprintln!("[baselined] outline-advanced/{name} -> {}", target.png.display());
+            eprintln!(
+                "[baselined] outline-advanced/{name} -> {}",
+                target.png.display()
+            );
             continue;
         }
         let (baseline, _) = golden_harness::read_baseline(&paths).expect("read baseline");
@@ -316,7 +317,9 @@ fn outline_advanced_hull_screen_hybrid() {
             let overlay = golden_harness::resolve_capture_paths(&dir, name, &platform);
             golden_harness::write_baseline(&overlay, &frame, &mut provenance)
                 .expect("write overlay candidate");
-            eprintln!("[overlay-candidate] {platform}/outline-advanced/{name} (canonical baseline unchanged)");
+            eprintln!(
+                "[overlay-candidate] {platform}/outline-advanced/{name} (canonical baseline unchanged)"
+            );
             continue;
         }
         assert!(

@@ -27,9 +27,7 @@ use bevy::{
 };
 use bevy_stylized::prelude::*;
 use bevy_stylized::stylized_render::{StylizedOutlineParams, StylizedRenderCapabilities};
-use golden_harness::{
-    CapturedImage, GoldenProvenance, Tolerance, capture, diff_rgba8,
-};
+use golden_harness::{CapturedImage, GoldenProvenance, Tolerance, capture, diff_rgba8};
 use scenario_model::ident::SessionId;
 use scene_runtime::{Settle, capture_in_app};
 use scenes::CameraRecipe;
