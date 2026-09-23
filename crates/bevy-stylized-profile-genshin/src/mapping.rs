@@ -345,9 +345,18 @@ pub fn map_bundle(
                     ("face_softness".into(), m.face_softness),
                 ]);
             }
-            GenshinMaterialRole::Brow
-            | GenshinMaterialRole::Pupil
-            | GenshinMaterialRole::Effect => {}
+            GenshinMaterialRole::Brow | GenshinMaterialRole::Pupil => {}
+            GenshinMaterialRole::Effect => {
+                // Effect surfaces use the shared ramp closure (the exporter
+                // resolves the Body/Hair switch to one authored ramp).
+                texture(
+                    m.ramp
+                        .as_deref()
+                        .ok_or_else(|| format!("{}: effect ramp required", m.name))?,
+                    StylizedTextureSemantic::Ramp,
+                )?;
+                descriptor.static_params.insert("genshin_ramp".into(), 1.0);
+            }
         }
         if let Some(lighting) = &m.lighting {
             if matches!(
@@ -666,7 +675,7 @@ mod tests {
         assert!(map_bundle(&i).is_err());
     }
     #[test]
-    fn effect_role_maps_without_ilm_or_ramp() {
+    fn effect_role_maps_with_ramp_and_optional_ilm() {
         let mut i = input();
         {
             let m = &mut i.materials[0];
@@ -677,28 +686,30 @@ mod tests {
         // Effect surfaces are source-HASHED: the alpha mask cutoff is required.
         assert!(map_bundle(&i).is_err());
         i.materials[0].alpha_mask = Some(0.5);
+        // The shared ramp closure is required for effect surfaces.
+        assert!(map_bundle(&i).is_err());
+        i.materials[0].ramp = Some("textures/ramp.png".into());
         let mapped = map_bundle(&i).unwrap();
         let d = &mapped["effect"];
-        assert_eq!(d.textures.len(), 1);
-        assert_eq!(d.textures[0].semantic, StylizedTextureSemantic::Color);
-        assert!(!d.static_params.contains_key("genshin_ramp"));
+        assert_eq!(d.textures.len(), 2);
+        assert_eq!(d.textures[1].semantic, StylizedTextureSemantic::Ramp);
+        assert_eq!(d.static_params["genshin_ramp"], 1.0);
         assert!(d.static_flags.alpha_test);
         assert_eq!(d.static_params["alpha_cutoff"], 0.5);
-        // An authored ILM is optional for effect surfaces; keep it when present.
+        // An authored ILM is kept when present (the wiring may feed any image).
         let mut i = body_input();
         let m = &mut i.materials[0];
         m.name = "effect".into();
         m.role = GenshinMaterialRole::Effect;
-        m.ramp = None;
         m.alpha_mask = Some(0.5);
         let mapped = map_bundle(&i).unwrap();
         let d = &mapped["effect"];
-        assert_eq!(d.textures.len(), 2);
+        assert_eq!(d.textures.len(), 3);
+        assert_eq!(d.textures[1].semantic, StylizedTextureSemantic::Ramp);
         assert_eq!(
-            d.textures[1].semantic,
+            d.textures[2].semantic,
             StylizedTextureSemantic::ContinuousMask
         );
-        assert!(!d.static_params.contains_key("genshin_ramp"));
     }
 
     #[test]

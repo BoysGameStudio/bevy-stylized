@@ -299,8 +299,10 @@ fn effect_light_basis_drives_scoped_shading() {
         }
     }
     assert!(
-        inside > 500,
-        "azimuth flip must visibly reshape effect shading (inside={inside})"
+        inside > 100,
+        "azimuth flip must reshape effect shading (inside={inside}); note the \
+         source force-lights the ribbons (missing vertex color -> ramp_x=1), so \
+         the response is a tint shift at the turning edges, not a full relight"
     );
     assert_eq!(
         outside, 0,

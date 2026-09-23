@@ -158,34 +158,43 @@ def main():
                 if image:
                     dest=textures/(safe+'_ilm.png');image.save(filepath=str(dest));item['ilm']='textures/'+dest.name
         if role in {'body','hair','effect'}:
-            ilms={n.image.name:n.image for n in mat.node_tree.nodes if n.type=='TEX_IMAGE' and n.image and n.image.name.endswith('_Lightmap.png')}
             if role=='effect':
-                # Effect surfaces: authored ILM optional (Eff_002 has none).
-                # Source blend is HASHED dither; ADR-0023 qualifies Opaque/Mask
-                # only, so the handoff carries an explicit mask cutoff.
+                # Effect surfaces: source blend is HASHED dither; ADR-0023
+                # qualifies Opaque/Mask only, so the handoff carries an
+                # explicit mask cutoff. ILM follows the material's actual
+                # Lightmap Lerp wiring (Eff_002 feeds its mask image as
+                # lightmap; a *_Lightmap.png name search would drop it).
                 if mat.blend_method!='HASHED':raise RuntimeError(f'effect material blend method changed: {mat.name}: {mat.blend_method}')
                 item['alpha_mask']=0.5
-                if len(ilms)>1:raise RuntimeError(f'expected at most one authored ILM image: {mat.name}: {list(ilms)}')
-                if ilms:
-                    image=next(iter(ilms.values()));dest=textures/(safe+'_ilm.png');image.save(filepath=str(dest));item['ilm']='textures/'+dest.name
+                lerp=mat.node_tree.nodes.get('Lightmap Lerp')
+                images={link.from_node.image for inp in (lerp.inputs if lerp else []) for link in inp.links if link.from_node.type=='TEX_IMAGE' and link.from_node.image}
+                if len(images)!=1:raise RuntimeError(f'expected one effect lightmap image for {mat.name}: {[i.name for i in images]}')
+                image=next(iter(images));dest=textures/(safe+'_ilm.png');image.save(filepath=str(dest));item['ilm']='textures/'+dest.name
             else:
+                ilms={n.image.name:n.image for n in mat.node_tree.nodes if n.type=='TEX_IMAGE' and n.image and n.image.name.endswith('_Lightmap.png')}
                 if len(ilms)!=1:raise RuntimeError(f'expected one authored ILM image: {mat.name}: {list(ilms)}')
                 image=next(iter(ilms.values()));dest=textures/(safe+'_ilm.png');image.save(filepath=str(dest));item['ilm']='textures/'+dest.name
             # Read the actual shader closure; the top-level ramp preview can be disconnected.
+            imgs=[];seen=set()
+            def collect_ramps(tree):
+                if tree.as_pointer() in seen:return
+                seen.add(tree.as_pointer())
+                for node in tree.nodes:
+                    if node.type=='TEX_IMAGE' and node.image and 'shadow_ramp' in node.image.name.lower():imgs.append(node.image)
+                    elif node.type=='GROUP' and node.node_tree:collect_ramps(node.node_tree)
+            collect_ramps(group.node_tree)
+            unique={i.name:i for i in imgs}
             if role=='effect':
-                pass
-            else:
-                imgs=[];seen=set()
-                def collect_ramps(tree):
-                    if tree.as_pointer() in seen:return
-                    seen.add(tree.as_pointer())
-                    for node in tree.nodes:
-                        if node.type=='TEX_IMAGE' and node.image and 'shadow_ramp' in node.image.name.lower():imgs.append(node.image)
-                        elif node.type=='GROUP' and node.node_tree:collect_ramps(node.node_tree)
-                collect_ramps(group.node_tree)
-                unique={i.name:i for i in imgs}
-                if len(unique)!=1:raise RuntimeError(f'expected one authored ramp for {mat.name}: {list(unique)}')
-                dest=textures/(safe+'_ramp.png');next(iter(unique.values())).save(filepath=str(dest));item['ramp']='textures/'+dest.name
+                # The shared base GI Body variant carries both body and hair
+                # ramps; the material's 'Body / Hair' switch selects.
+                switch=group.inputs['Body / Hair'].default_value
+                if switch not in (0.0,1.0):raise RuntimeError(f'unsupported Body/Hair switch for {mat.name}: {switch}')
+                want='hair' if switch>=0.5 else 'body'
+                selected=[i for i in unique.values() if want in i.name.lower()]
+                if len(selected)!=1:raise RuntimeError(f'expected one {want} ramp for {mat.name}: {sorted(unique)}')
+                unique={selected[0].name:selected[0]}
+            if len(unique)!=1:raise RuntimeError(f'expected one authored ramp for {mat.name}: {list(unique)}')
+            dest=textures/(safe+'_ramp.png');next(iter(unique.values())).save(filepath=str(dest));item['ramp']='textures/'+dest.name
         if role=='face':
             item['face_tints']={key:[list(group.inputs[label+('' if i==0 else ' '+str(i+1))].default_value) for i in range(3)] for key,label in [('day','Daytime Shadow Color'),('night','Nighttime Shadow Color')]}
             face_object=next(o for o in source_objects if mat in list(o.data.materials))

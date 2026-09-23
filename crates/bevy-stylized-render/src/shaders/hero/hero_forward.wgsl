@@ -405,7 +405,10 @@ fn fragment(vertex: VertexOutput, @builtin(front_facing) front_facing: bool) -> 
             //     × (vcolG × 2) × RampWidth)
             // Y accounts for top-down PNG rows; day uses the upper half.
             // 我方 day_night 约定 1=昼（face_misc.w，材质静态）。
-            var vcol_g = 1.0;
+            // 缺失顶点色 = 黑（EEVEE 已核实：未设置/未命名的 Col 属性读出
+            // (0,0,0)）——vcol_g=0 使分母为零、Blender 除法得 0、ramp_x=1
+            // （全亮），这是 Eff 网格（无 Col）的上游行为。
+            var vcol_g = 0.0;
 #ifdef VERTEX_COLORS
             vcol_g=pow(select(max(in.color.g,0.0),clamp(in.color.g,0.0,1.0),material.source_conventions.y>0.5),0.4545);
 #endif
