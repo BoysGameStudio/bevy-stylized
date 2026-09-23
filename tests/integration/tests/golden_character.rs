@@ -21,7 +21,7 @@ use bevy::{
 };
 use bevy_stylized::prelude::*;
 use golden_harness::{
-    CapturedImage, GoldenPaths, GoldenProvenance, Tolerance, capture, diff_rgba8,
+    CapturedImage, GoldenProvenance, Tolerance, capture, diff_rgba8,
 };
 use scenario_model::ident::SessionId;
 use scene_runtime::{Settle, capture_in_app};
@@ -84,6 +84,13 @@ fn gpu_info(app: &App) -> (String, String) {
         .unwrap_or_else(|| ("unknown".to_owned(), "unknown".to_owned()))
 }
 
+fn gpu_backend(app: &App) -> String {
+    app.world()
+        .get_resource::<RenderAdapterInfo>()
+        .map(|info| format!("{:?}", info.backend))
+        .unwrap_or_else(|| "unknown".to_owned())
+}
+
 /// 经 CaseDriver 观测周期捕获（settle→observe；帧语义与旧手写
 /// "SETTLE_FRAMES 次 update 后请求、下一帧提取"逐帧一致）。
 fn capture_frame(app: &mut App) -> CapturedImage {
@@ -106,8 +113,9 @@ fn evaluate_case(
     gpu: &str,
     driver: &str,
     fixture_prefix: &str,
+    platform: &str,
 ) -> Result<bool, Box<dyn std::error::Error>> {
-    let paths = GoldenPaths::new(dir, name);
+    let paths = golden_harness::resolve_baseline_paths(dir, name, platform);
     let mut provenance = GoldenProvenance::for_capture(
         "engine-golden-v1",
         None,
@@ -126,8 +134,9 @@ fn evaluate_case(
             std::env::var("GOLDEN_REBASELINE").as_deref() == Ok("1"),
             "accepted baseline missing; capture/accept explicitly"
         );
-        golden_harness::write_baseline(&paths, captured, &mut provenance)?;
-        eprintln!("[baselined] {fixture_prefix}/{name}");
+        let target = golden_harness::resolve_capture_paths(dir, name, platform);
+        golden_harness::write_baseline(&target, captured, &mut provenance)?;
+        eprintln!("[baselined] {fixture_prefix}/{name} -> {}", target.png.display());
         return Ok(true);
     }
     let (baseline, _) = golden_harness::read_baseline(&paths)?;
@@ -145,6 +154,18 @@ fn evaluate_case(
         report.stats.mean_absolute_delta,
         report.stats.psnr_db,
     );
+    if !report.passed
+        && std::env::var("GOLDEN_REBASELINE").as_deref() == Ok("1")
+        && platform != golden_harness::CANONICAL_GOLDEN_PLATFORM
+    {
+        // Explicit platform-overlay capture: the canonical baseline stays
+        // untouched; the overlay image is a candidate until reviewed and
+        // accepted (fixtures/README.md).
+        let overlay = golden_harness::resolve_capture_paths(dir, name, platform);
+        golden_harness::write_baseline(&overlay, captured, &mut provenance)?;
+        eprintln!("[overlay-candidate] {platform}/{fixture_prefix}/{name} (canonical baseline unchanged)");
+        return Ok(true);
+    }
     Ok(report.passed)
 }
 
@@ -304,6 +325,7 @@ fn character_synthetic_golden() {
     synthetic_character_scene(&mut app);
     let captured = capture_frame(&mut app);
     let (gpu, driver) = gpu_info(&app);
+    let platform = golden_harness::current_golden_platform(&gpu_backend(&app));
     let ok = evaluate_case(
         &golden_dir(),
         "face_sdf_instances",
@@ -311,6 +333,7 @@ fn character_synthetic_golden() {
         &gpu,
         &driver,
         "character-portable",
+        &platform,
     )
     .expect("golden evaluation");
     assert!(ok, "character synthetic case exceeded tolerance");

@@ -16,8 +16,9 @@ pub use capture::{
 };
 pub use diff::{DiffReport, DiffStats, Tolerance, diff_rgba8, evaluate};
 pub use golden::{
-    GoldenError, GoldenPaths, GoldenProvenance, decode_png, encode_png, engine_git_commit,
-    fnv1a64_hex, read_baseline, write_baseline,
+    CANONICAL_GOLDEN_PLATFORM, GoldenError, GoldenPaths, GoldenProvenance, current_golden_platform,
+    decode_png, encode_png, engine_git_commit, fnv1a64_hex, read_baseline, resolve_baseline_paths,
+    resolve_capture_paths, write_baseline,
 };
 pub use tier2::{
     Tier2RegionReport, Tier2Report, Tier2Thresholds, evaluate_tier2, evaluate_tier2_region,

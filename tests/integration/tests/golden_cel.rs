@@ -28,7 +28,7 @@ use bevy::{
 use bevy_stylized::prelude::*;
 use bevy_stylized::stylized_render::{StylizedOutlineParams, StylizedRenderCapabilities};
 use golden_harness::{
-    CapturedImage, GoldenPaths, GoldenProvenance, Tolerance, capture, diff_rgba8,
+    CapturedImage, GoldenProvenance, Tolerance, capture, diff_rgba8,
 };
 use scenario_model::ident::SessionId;
 use scene_runtime::{Settle, capture_in_app};
@@ -126,7 +126,13 @@ fn run_case(name: &str, eye: Vec3, look: Vec3, build: impl FnOnce(&mut App)) -> 
         capabilities.resolve_error
     );
 
-    let paths = GoldenPaths::new(&golden_dir(), name);
+    let backend = app
+        .world()
+        .get_resource::<RenderAdapterInfo>()
+        .map(|info| format!("{:?}", info.backend))
+        .unwrap_or_else(|| "unknown".to_owned());
+    let platform = golden_harness::current_golden_platform(&backend);
+    let paths = golden_harness::resolve_baseline_paths(&golden_dir(), name, &platform);
     let mut provenance = GoldenProvenance::for_capture(
         "engine-golden-v1",
         None,
@@ -145,8 +151,10 @@ fn run_case(name: &str, eye: Vec3, look: Vec3, build: impl FnOnce(&mut App)) -> 
             std::env::var("GOLDEN_REBASELINE").as_deref() == Ok("1"),
             "accepted baseline missing; capture/accept explicitly"
         );
-        golden_harness::write_baseline(&paths, &captured, &mut provenance).expect("write baseline");
-        eprintln!("[baselined] {name}");
+        let target = golden_harness::resolve_capture_paths(&golden_dir(), name, &platform);
+        golden_harness::write_baseline(&target, &captured, &mut provenance)
+            .expect("write baseline");
+        eprintln!("[baselined] {name} -> {}", target.png.display());
         return true;
     }
     let (baseline, _) = golden_harness::read_baseline(&paths).expect("read baseline");
@@ -164,6 +172,19 @@ fn run_case(name: &str, eye: Vec3, look: Vec3, build: impl FnOnce(&mut App)) -> 
         report.stats.mean_absolute_delta,
         report.stats.psnr_db,
     );
+    if !report.passed
+        && std::env::var("GOLDEN_REBASELINE").as_deref() == Ok("1")
+        && platform != golden_harness::CANONICAL_GOLDEN_PLATFORM
+    {
+        // Explicit platform-overlay capture: the canonical baseline stays
+        // untouched; the overlay image is a candidate until reviewed and
+        // accepted (fixtures/README.md).
+        let overlay = golden_harness::resolve_capture_paths(&golden_dir(), name, &platform);
+        golden_harness::write_baseline(&overlay, &captured, &mut provenance)
+            .expect("write overlay candidate");
+        eprintln!("[overlay-candidate] {platform}/{name} (canonical baseline unchanged)");
+        return true;
+    }
     report.passed
 }
 

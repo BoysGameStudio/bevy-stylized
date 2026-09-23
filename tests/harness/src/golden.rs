@@ -126,6 +126,48 @@ impl GoldenPaths {
     }
 }
 
+/// The canonical golden host (docs/reference/08 §1): only Linux/Vulkan writes
+/// canonical baselines; every other platform reads/writes its overlay.
+pub const CANONICAL_GOLDEN_PLATFORM: &str = "linux-vulkan";
+
+/// The current platform's golden identity: `<os>-<backend>` (lowercase), e.g.
+/// `macos-metal`. The backend string must come from the actual render adapter
+/// (`RenderAdapterInfo.backend`), never from a guess, so a capture cannot
+/// masquerade under another platform's overlay.
+#[must_use]
+pub fn current_golden_platform(backend: &str) -> String {
+    format!("{}-{}", std::env::consts::OS, backend.to_lowercase())
+}
+
+/// Baseline lookup for comparison: a platform overlay case
+/// (`<directory>/<platform>/<case>`) wins when present; otherwise the canonical
+/// baseline applies. A missing overlay case is never a silent pass — the
+/// canonical baseline decides, and on a platform where the capture genuinely
+/// differs the comparison fails until the overlay is explicitly captured,
+/// reviewed and accepted.
+#[must_use]
+pub fn resolve_baseline_paths(directory: &Path, case: &str, platform: &str) -> GoldenPaths {
+    if platform != CANONICAL_GOLDEN_PLATFORM {
+        let overlay = GoldenPaths::new(&directory.join(platform), case);
+        if overlay.baseline_exists() {
+            return overlay;
+        }
+    }
+    GoldenPaths::new(directory, case)
+}
+
+/// Capture target for an accepted-candidate write: the canonical set on the
+/// canonical host, the platform overlay everywhere else. A non-canonical
+/// capture never overwrites the canonical baseline.
+#[must_use]
+pub fn resolve_capture_paths(directory: &Path, case: &str, platform: &str) -> GoldenPaths {
+    if platform == CANONICAL_GOLDEN_PLATFORM {
+        GoldenPaths::new(directory, case)
+    } else {
+        GoldenPaths::new(&directory.join(platform), case)
+    }
+}
+
 /// Errors produced while reading or writing golden baselines.
 #[derive(Debug, thiserror::Error)]
 pub enum GoldenError {
@@ -303,5 +345,61 @@ mod tests {
         let paths = GoldenPaths::new(directory.path(), "absent");
         assert!(!paths.baseline_exists());
         assert!(read_baseline(&paths).is_err());
+    }
+
+    #[test]
+    fn platform_overlay_resolution_is_explicit_and_scoped() {
+        let directory = tempfile::tempdir().expect("tempdir");
+        let captured = sample_image();
+        let mut provenance = GoldenProvenance::for_capture(
+            "engine-golden-v1",
+            None,
+            "test-fixtures",
+            None,
+            "blender-gltf-npr-v1",
+            "gacha/v1",
+            "case_a",
+            "test-renderer",
+            "test-gpu",
+            "test-driver",
+            &captured,
+        );
+        // Canonical baseline exists: every platform falls back to it.
+        let canonical = GoldenPaths::new(directory.path(), "case_a");
+        write_baseline(&canonical, &captured, &mut provenance).expect("write");
+        assert_eq!(
+            resolve_baseline_paths(directory.path(), "case_a", "macos-metal"),
+            canonical
+        );
+        assert_eq!(
+            resolve_baseline_paths(directory.path(), "case_a", CANONICAL_GOLDEN_PLATFORM),
+            canonical
+        );
+        // An overlay entry wins, but only for its own platform.
+        let mut darker = captured.clone();
+        darker.data[0] ^= 64;
+        let overlay = resolve_capture_paths(directory.path(), "case_a", "macos-metal");
+        assert_ne!(overlay, canonical);
+        write_baseline(&overlay, &darker, &mut provenance).expect("write overlay");
+        let resolved = resolve_baseline_paths(directory.path(), "case_a", "macos-metal");
+        assert_eq!(resolved, overlay);
+        let (pixels, _) = read_baseline(&resolved).expect("read overlay");
+        assert_eq!(pixels, darker);
+        // Another platform (or the canonical host) never sees the overlay.
+        assert_eq!(
+            resolve_baseline_paths(directory.path(), "case_a", "windows-vulkan"),
+            canonical
+        );
+        // Capture routing: canonical host writes canonical; others write overlay.
+        assert_eq!(
+            resolve_capture_paths(directory.path(), "case_a", CANONICAL_GOLDEN_PLATFORM),
+            canonical
+        );
+        // A missing overlay case still resolves to the canonical baseline
+        // (the diff decides; absence is never a silent pass).
+        assert_eq!(
+            resolve_baseline_paths(directory.path(), "case_b", "macos-metal"),
+            GoldenPaths::new(directory.path(), "case_b")
+        );
     }
 }

@@ -9,7 +9,18 @@
 For the same device, toolchain and declared scene: maximum normalized channel delta
 ≤ 2/255, mean delta ≤ 0.5/255, PSNR ≥ 48 dB. Exact pixel equality is preferred.
 Different GPU/driver qualification requires its own measured policy; no additional
-platform is declared supported from the current Linux/Vulkan evidence.
+platform is declared supported from the current Linux/Vulkan evidence alone.
+
+The canonical golden baseline host is Linux/Vulkan. A non-canonical platform
+qualifies through the measured **platform overlay** mechanism
+([fixtures/README.md](../../fixtures/README.md#golden-platform-overlays)): the
+canonical baselines stay byte-identical, and an overlay holds only the cases whose
+deltas are root-caused platform truth (e.g. cross-vendor rounding at numerically
+hypersensitive boundaries), each captured through the normal capture path on the
+qualified device and accepted by review. An overlay never relaxes a threshold —
+the overlay image replaces the comparison input for that platform, with its own
+provenance. Same-toolchain reproduction criteria above apply unchanged to
+repeat captures within each platform.
 
 ## 2. Normalize the compared case
 

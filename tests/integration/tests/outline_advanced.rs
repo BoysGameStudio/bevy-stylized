@@ -25,7 +25,7 @@ use bevy::{
 use bevy_stylized::prelude::*;
 use bevy_stylized::stylized_render::screen_outline::StylizedScreenOutlineOverlay;
 use golden_harness::{
-    CapturedImage, GoldenPaths, GoldenProvenance, Tolerance, capture, diff_rgba8,
+    CapturedImage, GoldenProvenance, Tolerance, capture, diff_rgba8,
 };
 
 const SIZE: u32 = 512;
@@ -198,6 +198,7 @@ fn outline_advanced_hull_screen_hybrid() {
     let dir =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/golden/outline-advanced");
     let mut captures = Vec::new();
+    let mut platform = String::new();
     for (name, hull, screen) in [
         ("hull_only", true, false),
         ("screen_only", false, true),
@@ -206,6 +207,12 @@ fn outline_advanced_hull_screen_hybrid() {
         let mut app = headless_app(resources.clone());
         build_scene(&mut app, hull);
         let (frame, overlays) = capture_frame(&mut app, screen);
+        platform = golden_harness::current_golden_platform(
+            &app.world()
+                .get_resource::<bevy::render::renderer::RenderAdapterInfo>()
+                .map(|info| format!("{:?}", info.backend))
+                .unwrap_or_else(|| "unknown".to_owned()),
+        );
         // screen 开启时必须有 overlay；关闭时必须没有。
         assert_eq!(overlays > 0, screen, "{name}: overlay presence");
         let diagnostics = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -256,7 +263,7 @@ fn outline_advanced_hull_screen_hybrid() {
 
     // baseline / diff
     for (name, frame) in captures {
-        let paths = GoldenPaths::new(&dir, name);
+        let paths = golden_harness::resolve_baseline_paths(&dir, name, &platform);
         let mut provenance = GoldenProvenance::for_capture(
             "engine-golden-v1",
             None,
@@ -275,9 +282,10 @@ fn outline_advanced_hull_screen_hybrid() {
                 std::env::var("GOLDEN_REBASELINE").as_deref() == Ok("1"),
                 "accepted baseline missing; capture/accept explicitly"
             );
-            golden_harness::write_baseline(&paths, &frame, &mut provenance)
+            let target = golden_harness::resolve_capture_paths(&dir, name, &platform);
+            golden_harness::write_baseline(&target, &frame, &mut provenance)
                 .expect("write baseline");
-            eprintln!("[baselined] outline-advanced/{name}");
+            eprintln!("[baselined] outline-advanced/{name} -> {}", target.png.display());
             continue;
         }
         let (baseline, _) = golden_harness::read_baseline(&paths).expect("read baseline");
@@ -288,6 +296,19 @@ fn outline_advanced_hull_screen_hybrid() {
             stats,
             Tolerance::default(),
         );
+        if !report.passed
+            && std::env::var("GOLDEN_REBASELINE").as_deref() == Ok("1")
+            && platform != golden_harness::CANONICAL_GOLDEN_PLATFORM
+        {
+            // Explicit platform-overlay capture: the canonical baseline stays
+            // untouched; the overlay image is a candidate until reviewed and
+            // accepted (fixtures/README.md).
+            let overlay = golden_harness::resolve_capture_paths(&dir, name, &platform);
+            golden_harness::write_baseline(&overlay, &frame, &mut provenance)
+                .expect("write overlay candidate");
+            eprintln!("[overlay-candidate] {platform}/outline-advanced/{name} (canonical baseline unchanged)");
+            continue;
+        }
         assert!(
             report.passed,
             "outline-advanced/{name} exceeded: {:?}",
