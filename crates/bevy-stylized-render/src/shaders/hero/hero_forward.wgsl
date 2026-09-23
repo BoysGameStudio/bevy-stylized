@@ -47,6 +47,8 @@ struct HeroCharacterParams {
     palette_sharp_lit: vec4<f32>,
     palette_sharp_shadow: vec4<f32>,
     face_up: vec4<f32>,
+    // 效果网格光照基（同 CharacterParams.effect_light_dir）
+    effect_light_dir: vec4<f32>,
 }
 
 struct GenshinLightingParams {
@@ -309,6 +311,10 @@ fn fragment(vertex: VertexOutput, @builtin(front_facing) front_facing: bool) -> 
     if material.source_conventions.y>0.5 {light_direction=source_safe_normal(host_view.direction.xyz,vec3<f32>(0.0,1.0,0.0));}
     light_color=host_view.key_color.rgb;
 #endif
+    // 效果网格光照基：per-material key light 覆盖（编译期解码归一化）。
+    if material.character.effect_light_dir.w > 0.5 {
+        light_direction = material.character.effect_light_dir.xyz;
+    }
 
     var normal = normalize(in.world_normal);
     var matcap_normal = normal;

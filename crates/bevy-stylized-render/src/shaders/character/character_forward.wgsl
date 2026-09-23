@@ -52,6 +52,9 @@ struct CharacterParams {
     palette_sharp_shadow: vec4<f32>,
     // face basis 的 up（headright = normalize(cross(forward, up))）
     face_up: vec4<f32>,
+    // 效果网格光照基：xyz = per-material key light 方向（编译期解码归一化），
+    // w > 0.5 时覆盖 view 层 key light（docs/reference/03 效果网格光照基）
+    effect_light_dir: vec4<f32>,
 }
 
 const CEL_FLAG_ALPHA_MASK: u32 = 8u;
@@ -199,6 +202,10 @@ fn fragment(in: VertexOutput) -> FragmentOutput {
     light_direction=normalize(host_view.direction.xyz);
     light_color=host_view.key_color.rgb;
 #endif
+    // 效果网格光照基：per-material key light 覆盖（编译期解码归一化）。
+    if material.effect_light_dir.w > 0.5 {
+        light_direction = material.effect_light_dir.xyz;
+    }
     let normal = normalize(in.world_normal);
     let half_lambert = clamp(dot(normal, light_direction) * 0.5 + 0.5, 0.0, 1.0);
 

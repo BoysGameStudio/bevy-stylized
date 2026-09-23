@@ -137,6 +137,42 @@ pub struct GenshinMaterialInput {
     pub metallic: bool,
     pub specular_ramp: bool,
     pub packed_normal: bool,
+    /// Source HASHED/dithered transparency routed to Mask with this cutoff
+    /// (ADR-0023: only Opaque/Mask are qualified). Required for the
+    /// `effect` role; the cutoff is the explicit contract, not a default.
+    #[serde(default)]
+    pub alpha_mask: Option<f32>,
+}
+
+/// Decode the packed effect light basis (`docs/reference/03` 效果网格光照基).
+///
+/// The baked `light_direction` is a Blender `EULER_XYZ` rotation that the
+/// source "Dot Creation" group applies to the canonical vector `(0,0,-1)`
+/// (`Vector Rotate`, offset identity for the NdotL instances); the runtime
+/// direction is the rotated vector with the exporter's `[x, z, -y]`
+/// conversion, normalized. It replaces the view-level key light direction
+/// for effect surfaces; the half-lambert remap downstream is unchanged.
+pub fn decode_effect_light_direction(
+    basis: &bevy_stylized_core::StylizedEffectLightBasis,
+) -> Result<[f32; 3], String> {
+    let [rx, ry, rz] = basis.light_direction;
+    if ![rx, ry, rz].iter().all(|v| v.is_finite()) {
+        return Err("effect light rotation is not finite".into());
+    }
+    let (sx, cx) = rx.sin_cos();
+    let (sy, cy) = ry.sin_cos();
+    let (sz, cz) = rz.sin_cos();
+    // Blender Euler XYZ (extrinsic X, then Y, then Z) applied to (0,0,-1).
+    let x = -cz * sy * cx - sz * sx;
+    let y = -sz * sy * cx + cz * sx;
+    let z = -cy * cx;
+    // Exporter axis conversion [x, z, -y], then normalize.
+    let v = [x, z, -y];
+    let len = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+    if !len.is_finite() || len <= 1e-6 {
+        return Err("decoded effect light direction is degenerate".into());
+    }
+    Ok([v[0] / len, v[1] / len, v[2] / len])
 }
 
 /// Versioned authoring-to-runtime handoff. This is not a runtime sidecar.
@@ -223,12 +259,29 @@ pub fn map_bundle(
         if cross.iter().map(|v| v * v).sum::<f32>() < 1.0e-8 {
             return Err(format!("{}: degenerate face basis", m.name));
         }
+        if let Some(cutoff) = m.alpha_mask
+            && (!cutoff.is_finite() || !(0.0..1.0).contains(&cutoff))
+        {
+            return Err(format!("{}: invalid alpha mask cutoff", m.name));
+        }
+        if matches!(m.role, GenshinMaterialRole::Effect) && m.alpha_mask.is_none() {
+            return Err(format!(
+                "{}: effect surfaces require an explicit alpha mask cutoff (source HASHED)",
+                m.name
+            ));
+        }
         let mut descriptor = StylizedMaterialDescriptor {
             name: m.name.clone(),
             surface_class: StylizedSurfaceClass::Hero,
             ..Default::default()
         };
         descriptor.static_flags.double_sided = true;
+        if let Some(cutoff) = m.alpha_mask {
+            descriptor.static_flags.alpha_test = true;
+            descriptor
+                .static_params
+                .insert("alpha_cutoff".into(), cutoff);
+        }
         if m.cubic_base_color {
             descriptor
                 .static_params
@@ -601,6 +654,7 @@ mod tests {
                 metallic: false,
                 specular_ramp: false,
                 packed_normal: false,
+                alpha_mask: None,
             }],
             effect_lighting: BTreeMap::new(),
         }
@@ -614,21 +668,29 @@ mod tests {
     #[test]
     fn effect_role_maps_without_ilm_or_ramp() {
         let mut i = input();
-        let m = &mut i.materials[0];
-        m.name = "effect".into();
-        m.role = GenshinMaterialRole::Effect;
-        m.face_sdf = None;
+        {
+            let m = &mut i.materials[0];
+            m.name = "effect".into();
+            m.role = GenshinMaterialRole::Effect;
+            m.face_sdf = None;
+        }
+        // Effect surfaces are source-HASHED: the alpha mask cutoff is required.
+        assert!(map_bundle(&i).is_err());
+        i.materials[0].alpha_mask = Some(0.5);
         let mapped = map_bundle(&i).unwrap();
         let d = &mapped["effect"];
         assert_eq!(d.textures.len(), 1);
         assert_eq!(d.textures[0].semantic, StylizedTextureSemantic::Color);
         assert!(!d.static_params.contains_key("genshin_ramp"));
+        assert!(d.static_flags.alpha_test);
+        assert_eq!(d.static_params["alpha_cutoff"], 0.5);
         // An authored ILM is optional for effect surfaces; keep it when present.
         let mut i = body_input();
         let m = &mut i.materials[0];
         m.name = "effect".into();
         m.role = GenshinMaterialRole::Effect;
         m.ramp = None;
+        m.alpha_mask = Some(0.5);
         let mapped = map_bundle(&i).unwrap();
         let d = &mapped["effect"];
         assert_eq!(d.textures.len(), 2);
@@ -637,6 +699,30 @@ mod tests {
             StylizedTextureSemantic::ContinuousMask
         );
         assert!(!d.static_params.contains_key("genshin_ramp"));
+    }
+
+    #[test]
+    fn effect_light_rotation_decodes_to_runtime_direction() {
+        let basis = |light_direction| bevy_stylized_core::StylizedEffectLightBasis {
+            light_direction,
+            head_forward: [0.0, 0.0, 0.7827],
+            head_up: [0.0, 0.5384, 0.0],
+        };
+        // Locked upstream value: (-π/2, 0, 0) rotates (0,0,-1) to Blender
+        // (0,-1,0), which the [x,z,-y] conversion maps to runtime +Z.
+        let d = decode_effect_light_direction(&basis([-std::f32::consts::FRAC_PI_2, 0.0, 0.0]))
+            .unwrap();
+        assert!((d[0]).abs() < 1e-6 && d[1].abs() < 1e-6 && (d[2] - 1.0).abs() < 1e-6);
+        // Identity rotation: (0,0,-1) stays; conversion yields runtime -Y.
+        let d = decode_effect_light_direction(&basis([0.0, 0.0, 0.0])).unwrap();
+        assert!((d[0]).abs() < 1e-6 && (d[1] + 1.0).abs() < 1e-6 && d[2].abs() < 1e-6);
+        // Y-only rotation by π/2: Blender (0,0,-1) -> (-1,0,0) -> runtime -X.
+        let d =
+            decode_effect_light_direction(&basis([0.0, std::f32::consts::FRAC_PI_2, 0.0])).unwrap();
+        assert!((d[0] + 1.0).abs() < 1e-6 && d[1].abs() < 1e-6 && d[2].abs() < 1e-6);
+        // Non-finite rotations fail closed.
+        assert!(decode_effect_light_direction(&basis([f32::NAN, 0.0, 0.0])).is_err());
+        assert!(decode_effect_light_direction(&basis([f32::INFINITY, 0.0, 0.0])).is_err());
     }
     #[test]
     fn source_outline_colors_width_and_disabled_classes_are_preserved() {

@@ -161,6 +161,10 @@ def main():
             ilms={n.image.name:n.image for n in mat.node_tree.nodes if n.type=='TEX_IMAGE' and n.image and n.image.name.endswith('_Lightmap.png')}
             if role=='effect':
                 # Effect surfaces: authored ILM optional (Eff_002 has none).
+                # Source blend is HASHED dither; ADR-0023 qualifies Opaque/Mask
+                # only, so the handoff carries an explicit mask cutoff.
+                if mat.blend_method!='HASHED':raise RuntimeError(f'effect material blend method changed: {mat.name}: {mat.blend_method}')
+                item['alpha_mask']=0.5
                 if len(ilms)>1:raise RuntimeError(f'expected at most one authored ILM image: {mat.name}: {list(ilms)}')
                 if ilms:
                     image=next(iter(ilms.values()));dest=textures/(safe+'_ilm.png');image.save(filepath=str(dest));item['ilm']='textures/'+dest.name

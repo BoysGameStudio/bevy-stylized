@@ -57,8 +57,9 @@ pub const CHAR_FLAG_PORTABLE_FALLBACK: u32 = 1 << 4;
 /// Character 材质 GPU uniform（cel 基础 + character 扩展，packed，
 /// 禁止 per-feature UBO）。
 ///
-/// 布局（13×vec4 = 208B，单 UBO）：cel 基础 4 + face_forward/face_misc/
-/// hair/emission 4 + palette 4（sharp/soft × lit/shadow）+ face_up。
+/// 布局（14×vec4 = 224B，单 UBO）：cel 基础 4 + face_forward/face_misc/
+/// hair/emission 4 + palette 4（sharp/soft × lit/shadow）+ face_up +
+/// effect_light_dir。
 ///
 /// Palette 语义（docs/reference/07 §3.7，已核实）：sharp/soft 双档光色与
 /// 双档阴影色为**串联相乘**结构——soft = lerp(softShadow, softLit,
@@ -93,6 +94,11 @@ pub struct StylizedCharacterParams {
     /// face basis 的 up 向量（head basis：headright =
     /// normalize(cross(forward, up))，docs/reference/07 §3.3 已核实）。
     pub face_up: bevy::math::Vec4,
+    /// 效果网格光照基：xyz = per-material key light 方向（编译期从打包
+    /// rotation 解码并归一化；docs/reference/03 效果网格光照基），w = 启用
+    /// （>0.5 时覆盖 view 层 key light）。零向量 = 禁用（默认；非效果材质
+    /// 不变）。
+    pub effect_light_dir: bevy::math::Vec4,
 }
 
 impl Default for StylizedCharacterParams {
@@ -110,6 +116,7 @@ impl Default for StylizedCharacterParams {
             palette_sharp_lit: bevy::math::Vec4::ONE,
             palette_sharp_shadow: bevy::math::Vec4::new(0.7, 0.7, 0.75, 1.0),
             face_up: bevy::math::Vec4::Y,
+            effect_light_dir: bevy::math::Vec4::ZERO,
         }
     }
 }
@@ -126,6 +133,19 @@ impl StylizedCharacterParams {
         self.face_forward_softness =
             bevy::math::Vec4::new(forward.x, forward.y, forward.z, softness.max(0.0001));
         self.face_up = bevy::math::Vec4::new(up.x, up.y, up.z, 0.0);
+        self
+    }
+
+    /// 设置效果网格光照基（per-material key light 覆盖）。零/非有限方向
+    /// = 禁用，绝不半覆盖。
+    #[must_use]
+    pub fn with_effect_light_dir(mut self, direction: bevy::math::Vec3) -> Self {
+        let dir = direction.normalize_or_zero();
+        self.effect_light_dir = if dir == bevy::math::Vec3::ZERO {
+            bevy::math::Vec4::ZERO
+        } else {
+            dir.extend(1.0)
+        };
         self
     }
 
@@ -410,6 +430,18 @@ impl StylizedCharacterMaterial {
                 ),
                 intensity,
             );
+        }
+        // 效果网格光照基：per-material key light 覆盖。编译期 join 已解码并
+        // 归一化（fail-closed）；with_effect_light_dir 防御性归一化，退化
+        // 输入 = 禁用而不是半覆盖。
+        if let (Some(x), Some(y), Some(z)) = (
+            get("effect_light_dir_0"),
+            get("effect_light_dir_1"),
+            get("effect_light_dir_2"),
+        ) {
+            material.params = material
+                .params
+                .with_effect_light_dir(bevy::math::Vec3::new(x, y, z));
         }
         material.sync_flags();
         material

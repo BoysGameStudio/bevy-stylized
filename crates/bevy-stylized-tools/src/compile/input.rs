@@ -173,6 +173,101 @@ pub(super) fn material_inputs(
     }
 }
 
+/// Join the mesh-keyed effect light basis onto the mapped material
+/// descriptors via GLB node names (`runtime_<mesh>`), decoding the packed
+/// source rotation into a runtime light direction (`effect_light_dir_*`
+/// static params). Fail-closed: every baked mesh needs its node, every
+/// effect-role material needs exactly one basis, and no basis may leak onto
+/// a non-effect mesh.
+#[cfg(feature = "profile-genshin")]
+fn inject_effect_light_basis(
+    scene: &gltf::Gltf,
+    input: &bevy_stylized_profile_genshin::GenshinBundleInput,
+    materials: &mut BTreeMap<String, StylizedMaterialDescriptor>,
+) -> Result<(), String> {
+    use bevy_stylized_profile_genshin::GenshinMaterialRole;
+    let effect_roles: std::collections::BTreeSet<&str> = input
+        .materials
+        .iter()
+        .filter(|m| matches!(m.role, GenshinMaterialRole::Effect))
+        .map(|m| m.name.as_str())
+        .collect();
+    if input.effect_lighting.is_empty() {
+        return if effect_roles.is_empty() {
+            Ok(())
+        } else {
+            Err("effect-role materials without baked effect_lighting".into())
+        };
+    }
+    let mut assigned: BTreeMap<String, [f32; 3]> = BTreeMap::new();
+    let mut seen_meshes: std::collections::BTreeSet<&str> = Default::default();
+    for node in scene.nodes() {
+        let Some(mesh_name) = node.name().and_then(|n| n.strip_prefix("runtime_")) else {
+            continue;
+        };
+        let basis = input.effect_lighting.get(mesh_name);
+        let Some(mesh) = node.mesh() else { continue };
+        for primitive in mesh.primitives() {
+            let Some(material) = primitive.material().name() else {
+                continue;
+            };
+            match basis {
+                Some(basis) => {
+                    seen_meshes.insert(mesh_name);
+                    if !effect_roles.contains(material) {
+                        return Err(format!(
+                            "effect mesh {mesh_name} uses non-effect material {material}"
+                        ));
+                    }
+                    let dir = bevy_stylized_profile_genshin::decode_effect_light_direction(basis)
+                        .map_err(|e| format!("{mesh_name}: {e}"))?;
+                    if let Some(previous) = assigned.get(material) {
+                        if previous != &dir {
+                            return Err(format!(
+                                "effect material {material} receives conflicting light bases"
+                            ));
+                        }
+                    } else {
+                        assigned.insert(material.to_owned(), dir);
+                    }
+                }
+                None => {
+                    if effect_roles.contains(material) {
+                        return Err(format!(
+                            "effect material {material} leaks onto non-effect mesh {mesh_name}"
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    for mesh_name in input.effect_lighting.keys() {
+        if !seen_meshes.contains(mesh_name.as_str()) {
+            return Err(format!(
+                "effect mesh {mesh_name} has no runtime node in the GLB"
+            ));
+        }
+    }
+    for role_material in &effect_roles {
+        if !assigned.contains_key(*role_material) {
+            return Err(format!(
+                "effect material {role_material} received no baked light basis"
+            ));
+        }
+    }
+    for (material, dir) in assigned {
+        let descriptor = materials
+            .get_mut(&material)
+            .ok_or_else(|| format!("effect material {material} missing from mapped materials"))?;
+        for (i, v) in dir.iter().enumerate() {
+            descriptor
+                .static_params
+                .insert(format!("effect_light_dir_{i}"), *v);
+        }
+    }
+    Ok(())
+}
+
 fn load_profile_materials(
     path: &Path,
     profile: &str,
@@ -193,8 +288,9 @@ fn load_profile_materials(
         let data = std::fs::read(&source).map_err(|e| format!("{}: {e}", source.display()))?;
         let input: bevy_stylized_profile_genshin::GenshinBundleInput =
             serde_json::from_slice(&data).map_err(|e| e.to_string())?;
-        let materials = bevy_stylized_profile_genshin::map_bundle(&input)?;
+        let mut materials = bevy_stylized_profile_genshin::map_bundle(&input)?;
         let scene = gltf::Gltf::open(path).map_err(|e| e.to_string())?;
+        inject_effect_light_basis(&scene, &input, &mut materials)?;
         for primitive in scene.meshes().flat_map(|m| m.primitives()) {
             let Some(material) = primitive.material().name().and_then(|n| materials.get(n)) else {
                 continue;

@@ -155,13 +155,55 @@ qualify the original effects.
 
 The effects recipe (`genshin-static-effects-v1`) includes both meshes through
 the recipe's optional `effect_meshes` list with material role `effect`: they
-export as opaque evaluated surfaces, and the exporter bakes the per-mesh uniform
-"Light Vectors" GN outputs (`lightDir`, `headForward`, `headUp`) into the
-handoff and sidecar `effect_lighting` map with a fail-closed uniformity check.
-This is data handoff only. Effect shading still needs an explicit source graph
-and texture/control mapping, then transparent ordering/depth and time-dependent
-reference cases; it cannot be enabled by treating diffuse Alpha as ordinary
-opacity.
+export as evaluated surfaces with an explicit alpha mask (see below), and the
+exporter bakes the per-mesh uniform "Light Vectors" GN outputs (`lightDir`,
+`headForward`, `headUp`) into the handoff and sidecar `effect_lighting` map
+with a fail-closed uniformity check.
+
+### Effect light basis decode (verified against the locked 3.6.9 import)
+
+Production side (GN "Light Vectors" group, per-mesh uniform outputs):
+
+- `lightDir` is the `Object Info.Rotation` of the recipe's light proxy: an
+  EULER_XYZ rotation triple, **not** a direction vector. Locked static build:
+  `(-π/2, 0, 0)`.
+- `headForward`/`headUp` are positional offsets of the Head Forward/Head Up
+  proxies from the Head Origin proxy. They are consumed by the face materials,
+  not by the effect materials; the sidecar carries them as the authoring record.
+- The eight palette color outputs and `Rim` are read by Attribute nodes in
+  "Global Material Properties" but are **not connected** to that group's
+  outputs — the outputs are unlinked constants (white palette, shadow position
+  0.55, Day/Night 0). In this static build the baked palette attributes are
+  observational only; the runtime palette/view system owns tinting.
+
+Consumption side ("Dot Creation" group; the NdotL instances bind `Offset =
+[0,0,0]`):
+
+- `L = normalize(RotateEulerXYZ(lightDir, (0,0,-1)))` in Blender axes (the
+  light-direction frame's object-location subtraction cancels to the constant
+  `(0,0,-1)`; verified `rotation_type = EULER_XYZ`).
+- The runtime direction is the `[x, z, -y]` conversion of `L` (the exporter's
+  axis convention). The locked value decodes to `(0, 0, 1)`.
+- `t = clamp(0.5 + 0.5 · dot(N, L))`, then the shared lighting chain (shadow
+  position, ramp, soft/sharp palette multiplies) — identical to the runtime's
+  existing half-lambert path, so effect materials keep body-shader family
+  behavior and only the light direction is per-material.
+
+Runtime wiring: the strict compiler joins the mesh-keyed basis onto effect
+materials via GLB node names and emits `effect_light_dir_*` static params
+(fail-closed: missing runtime node, conflicting bases, a basis leaking onto a
+non-effect mesh, or an effect material without a basis are all errors). The
+character/hero shaders override the view-level key light direction per material
+when the parameter is enabled.
+
+Transparency mapping: the source effect materials are `blend_method = HASHED`
+(dithered). ADR-0023 qualifies Opaque/Mask only, so the handoff maps them to
+Mask with an explicit cutoff (`alpha_mask = 0.5`; required for the effect role;
+the exporter fails closed if the source blend method changes). The baked diffuse
+alpha is uniform 1.0 in this static build, so the mask currently discards
+nothing; reconstructing the source dissolve/noise alpha (the "Genshin Alpha"
+group driven by mask/noise textures) remains parity scope, together with
+transparent ordering/depth and time-dependent reference cases.
 
 | Surface | Current producer behavior |
 | --- | --- |

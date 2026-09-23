@@ -10,7 +10,8 @@
 
 pub mod mapping;
 pub use mapping::{
-    GenshinBundleInput, GenshinMaterialInput, GenshinMaterialRole, map_bundle, map_view,
+    GenshinBundleInput, GenshinMaterialInput, GenshinMaterialRole, decode_effect_light_direction,
+    map_bundle, map_view,
 };
 
 use bevy_stylized_core::{
