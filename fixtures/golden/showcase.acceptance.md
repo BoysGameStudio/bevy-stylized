@@ -45,9 +45,13 @@ preset owns its own baseline, matching the per-scene catalog entries.
 - `showcase/environment-night.png` — `cf70c315…6124b0`
 - `showcase/effects.png` — `e249cdae…340d17`
 
-**macOS/Metal note (2026-09-23):** all eleven cases match these canonical
+**macOS/Metal note (2026-09-23):** ten of eleven cases match these canonical
 baselines on the M4 Pro within tolerance (max 1–2/255 cross-vendor rounding,
-mean < 0.03), so no `macos-metal` overlay entries are required for this set.
+mean < 0.03). `showcase/effects` differs by exactly one pixel (delta 29 at
+(376, 305), on the flipped-sphere boundary — the same root-caused platform-truth
+class as the existing `macos-metal` overlays) and is accepted into the overlay
+at `showcase/macos-metal/effects.png` (SHA-256 `5784b37c…daff2a`; captured at
+engine commit `7431c331`, sidecar provenance alongside).
 
 **Scope of this acceptance:** these images are the canonical baselines for the
 `showcase_golden` lane suite (`tests/suites.json`, ten identities). Judgment is

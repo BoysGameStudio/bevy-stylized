@@ -1,0 +1,18 @@
+{
+  "reference_toolchain": "engine-golden-v1",
+  "blender": null,
+  "gacha_setup": "synthetic-fixtures",
+  "gacha_setup_commit": null,
+  "export_contract": "blender-gltf-npr-v1",
+  "profile_schema": "bevy_stylized.material/v1",
+  "fixture": "showcase/effects",
+  "renderer": "bevy-stylized-render-0.1.0",
+  "engine_git_commit": "7431c33177bb27e07a1606d440b5f5454168ea3a",
+  "engine_source_revision": null,
+  "gpu": "Apple M4 Pro (Metal)",
+  "driver": " ",
+  "captured_unix_seconds": 1790162260,
+  "width": 512,
+  "height": 512,
+  "png_fnv1a64": "801efb3a158dba86"
+}
