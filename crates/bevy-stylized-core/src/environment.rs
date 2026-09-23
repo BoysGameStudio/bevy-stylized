@@ -1,5 +1,5 @@
 //! 环境 NPR 数据模型（V2-d，docs/roadmap/01 §Environment NPR；
-//! provisional pending ADR-0009 的环境层条款）。
+//! ADR-0009 Accepted 2026-09-23 的环境层条款）。
 //!
 //! 纯 View 层数据：大气调色板（雾色 / zenith 天色）、距离雾参数、
 //! 风格化阴影染色。**默认值全部恒等**（雾关、阴影染色强度 0、zenith
@@ -9,8 +9,8 @@
 //!
 //! - 完整 stylized IBL / reflection probes 超出本次切片；本模块提供
 //!   调色板驱动的近似（fog 色 + zenith 天色 + ambient/key light 既有通道）；
-//! - 雾仅线性 start/end（height falloff 需额外数据通道，推迟到 ADR-0009
-//!   的正式 view uniform 决策）；
+//! - 雾仅线性 start/end（height falloff 需额外数据通道，ADR-0009 记录为
+//!   明确推迟项）；
 //! - 阴影染色为乘法 tint 作用于 shadow 侧颜色。
 
 use bevy_color::LinearRgba;

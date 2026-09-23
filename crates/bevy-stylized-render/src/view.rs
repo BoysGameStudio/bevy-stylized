@@ -10,7 +10,7 @@
 //! **禁止**反向路径：View 数据不得写入任何材质资产（per-frame material
 //! mutation 禁令）。
 //!
-//! ## 语义映射（provisional，pending ADR-0009）
+//! ## 语义映射（ADR-0009 Accepted 2026-09-23）
 //!
 //! - `key_light_direction` / `key_light_color` → 框架托管的
 //!   `DirectionalLight`（[`StylizedKeyLight`]）；
@@ -73,14 +73,14 @@ pub fn exposure_component(multiplier: f32) -> Exposure {
     }
 }
 
-/// 夜间环境光（冷蓝低亮度；provisional 常数，pending ADR-0009）。
+/// 夜间环境光（冷蓝低亮度；ADR-0009 ratified 常数）。
 const NIGHT_AMBIENT_COLOR: LinearRgba = LinearRgba::new(0.09, 0.11, 0.19, 1.0);
 /// 昼间环境亮度基准。
 const DAY_AMBIENT_BRIGHTNESS: f32 = 0.35;
 /// 夜间环境亮度基准。
 const NIGHT_AMBIENT_BRIGHTNESS: f32 = 0.06;
 
-/// Day/Night 解析（provisional，pending ADR-0009）：
+/// Day/Night 解析（ADR-0009 ratified）：
 ///
 /// **选择：lerp 环境光亮度与色温，不改 ramp 行**。ramp 行是
 /// Instance/Profile 语义（ramp atlas 的行属于材质/profile 索引），View 层
@@ -118,15 +118,15 @@ pub fn resolve_ambient_light(descriptor: &StylizedViewDescriptor) -> AmbientLigh
     }
 }
 
-/// 环境模型 → Bevy `DistanceFog` 组件映射（V2-d，provisional pending
-/// ADR-0009）。
+/// 环境模型 → Bevy `DistanceFog` 组件映射（V2-d；ADR-0009 Accepted
+/// 2026-09-23）。
 ///
 /// 通道约定（与 `npr_common.wgsl` 的环境段一致）：
 ///
 /// - `color` = 雾色（rgb + alpha 强度）；`falloff = Linear(start, end)`；
 /// - `directional_light_color` 复用为**风格化阴影染色**通道（rgb + alpha
-///   强度）——Bevy 原生散射语义我方 shader 不消费；正式 view uniform 属
-///   ADR-0009 决策。
+///   强度）——Bevy 原生散射语义我方 shader 不消费（ADR-0009 ratified 通道
+///   约定；统一 view uniform 属后续项）。
 ///
 /// `None` = 恒等（不挂组件，shader 侧无 `DISTANCE_FOG` def，零开销）。
 /// 阴影染色强度 > 0 但雾未启用时仍挂组件（雾参数取 `f32::MAX`，因子恒 0）

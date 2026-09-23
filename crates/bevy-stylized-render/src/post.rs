@@ -38,7 +38,7 @@ pub enum StylizedDisplayTransform {
     #[default]
     None,
     /// 上游 Genshin Tonemapper 有理曲线（docs/reference/07 §3.8 已核实；
-    /// 命名保持 hook 形态，profile 级变体 pending ADR-0009）。
+    /// 命名保持 hook 形态（ADR-0009 Accepted；profile 级变体属后续）。
     SimpleCompress,
 }
 
