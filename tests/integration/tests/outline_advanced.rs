@@ -199,6 +199,8 @@ fn outline_advanced_hull_screen_hybrid() {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/golden/outline-advanced");
     let mut captures = Vec::new();
     let mut platform = String::new();
+    let mut adapter_gpu = "unknown".to_owned();
+    let mut adapter_driver = "unknown".to_owned();
     for (name, hull, screen) in [
         ("hull_only", true, false),
         ("screen_only", false, true),
@@ -207,12 +209,20 @@ fn outline_advanced_hull_screen_hybrid() {
         let mut app = headless_app(resources.clone());
         build_scene(&mut app, hull);
         let (frame, overlays) = capture_frame(&mut app, screen);
-        platform = golden_harness::current_golden_platform(
-            &app.world()
-                .get_resource::<bevy::render::renderer::RenderAdapterInfo>()
-                .map(|info| format!("{:?}", info.backend))
-                .unwrap_or_else(|| "unknown".to_owned()),
-        );
+        let adapter = app
+            .world()
+            .get_resource::<bevy::render::renderer::RenderAdapterInfo>()
+            .map(|info| {
+                (
+                    format!("{} ({:?})", info.name, info.backend),
+                    format!("{} {}", info.driver, info.driver_info),
+                    format!("{:?}", info.backend),
+                )
+            })
+            .unwrap_or_else(|| ("unknown".into(), "unknown".into(), "unknown".into()));
+        platform = golden_harness::current_golden_platform(&adapter.2);
+        adapter_gpu = adapter.0;
+        adapter_driver = adapter.1;
         // screen 开启时必须有 overlay；关闭时必须没有。
         assert_eq!(overlays > 0, screen, "{name}: overlay presence");
         let diagnostics = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -273,8 +283,8 @@ fn outline_advanced_hull_screen_hybrid() {
             "bevy_stylized.material/v1",
             &format!("outline-advanced/{name}"),
             "bevy-stylized-render-0.1.0",
-            "local",
-            "local",
+            &adapter_gpu,
+            &adapter_driver,
             &frame,
         );
         if !paths.baseline_exists() {
