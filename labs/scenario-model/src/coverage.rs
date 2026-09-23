@@ -131,12 +131,11 @@ pub fn coverage_report() -> CoverageReport {
     let byte = |evidence: &str| Judgment::ByteEquivalence {
         evidence: evidence.to_string(),
     };
-    let non_black = || Judgment::NonBlackCapture;
     let scenes = vec![
         scene(
             "overview",
             FAMILY_LIGHTING,
-            non_black(),
+            golden("fixtures/golden/showcase"),
             CoverageState::Pending,
         ),
         scene(
@@ -148,7 +147,7 @@ pub fn coverage_report() -> CoverageReport {
         scene(
             "lighting",
             FAMILY_LIGHTING,
-            non_black(),
+            golden("fixtures/golden/showcase"),
             CoverageState::Pending,
         ),
         scene(
@@ -157,8 +156,18 @@ pub fn coverage_report() -> CoverageReport {
             byte("apply_params/parameters 阈值扫描（H2/H3，同配方逐字节一致）"),
             CoverageState::Pending,
         ),
-        scene("hair", FAMILY_HAIR, non_black(), CoverageState::Pending),
-        scene("metal", FAMILY_METAL, non_black(), CoverageState::Pending),
+        scene(
+            "hair",
+            FAMILY_HAIR,
+            golden("fixtures/golden/showcase"),
+            CoverageState::Pending,
+        ),
+        scene(
+            "metal",
+            FAMILY_METAL,
+            golden("fixtures/golden/showcase"),
+            CoverageState::Pending,
+        ),
         scene(
             "outline",
             FAMILY_OUTLINE,
@@ -186,13 +195,13 @@ pub fn coverage_report() -> CoverageReport {
         scene(
             "reference",
             FAMILY_REFERENCE,
-            non_black(),
+            golden("fixtures/golden/showcase"),
             CoverageState::Pending,
         ),
         scene(
             "performance",
             FAMILY_INSTANCES,
-            non_black(),
+            golden("fixtures/golden/showcase"),
             CoverageState::Pending,
         ),
         scene(
@@ -204,31 +213,31 @@ pub fn coverage_report() -> CoverageReport {
         scene(
             "lod",
             FAMILY_DEFORMATION,
-            non_black(),
+            golden("fixtures/golden/showcase"),
             CoverageState::Pending,
         ),
         scene(
             "environment-day",
             FAMILY_LIGHTING,
-            non_black(),
+            golden("fixtures/golden/showcase"),
             CoverageState::Pending,
         ),
         scene(
             "environment-dusk",
             FAMILY_LIGHTING,
-            non_black(),
+            golden("fixtures/golden/showcase"),
             CoverageState::Pending,
         ),
         scene(
             "environment-night",
             FAMILY_LIGHTING,
-            non_black(),
+            golden("fixtures/golden/showcase"),
             CoverageState::Pending,
         ),
         scene(
             "effects",
             FAMILY_LIGHTING,
-            non_black(),
+            golden("fixtures/golden/showcase"),
             CoverageState::Pending,
         ),
     ];
