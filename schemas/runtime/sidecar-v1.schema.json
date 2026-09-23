@@ -4,6 +4,13 @@
   "description": "`.npr.json` sidecar 的顶层结构（骨架，provisional）。",
   "type": "object",
   "properties": {
+    "effect_lighting": {
+      "description": "效果网格的光照基（按源网格名索引；additive optional，缺省 = 无效果数据）。\n空表不序列化：无效果网格的既有 sidecar 保持逐字节不变。",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/StylizedEffectLightBasis"
+      }
+    },
     "materials": {
       "description": "按材质名索引的 material descriptor。",
       "type": "object",
@@ -21,6 +28,47 @@
     "schema"
   ],
   "$defs": {
+    "StylizedEffectLightBasis": {
+      "description": "单个效果网格的光照基（per-mesh uniform；不是逐顶点数据）。",
+      "type": "object",
+      "properties": {
+        "head_forward": {
+          "description": "头部前向（face 光照基准；导出侧已完成 `[x, z, -y]` 转换）。",
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        },
+        "head_up": {
+          "description": "头部上向（face 光照基准）。",
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        },
+        "light_direction": {
+          "description": "打包光照方向（上游编码；当前锁定源 = `[-π/2, 0, 0]`）。",
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 3,
+          "minItems": 3
+        }
+      },
+      "required": [
+        "light_direction",
+        "head_forward",
+        "head_up"
+      ]
+    },
     "StylizedMaterialDescriptor": {
       "description": "Material 层描述符：纹理/Ramp、静态开关与 Hair/Metal 等静态参数。\n\n**禁止**存放 Face Transform、Day/Night、相机后处理等 instance/view 状态。",
       "type": "object",

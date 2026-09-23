@@ -81,6 +81,10 @@ pub struct StylizedSidecar {
     /// 按材质名索引的 material descriptor。
     #[serde(default)]
     pub materials: BTreeMap<String, StylizedMaterialDescriptor>,
+    /// 效果网格的光照基（按源网格名索引；additive optional，缺省 = 无效果数据）。
+    /// 空表不序列化：无效果网格的既有 sidecar 保持逐字节不变。
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub effect_lighting: BTreeMap<String, bevy_stylized_core::StylizedEffectLightBasis>,
 }
 
 /// 由 `.gltf` / `.glb` 路径推导 sidecar 路径（`<stem>.npr.json`）。
@@ -372,6 +376,39 @@ mod tests {
             error,
             StylizedImportError::UnsupportedSidecarSchema { .. }
         ));
+    }
+
+    #[test]
+    fn sidecar_effect_lighting_is_additive_optional() {
+        // 旧 sidecar（无 effect_lighting 字段）解析为空表——additive optional。
+        let old = parse_sidecar_str(r#"{"schema": "bevy-stylized.sidecar/v1", "materials": {}}"#)
+            .expect("legacy sidecar parses");
+        assert!(old.effect_lighting.is_empty());
+        // 新字段 round-trip（效果网格光照基，per-mesh uniform）。
+        let sidecar = StylizedSidecar {
+            schema: STYLIZED_SIDECAR_SCHEMA.into(),
+            effect_lighting: BTreeMap::from([(
+                "Eff_001".to_string(),
+                bevy_stylized_core::StylizedEffectLightBasis {
+                    light_direction: [-std::f32::consts::FRAC_PI_2, 0.0, 0.0],
+                    head_forward: [0.0, -0.7827, 0.0],
+                    head_up: [0.0, 0.0, 0.5384],
+                },
+            )]),
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&sidecar).expect("serialize");
+        let back = parse_sidecar_str(&json).expect("round-trip parses");
+        let basis = back.effect_lighting.get("Eff_001").expect("basis present");
+        assert!((basis.light_direction[0] + std::f32::consts::FRAC_PI_2).abs() < 1e-6);
+        assert!((basis.head_up[2] - 0.5384).abs() < 1e-4);
+        // 空表不序列化：无效果网格的既有 sidecar 输出保持逐字节不变。
+        let empty = serde_json::to_string(&StylizedSidecar {
+            schema: STYLIZED_SIDECAR_SCHEMA.into(),
+            ..Default::default()
+        })
+        .expect("serialize");
+        assert!(!empty.contains("effect_lighting"));
     }
 
     #[test]

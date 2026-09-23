@@ -67,6 +67,9 @@ pub(super) struct MaterialInputs {
     pub(super) materials: BTreeMap<String, StylizedMaterialDescriptor>,
     pub(super) directives: BTreeMap<String, CompileDirectives>,
     pub(super) view: Option<StylizedViewDescriptor>,
+    /// Profile handoff 的效果网格光照基（additive optional；无 profile 或无
+    /// 效果数据时为空）。
+    pub(super) effect_lighting: BTreeMap<String, bevy_stylized_core::StylizedEffectLightBasis>,
 }
 
 pub(super) fn material_inputs(
@@ -114,6 +117,7 @@ pub(super) fn material_inputs(
     }
 
     let mut profile_view = None;
+    let mut profile_effect_lighting = BTreeMap::new();
     if let Some(profile) = profile {
         if path.extension().and_then(|x| x.to_str()) != Some("glb") {
             diagnostics.push(Diagnostic {
@@ -123,7 +127,8 @@ pub(super) fn material_inputs(
         }
         let mapped = load_profile_materials(path, profile);
         match mapped {
-            Ok((materials, view)) => {
+            Ok((materials, view, effect_lighting)) => {
+                profile_effect_lighting = effect_lighting;
                 profile_view = Some(view);
                 let expected: std::collections::BTreeSet<_> = document
                     .materials()
@@ -164,6 +169,7 @@ pub(super) fn material_inputs(
         materials: sidecar_materials,
         directives: sidecar_directives,
         view: profile_view,
+        effect_lighting: profile_effect_lighting,
     }
 }
 
@@ -174,6 +180,7 @@ fn load_profile_materials(
     (
         BTreeMap<String, StylizedMaterialDescriptor>,
         bevy_stylized_core::StylizedViewDescriptor,
+        BTreeMap<String, bevy_stylized_core::StylizedEffectLightBasis>,
     ),
     String,
 > {
@@ -206,7 +213,11 @@ fn load_profile_materials(
                 }
             }
         }
-        Ok((materials, bevy_stylized_profile_genshin::map_view(&input)?))
+        Ok((
+            materials,
+            bevy_stylized_profile_genshin::map_view(&input)?,
+            input.effect_lighting,
+        ))
     }
     #[cfg(not(feature = "profile-genshin"))]
     {

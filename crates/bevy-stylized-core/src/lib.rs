@@ -21,6 +21,7 @@ pub mod axis;
 pub mod budget;
 pub mod capability;
 pub mod descriptor;
+pub mod effect;
 pub mod environment;
 pub mod governor;
 pub mod lod;
@@ -44,6 +45,7 @@ pub use descriptor::{
     StylizedMaterialDescriptor, StylizedMaterialFlags, StylizedTextureRef, StylizedTextureSemantic,
     StylizedViewDescriptor, StylizedViewQuality,
 };
+pub use effect::StylizedEffectLightBasis;
 pub use environment::{StylizedEnvironment, StylizedFog, StylizedShadowTint, stylized_fog_factor};
 pub use governor::{
     QualityAdjustment, QualityDecision, QualitySignals, QualityTimingSource, QualityTransition,

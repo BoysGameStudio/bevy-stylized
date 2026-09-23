@@ -212,6 +212,7 @@ pub(super) fn build(
         let sidecar = bevy_stylized_gltf::StylizedSidecar {
             schema: bevy_stylized_gltf::STYLIZED_SIDECAR_SCHEMA.into(),
             materials: runtime_materials,
+            effect_lighting: inputs.effect_lighting.clone(),
         };
         pending.push(PendingWrite {
             kind: "sidecar",

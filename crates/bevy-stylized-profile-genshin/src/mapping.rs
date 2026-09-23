@@ -13,6 +13,9 @@ pub enum GenshinMaterialRole {
     Face,
     Brow,
     Pupil,
+    /// Effect mesh surfaces (skirt ribbons): body shader family, no authored
+    /// ILM/ramp requirement; the light basis travels via `effect_lighting`.
+    Effect,
 }
 
 /// Evaluated Genshin body lighting inputs; independent of animation controls.
@@ -147,6 +150,10 @@ pub struct GenshinBundleInput {
     /// Upstream convention: zero is day, one is night.
     #[serde(default)]
     pub day_night: f32,
+    /// Effect mesh light basis keyed by source mesh name (additive optional;
+    /// exported from the evaluated "Light Vectors" GN outputs).
+    #[serde(default)]
+    pub effect_lighting: BTreeMap<String, bevy_stylized_core::StylizedEffectLightBasis>,
 }
 
 /// Convert a complete supported variant, rejecting guessed/default material roles.
@@ -285,12 +292,16 @@ pub fn map_bundle(
                     ("face_softness".into(), m.face_softness),
                 ]);
             }
-            GenshinMaterialRole::Brow | GenshinMaterialRole::Pupil => {}
+            GenshinMaterialRole::Brow
+            | GenshinMaterialRole::Pupil
+            | GenshinMaterialRole::Effect => {}
         }
         if let Some(lighting) = &m.lighting {
             if matches!(
                 m.role,
-                GenshinMaterialRole::Brow | GenshinMaterialRole::Pupil
+                GenshinMaterialRole::Brow
+                    | GenshinMaterialRole::Pupil
+                    | GenshinMaterialRole::Effect
             ) && let Some(ilm) = &m.ilm
             {
                 texture(ilm, StylizedTextureSemantic::ContinuousMask)?;
@@ -591,6 +602,7 @@ mod tests {
                 specular_ramp: false,
                 packed_normal: false,
             }],
+            effect_lighting: BTreeMap::new(),
         }
     }
     #[test]
@@ -598,6 +610,33 @@ mod tests {
         let mut i = input();
         i.materials[0].face_sdf = None;
         assert!(map_bundle(&i).is_err());
+    }
+    #[test]
+    fn effect_role_maps_without_ilm_or_ramp() {
+        let mut i = input();
+        let m = &mut i.materials[0];
+        m.name = "effect".into();
+        m.role = GenshinMaterialRole::Effect;
+        m.face_sdf = None;
+        let mapped = map_bundle(&i).unwrap();
+        let d = &mapped["effect"];
+        assert_eq!(d.textures.len(), 1);
+        assert_eq!(d.textures[0].semantic, StylizedTextureSemantic::Color);
+        assert!(!d.static_params.contains_key("genshin_ramp"));
+        // An authored ILM is optional for effect surfaces; keep it when present.
+        let mut i = body_input();
+        let m = &mut i.materials[0];
+        m.name = "effect".into();
+        m.role = GenshinMaterialRole::Effect;
+        m.ramp = None;
+        let mapped = map_bundle(&i).unwrap();
+        let d = &mapped["effect"];
+        assert_eq!(d.textures.len(), 2);
+        assert_eq!(
+            d.textures[1].semantic,
+            StylizedTextureSemantic::ContinuousMask
+        );
+        assert!(!d.static_params.contains_key("genshin_ramp"));
     }
     #[test]
     fn source_outline_colors_width_and_disabled_classes_are_preserved() {
