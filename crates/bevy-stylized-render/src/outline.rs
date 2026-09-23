@@ -3,8 +3,9 @@
 //! 顶点沿法线外扩 + front-face cull；无 geometry shader / tessellation /
 //! compute 依赖，满足 Portable。宽度以物理像素为单位、视口尺寸无关。
 //!
-//! **Provisional（ADR-0008 草案）**：生命周期契约（bounds / LOD / despawn
-//! 的完整语义）随 ADR-0008 关闭而定；当前实现为最小可用副本同步。
+//! 生命周期契约（ADR-0008 Accepted 2026-09-23）：副本镜像源 mesh/材质/
+//! 变形组件、镜像 render layers 与外部更新的 bounds，移除时只清理自身
+//! 副本（见 `sync_outline_replicas`）。
 
 use bevy::prelude::{Or, With, error};
 use bevy::{
@@ -311,7 +312,7 @@ pub const ATTRIBUTE_OUTLINE_SOURCE_POSITION: bevy::mesh::MeshVertexAttribute =
 /// 挂在带 `Mesh3d` 实体上：为其生成一个轮廓副本实体。
 ///
 /// 副本与源实体共享 mesh；作为子实体继承 transform/visibility。
-/// 生命周期（provisional，ADR-0008）：[`sync_outline_replicas`] 每帧清理
+/// 生命周期（ADR-0008）：[`sync_outline_replicas`] 每帧清理
 /// 源组件已移除/源实体已销毁的孤儿副本；源实体 despawn 时副本作为子实体
 /// 一并销毁。
 #[derive(Component, Clone, Debug, Reflect)]

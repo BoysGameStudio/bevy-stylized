@@ -1,5 +1,5 @@
 //! Screen-space 描边（depth/normal 边缘检测）+ hull 混合（It-V2a，
-//! provisional pending ADR-0008）。
+//! ADR-0008 Accepted 2026-09-23）。
 //!
 //! ## 档位门控
 //!
@@ -39,7 +39,7 @@ use crate::StylizedRenderCapabilities;
 pub const SCREEN_OUTLINE_SHADER_PATH: &str =
     "embedded://bevy_stylized_render/shaders/outline/screen_outline.wgsl";
 
-/// 描边模式（provisional pending ADR-0008）。
+/// 描边模式（ADR-0008；masked 外观见 ADR-0023 的未合格格）。
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Reflect)]
 pub enum StylizedOutlineMode {
     /// 仅 hull（Portable 基线）。

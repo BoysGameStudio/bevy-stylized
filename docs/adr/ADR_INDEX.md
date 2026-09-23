@@ -11,7 +11,7 @@
 | ADR-0005 | Profile Boundary | Proposed | [`0005-profile-boundary.md`](0005-profile-boundary.md) |
 | ADR-0006 | Texture Packing and Semantic Preservation | Proposed | [`0006-texture-packing-and-semantics.md`](0006-texture-packing-and-semantics.md) |
 | ADR-0007 | Reference Renderer and Golden Chain | Accepted | [`0007-reference-renderer-and-golden-chain.md`](0007-reference-renderer-and-golden-chain.md) |
-| ADR-0008 | Outline Architecture | Proposed | [`0008-outline-architecture.md`](0008-outline-architecture.md) |
+| ADR-0008 | Outline Architecture | Accepted | [`0008-outline-architecture.md`](0008-outline-architecture.md) |
 | ADR-0009 | Lighting Backends | Proposed | [`0009-lighting-backends.md`](0009-lighting-backends.md) |
 | ADR-0010 | Platform Support Policy | Proposed | [`0010-platform-support-policy.md`](0010-platform-support-policy.md) |
 | ADR-0011 | Reference Toolchain Lock | Accepted | [`0011-reference-toolchain.md`](0011-reference-toolchain.md) |

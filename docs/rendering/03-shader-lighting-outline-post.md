@@ -325,7 +325,7 @@ Hull 副本在 PostUpdate 的引擎动画求值之后、transform propagation �
 变形组件。源 mesh 或 outline 组件移除时清理副本。自定义 PostUpdate 输入系统
 需要显式排在 `sync_outline_replicas` 之前。此同步只消费外部求值状态，不控制动画。
 已有连续 morph GPU 回归不等价于完整的动态 bounds、LOD 或所有 prepass 验证；
-ADR-0008 仍未关闭。
+生命周期语义由 ADR-0008（Accepted 2026-09-23）关闭。
 
 ## Alpha / Transparency / Shadow / Prepass Matrix（V1 必需）
 
