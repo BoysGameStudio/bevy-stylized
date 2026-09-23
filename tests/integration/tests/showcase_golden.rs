@@ -10,7 +10,7 @@ use bevy::{
     render::{RenderPlugin, renderer::RenderAdapterInfo, settings::RenderCreation},
     window::{ExitCondition, WindowPlugin},
 };
-use golden_harness::{CapturedImage, GoldenProvenance, Tolerance, capture, diff_rgba8};
+use golden_harness::{GoldenProvenance, Tolerance, capture, diff_rgba8};
 
 fn golden_dir() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/golden/showcase")
