@@ -26,6 +26,7 @@ declares; non-trivial content confirmed, no placeholder frames):
 | `environment-day` | Fog-blue sky/ground with three spheres, day palette | `views::environment_day` preset over `builders::environment` |
 | `environment-dusk` | Same layout, warm dusk palette | `views::environment_dusk` preset |
 | `environment-night` | Same layout, dark night palette | `views::environment_night` preset |
+| `effects` | Three spheres: view-lit, +Z override, −Z flipped (dimmer right) | `builders::effects` per-material light-basis override contrast (captured at engine commit `a7732894`) |
 
 The three environment images share one builder with three view presets; each
 preset owns its own baseline, matching the per-scene catalog entries.
@@ -42,6 +43,11 @@ preset owns its own baseline, matching the per-scene catalog entries.
 - `showcase/environment-day.png` — `3abb9223…d47291`
 - `showcase/environment-dusk.png` — `f5b6cf29…9079c6`
 - `showcase/environment-night.png` — `cf70c315…6124b0`
+- `showcase/effects.png` — `e249cdae…340d17`
+
+**macOS/Metal note (2026-09-23):** all eleven cases match these canonical
+baselines on the M4 Pro within tolerance (max 1–2/255 cross-vendor rounding,
+mean < 0.03), so no `macos-metal` overlay entries are required for this set.
 
 **Scope of this acceptance:** these images are the canonical baselines for the
 `showcase_golden` lane suite (`tests/suites.json`, ten identities). Judgment is
