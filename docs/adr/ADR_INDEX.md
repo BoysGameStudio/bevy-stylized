@@ -17,7 +17,7 @@
 | ADR-0011 | Reference Toolchain Lock | Accepted | [`0011-reference-toolchain.md`](0011-reference-toolchain.md) |
 | ADR-0012 | Blender Export Contract | Accepted | [`0012-blender-export-contract.md`](0012-blender-export-contract.md) |
 | ADR-0013 | Upstream Reference Upgrade Policy | Proposed | [`0013-upstream-reference-upgrade.md`](0013-upstream-reference-upgrade.md) |
-| ADR-0014 | Reference vs Runtime Artifact Boundary | Proposed | [`0014-reference-vs-runtime-artifact-boundary.md`](0014-reference-vs-runtime-artifact-boundary.md) |
+| ADR-0014 | Reference vs Runtime Artifact Boundary | Accepted | [`0014-reference-vs-runtime-artifact-boundary.md`](0014-reference-vs-runtime-artifact-boundary.md) |
 | ADR-0015 | Blender Reference Export Bridge | Accepted | [`0015-blender-reference-export-bridge.md`](0015-blender-reference-export-bridge.md) |
 | ADR-0016 | Package Naming | Accepted | [`0016-package-naming.md`](0016-package-naming.md) |
 | ADR-0017 | License and Provenance | Accepted | [`0017-license-and-provenance.md`](0017-license-and-provenance.md) |
