@@ -6,10 +6,9 @@
 //!   键下的 payload；
 //! - **sidecar**：与 `.gltf` / `.glb` 同目录的 `.npr.json` 文件。
 //!
-//! **优先级未定（ADR-0020 仍为 Proposed）**：本模块同时实现两条通道，
-//! 二者冲突时产生显式 [`StylizedImportDiagnostic`] 并**拒绝静默取舍**
-//! （冲突项的 descriptor 置 `None`，由调用方显式解决）。该行为本身也是
-//! provisional，随 ADR-0020 关闭可能调整。
+//! **冲突即显式失败（ADR-0020 Accepted 2026-09-23）**：本模块同时实现两条
+//! 通道，二者冲突时产生显式 [`StylizedImportDiagnostic`] 并**拒绝静默取舍**
+//! （冲突项的 descriptor 置 `None`，由调用方显式解决）。
 
 use std::{collections::BTreeMap, path::Path};
 
@@ -198,8 +197,8 @@ pub enum StylizedImportSeverity {
 /// 诊断类别。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StylizedImportDiagnosticCode {
-    /// extras 与 sidecar 同时提供且内容冲突（ADR-0020 未定优先级，
-    /// 拒绝静默取舍）。
+    /// extras 与 sidecar 同时提供且内容冲突（ADR-0020：冲突即显式失败，
+    /// 无通道优先级）。
     ExtrasSidecarConflict,
 }
 
@@ -229,8 +228,8 @@ pub struct StylizedMaterialImport {
 
 /// 合并 extras 与 sidecar 两条通道的 material 元数据。
 ///
-/// ADR-0020（优先级）仍为 Proposed，因此本函数实现**双通道读取 +
-/// 冲突暴露**，不实现任何优先级：
+/// ADR-0020（Accepted）：本函数实现**双通道读取 + 冲突显式失败**，
+/// 不实现任何通道优先级：
 ///
 /// - 仅一条通道有数据：直接采用；
 /// - 两条通道都有且语义相等：采用并附 warning 记录双通道来源；
@@ -267,7 +266,7 @@ pub fn import_material(
                     message: format!(
                         "material {name:?}: extras and sidecar both provide \
                          {MATERIAL_EXTRAS_KEY} metadata with different contents; \
-                         precedence is undecided (ADR-0020 Proposed), refusing to \
+                         conflict is an explicit failure (ADR-0020), refusing to \
                          pick one silently"
                     ),
                     extras_value: Some(extras_value),

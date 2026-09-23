@@ -67,7 +67,7 @@ pub(super) fn build(
         };
         let mut conflict = false;
         for diagnostic in &import.diagnostics {
-            // 冲突 = 拒绝静默取舍（ADR-0020 Provisional）；compile 升级为 error。
+            // 冲突 = 拒绝静默取舍（ADR-0020 Accepted）；compile 升级为 error。
             let is_conflict = matches!(
                 diagnostic.code,
                 bevy_stylized_gltf::StylizedImportDiagnosticCode::ExtrasSidecarConflict

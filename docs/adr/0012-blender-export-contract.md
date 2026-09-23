@@ -74,8 +74,9 @@ precedence) is a separate decision and stays Proposed.
   generalized unit/negative-scale validation) remain explicitly unresolved
   follow-up work; implementations must not silently depend on them being
   settled.
-- extras/sidecar precedence continues to be governed by ADR-0020 (Proposed);
-  the importer exposing conflicts unchanged.
+- extras/sidecar precedence is governed by ADR-0020 (Accepted 2026-09-23:
+  conflict is an explicit failure with both values exposed, no channel
+  priority); the importer exposing conflicts is unchanged.
 
 ## Revisit trigger
 

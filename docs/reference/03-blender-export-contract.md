@@ -4,8 +4,8 @@ This document owns the Blender-to-runtime boundary. The
 [export bridge](../authoring/02-blender-reference-export-bridge.md) owns build stages;
 the [reference workflow](01-reference-authoring-workflow.md) owns reproduction.
 ADR-0012 is Accepted (2026-09-22, current static character scope); ADR-0020
-remains Proposed. Describing current mechanisms does not freeze a broader
-interchange API.
+is Accepted (2026-09-23, conflict is an explicit failure). Describing current
+mechanisms does not freeze a broader interchange API.
 
 ## Current static character export
 
@@ -197,8 +197,8 @@ selected profile. A generic inventory does not imply that every source asset
 provides every attribute. Do not silently invent absent semantic data.
 
 Extras and generic sidecars are distinct input channels. The importer exposes
-conflicts rather than silently choosing a winner; ADR-0020 retains precedence
-policy ownership. `bevy_stylized.compile/v1` is a compiler directive namespace,
+conflicts rather than silently choosing a winner (ADR-0020 Accepted: conflict
+is an explicit failure carrying both channel values). `bevy_stylized.compile/v1` is a compiler directive namespace,
 not the character profile handoff or either completion manifest. ILM channel
 meaning is defined by the [Gacha behavior contract](07-gacha-setup-behavior-contract-v1.md)
 and compiler implementation, not copied into an export-settings checklist.

@@ -5,7 +5,7 @@
 //! - [`attributes`]：把 `npr-attributes.v1.json` 契约的 10 个 `_NPR_*`
 //!   顶点属性注册为 Bevy 自定义顶点属性；
 //! - [`metadata`]：`bevy_stylized.*` namespaced extras 与 `.npr.json`
-//!   sidecar 的 typed 导入；extras/sidecar 冲突显式暴露（ADR-0020
+//!   sidecar 的 typed 导入；extras/sidecar 冲突显式暴露（ADR-0020 Accepted
 //!   Proposed，绝不静默取舍）；
 //! - [`setup`]：`GltfPlugin` 配置入口与初始化顺序守卫（ADR-0028
 //!   Accepted）。
