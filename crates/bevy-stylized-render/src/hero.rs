@@ -1,7 +1,7 @@
 //! Hero@Portable 材质：Character + authored ramp / packed normal /
 //! metal matcap / spec ramp（docs/rendering/01 Hero class）。
 //!
-//! **Provisional（ADR-0001 未决）**：与 cel/character 同属薄层临时 backend。
+//! 薄层 backend（ADR-0001 Accepted）：与 cel/character 同属薄层临时 backend。
 //!
 //! ## 预算（超出 Cel 的 interim 子预算，实际计数见 interim_budget 测试输出）
 //!

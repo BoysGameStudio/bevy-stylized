@@ -1,7 +1,7 @@
 //! Character@Portable 材质：Cel + Face SDF / Hair / Rim / Emission
 //! （docs/rendering/01 Character class 定义）。
 //!
-//! **Provisional（ADR-0001 未决）**：与 [`crate::material::StylizedCelMaterial`]
+//! 薄层 backend（ADR-0001 Accepted）：与 [`crate::material::StylizedCelMaterial`]
 //! 同属薄层临时 backend。
 //!
 //! ## 关键设计

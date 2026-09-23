@@ -1,4 +1,4 @@
-//! ADR-0001 spike（证据采集，provisional——不关闭 ADR）。
+//! ADR-0001 spike 测量证据（backend 三方对比；ADR-0001 Accepted 2026-09-23）。
 //!
 //! Runtime material backend 三方对比（docs/architecture/02）：
 //!

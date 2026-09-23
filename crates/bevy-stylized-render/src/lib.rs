@@ -1,10 +1,9 @@
 //! `bevy-stylized-render`：Cel/Character/Hero 材质、实例传输、view、
 //! LOD、描边和后处理的运行时实现。
 //!
-//! **Provisional（ADR-0001 未决）**：本 crate 是建立在 Bevy `Material`
-//! 组合路径上的薄层临时 backend；公共语义全部挂在 `bevy-stylized-core`
-//! 的 descriptor 上，ADR-0001 三方对比（It-6）结论引发的返工被限制在
-//! 本 crate 内部。
+//! 薄层 backend（ADR-0001 Accepted 2026-09-23）：本 crate 建立在 Bevy
+//! `Material` 组合路径上；公共语义全部挂在 `bevy-stylized-core` 的
+//! descriptor 上，backend 相关返工被限制在本 crate 内部。
 //!
 //! 内容：
 //!

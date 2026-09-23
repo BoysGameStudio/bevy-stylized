@@ -1,8 +1,8 @@
 //! Cel@Portable 前向主材质（It-3b 切片）。
 //!
-//! **Provisional（ADR-0001 未决）**：本切片建立在 Bevy `Material` 组合路径
+//! 薄层 backend（ADR-0001 Accepted）：本切片建立在 Bevy `Material` 组合路径
 //! 上，是薄层临时 backend；所有公共语义挂在 core 的
-//! [`StylizedMaterialDescriptor`] 上，ADR-0001 三方对比结论引发的返工被
+//! [`StylizedMaterialDescriptor`] 上，backend 相关返工被
 //! 限制在本 crate 内部。
 //!
 //! Portable 约束（docs/rendering/01、治理不变量 6/7/8）：
