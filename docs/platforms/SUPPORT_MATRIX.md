@@ -159,6 +159,24 @@ qualified, docs/reference/08 §1), and `asset_adoption` requires an explicit
 local `STYLIZED_TEST_ASSET` input that was not provisioned in this run.
 macOS stays Not qualified above.
 
+2026-09-23 root-cause of the three Metal golden deltas (diff-map evidence):
+all three decompose into thousands of ±1 cross-vendor rounding pixels plus
+1–2 outlier pixels at numerically hypersensitive boundaries, and none is a
+fixable renderer defect. `golden_cel` sphere_outline: 992 px at delta 1 plus
+one rim pixel at delta 6 (outline-silhouette coverage rounding).
+`golden_character` face_sdf_instances: 9059 px at delta 1 plus two pixels at
+delta 33 on the SDF threshold boundary of the high-threshold sphere, where
+the steep smoothstep turns sub-ulp sampler/interpolation rounding into a
+lit-vs-shadow flip. `outline_advanced`: screen-edge DETECTION was verified
+correct on Metal (a direct prepass probe shows correct reverse-Z depth and
+correct normals, and the edge map contains every baseline edge at the same
+positions); the residual differences are sparse sub-pixel coverage/raster
+rounding along edge lines (hull_only: 477/478 px below delta 48, one at 49;
+screen/hybrid outliers to 186 at isolated edge pixels). No shader change can
+remove these without altering the accepted Linux/Vulkan baselines, so the
+suites keep failing on Metal exactly as before; the qualified Golden
+comparison host remains Linux/Vulkan (docs/reference/08 §1).
+
 On SwiftShader, cold-launched original/fixed APK pairs were each captured after
 600 update frames at the same front pose, camera and 1080×2400 resolution.
 Both procedural and static-character application ROIs `(0,160)-(1080,2240)`
