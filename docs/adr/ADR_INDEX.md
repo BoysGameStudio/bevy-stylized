@@ -29,7 +29,7 @@
 | ADR-0023 | Render Semantics Matrix | Accepted | [`0023-render-semantics-matrix.md`](0023-render-semantics-matrix.md) |
 | ADR-0024 | Cargo Feature Policy | Accepted | [`0024-cargo-feature-policy.md`](0024-cargo-feature-policy.md) |
 | ADR-0025 | Profile API and Schema Stability | Accepted | [`0025-profile-api-and-schema-stability.md`](0025-profile-api-and-schema-stability.md) |
-| ADR-0026 | Disabled Feature Cost Policy | Proposed | [`0026-disabled-feature-cost-policy.md`](0026-disabled-feature-cost-policy.md) |
+| ADR-0026 | Disabled Feature Cost Policy | Accepted | [`0026-disabled-feature-cost-policy.md`](0026-disabled-feature-cost-policy.md) |
 | ADR-0027 | Current Bevy Baseline | Accepted | [`0027-bevy-compatibility-policy.md`](0027-bevy-compatibility-policy.md) |
 | ADR-0028 | glTF Plugin Initialization Ordering | Accepted | [`0028-gltf-plugin-initialization.md`](0028-gltf-plugin-initialization.md) |
 | ADR-0029 | Performance Evidence Policy | Accepted | [`0029-performance-evidence-policy.md`](0029-performance-evidence-policy.md) |

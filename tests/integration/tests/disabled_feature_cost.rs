@@ -1,4 +1,4 @@
-//! Disabled-feature 成本测试（provisional，pending ADR-0026）：
+//! Disabled-feature 成本测试（ADR-0026 Accepted 2026-09-23）：
 //! 组件缺失时对应系统必须零工作（cheap query early-out），不产生实体、
 //! 不写资产。
 
