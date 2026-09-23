@@ -83,7 +83,8 @@
       "showcase_golden_lod",
       "showcase_golden_environment_day",
       "showcase_golden_environment_dusk",
-      "showcase_golden_environment_night"
+      "showcase_golden_environment_night",
+      "showcase_golden_effects"
     ]
   },
   "asset-integration": [

@@ -141,3 +141,4 @@ scene_case!(showcase_golden_lod, "lod");
 scene_case!(showcase_golden_environment_day, "environment-day");
 scene_case!(showcase_golden_environment_dusk, "environment-dusk");
 scene_case!(showcase_golden_environment_night, "environment-night");
+scene_case!(showcase_golden_effects, "effects");
