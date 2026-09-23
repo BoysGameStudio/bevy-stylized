@@ -796,3 +796,35 @@ pub fn environment(world: &mut World) -> CameraRecipe {
     ));
     CameraRecipe::new(Vec3::new(0.0, 2.5, 4.0), Vec3::new(0.0, 0.5, -15.0))
 }
+
+// ---------------------------------------------------------------------------
+// effects：效果网格光照基——per-material key light 覆盖（docs/reference/03
+// 效果网格光照基 decode 节）。同一 view 光下三个球体：左 = 无覆盖（随 view
+// key light）；中 = 锁定的上游解码方向（+Z，正对默认机位）；右 = 方位角
+// 翻转（-Z，正面落影）。覆盖的存在与作用域直接可读。
+// ---------------------------------------------------------------------------
+pub fn effects(world: &mut World) -> CameraRecipe {
+    let mesh = sphere(world, 0.85);
+    let base = StylizedHeroParams::default().with_ramp_rows(1.0);
+    let mut locked = base;
+    locked.character = locked.character.with_effect_light_dir(Vec3::Z);
+    let mut flipped = base;
+    flipped.character = flipped.character.with_effect_light_dir(Vec3::NEG_Z);
+    let mut materials = Vec::new();
+    for params in [base, locked, flipped] {
+        materials.push(world.resource_mut::<Assets<StylizedHeroMaterial>>().add(
+            StylizedHeroMaterial {
+                params,
+                ..StylizedHeroMaterial::default()
+            },
+        ));
+    }
+    for (material, x) in materials.into_iter().zip([-1.9, 0.0, 1.9]) {
+        world.spawn((
+            Mesh3d(mesh.clone()),
+            MeshMaterial3d(material),
+            Transform::from_xyz(x, 1.0, 0.0),
+        ));
+    }
+    CameraRecipe::new(Vec3::new(0.0, 1.0, 6.2), Vec3::new(0.0, 1.0, 0.0))
+}

@@ -34,7 +34,7 @@ pub struct SceneBinding {
     pub view: Option<(&'static str, ViewPresetFn)>,
 }
 
-/// 全部 17 条绑定（顺序与 catalog 一致）。
+/// 全部 18 条绑定（顺序与 catalog 一致）。
 #[must_use]
 pub fn bindings() -> Vec<SceneBinding> {
     use builders as b;
@@ -140,6 +140,12 @@ pub fn bindings() -> Vec<SceneBinding> {
             symbol: "builders::environment",
             build: b::environment,
             view: Some(("views::environment_night", views::environment_night)),
+        },
+        SceneBinding {
+            id: "effects",
+            symbol: "builders::effects",
+            build: b::effects,
+            view: None,
         },
     ]
 }

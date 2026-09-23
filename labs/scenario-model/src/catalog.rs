@@ -1,6 +1,6 @@
 //! 纯数据场景目录（docs/showcase/01 §依赖与代码所有权 / §场景、配方与验证身份）。
 //!
-//! 目录以注册定义为唯一源；本模块的内容是 17 个注册用例的元数据（稳定 ID、
+//! 目录以注册定义为唯一源；本模块的内容是 18 个注册用例的元数据（稳定 ID、
 //! 能力/tier 需求、资产依赖、参数 schema 占位）。元数据必须可在不启用
 //! renderer/glTF/UI 的构建中枚举——本模块不依赖任何渲染、glTF 或 UI 类型。
 //!
@@ -19,8 +19,8 @@ use bevy_stylized_core::axis::StylizedExecutionTier;
 use crate::ident::{PresetId, SceneId};
 use crate::recipe::{AssetDecl, SceneRecipe};
 
-/// 目录条目数量（`apps/showcase::all_cases` 的 17 个注册项，顺序固定）。
-pub const CATALOG_LEN: usize = 17;
+/// 目录条目数量（`apps/showcase::all_cases` 的 18 个注册项，顺序固定）。
+pub const CATALOG_LEN: usize = 18;
 
 /// 构建器绑定的数据记录（本阶段不做绑定，只记录所有者与符号）。
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -252,7 +252,7 @@ pub fn require_declared_assets(
     Ok(())
 }
 
-/// 内置目录：`apps/showcase` 现有 17 个注册用例（顺序与注册表一致）。
+/// 内置目录：`apps/showcase` 现有 18 个注册用例（顺序与注册表一致）。
 ///
 /// `builder` 记录当前所有者符号（`labs/scenes::builders::*`，视图 preset 在
 /// `labs/scenes::views::*`）；`reference`
@@ -426,6 +426,14 @@ pub fn catalog() -> Vec<CatalogEntry> {
             None,
             vec![],
         ),
+        entry(
+            "effects",
+            "效果网格光照基：per-material key light 覆盖对比",
+            "builders::effects",
+            None,
+            None,
+            vec![],
+        ),
     ]
 }
 
@@ -464,6 +472,7 @@ mod tests {
                 "environment-day",
                 "environment-dusk",
                 "environment-night",
+                "effects",
             ]
         );
         assert_eq!(validate_catalog(&entries), Ok(()));

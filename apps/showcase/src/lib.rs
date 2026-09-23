@@ -1,4 +1,4 @@
-//! Showcase 框架（It-9a）：17 个固定用例（docs/showcase/01 关卡表 ×
+//! Showcase 框架（It-9a）：18 个固定用例（docs/showcase/01 关卡表 ×
 //! release gate §Showcase）。
 //!
 //! 每个用例 = 固定场景 + 可选 headless 捕获。职责边界：showcase 是
@@ -187,7 +187,7 @@ pub fn capture_case(case: &ShowcaseCase, resources: RenderResources) -> Captured
     receipts.pop().expect("one observation").image
 }
 
-/// 全部 17 个用例（顺序固定，与 `labs/scenes` 绑定表/catalog 一致）。
+/// 全部 18 个用例（顺序固定，与 `labs/scenes` 绑定表/catalog 一致）。
 ///
 /// 构建器与视图 preset 来自 `labs/scenes` 注册表；宿主侧只补充输出绑定
 /// 元数据（reference 的资产根、outline-advanced 的 tier 请求）。

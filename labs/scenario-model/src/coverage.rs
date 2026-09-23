@@ -225,6 +225,12 @@ pub fn coverage_report() -> CoverageReport {
             non_black(),
             CoverageState::Pending,
         ),
+        scene(
+            "effects",
+            FAMILY_LIGHTING,
+            non_black(),
+            CoverageState::Pending,
+        ),
     ];
     let families = [
         (FAMILY_RAMP, "1/2/3/5 bands、256 authored ramp、smoothing、day/night atlas、360° 光照、时间稳定性"),
@@ -281,7 +287,7 @@ mod tests {
             .iter()
             .map(|coverage| coverage.scene.as_str())
             .collect();
-        assert_eq!(coverage_ids.len(), 17, "every catalog scene exactly once");
+        assert_eq!(coverage_ids.len(), 18, "every catalog scene exactly once");
         for id in &catalog_ids {
             assert_eq!(
                 coverage_ids.iter().filter(|c| c == &id).count(),
@@ -365,7 +371,7 @@ mod tests {
         let bytes = coverage_json().expect("serialize");
         let value: serde_json::Value = serde_json::from_slice(&bytes).expect("parse");
         assert_eq!(value["schema"], "bevy_stylized.coverage/v1");
-        assert_eq!(value["scenes"].as_array().expect("scenes").len(), 17);
+        assert_eq!(value["scenes"].as_array().expect("scenes").len(), 18);
         // 生成物写出（运行期生成，非受管快照）。
         let out_dir = root.join("target/stylized/coverage");
         std::fs::create_dir_all(&out_dir).expect("create coverage out dir");
@@ -374,7 +380,7 @@ mod tests {
 
     #[test]
     fn suites_registry_identities_are_intact() {
-        // line 704：用例减少需证明——必需测试身份清单仍可解析且 17 个
+        // line 704：用例减少需证明——必需测试身份清单仍可解析且 18 个
         // showcase 用例名逐一可解析回 catalog 场景。
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
         let suites: serde_json::Value = serde_json::from_slice(
@@ -387,7 +393,7 @@ mod tests {
         let showcase_cases: std::collections::BTreeSet<&str> =
             report.scenes.iter().map(|c| c.scene.as_str()).collect();
         // showcase 用例名（all_cases 的数据源即 catalog）与 catalog 一一对应。
-        assert_eq!(showcase_cases.len(), 17);
+        assert_eq!(showcase_cases.len(), 18);
         for id in &showcase_cases {
             assert!(
                 crate::catalog::catalog_entry(id).is_some(),

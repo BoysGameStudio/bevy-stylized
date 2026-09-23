@@ -296,7 +296,7 @@ mod tests {
     #[test]
     fn catalog_order_matches_registry_and_scenario_catalog() {
         let controller = controller();
-        assert_eq!(controller.cases().len(), 17);
+        assert_eq!(controller.cases().len(), 18);
         let ids: Vec<&str> = controller
             .cases()
             .iter()
@@ -322,6 +322,7 @@ mod tests {
                 "environment-day",
                 "environment-dusk",
                 "environment-night",
+                "effects",
             ]
         );
     }
@@ -333,7 +334,7 @@ mod tests {
             controller.evaluate(&SessionCommand::NextCase),
             CommandPlan::Switch(1)
         );
-        controller.current = 16;
+        controller.current = 17;
         assert_eq!(
             controller.evaluate(&SessionCommand::NextCase),
             CommandPlan::Switch(0)
@@ -341,7 +342,7 @@ mod tests {
         controller.current = 0;
         assert_eq!(
             controller.evaluate(&SessionCommand::PrevCase),
-            CommandPlan::Switch(16)
+            CommandPlan::Switch(17)
         );
         assert_eq!(
             controller.evaluate(&SessionCommand::SelectCase(

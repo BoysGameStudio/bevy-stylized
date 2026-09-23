@@ -20,7 +20,7 @@
 //!   （RFC 8785 JCS：UTF-16 码元属性排序、ECMAScript 数字表示、UTF-8）；
 //! - [`identity`]：recipe/session/execution/artifact 四域 SHA-256，
 //!   结构化长度前缀编码；
-//! - [`catalog`]：纯数据场景目录（`apps/showcase` 现有 17 个注册用例的
+//! - [`catalog`]：纯数据场景目录（`apps/showcase` 现有 18 个注册用例的
 //!   元数据；所有者位置与构建符号记录为数据，绑定核对由 `labs/scenes` 执行）。
 
 pub mod action;
