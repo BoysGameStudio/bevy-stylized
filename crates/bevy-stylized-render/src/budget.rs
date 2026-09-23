@@ -1,4 +1,4 @@
-//! Whole-pipeline 预算测量（docs/rendering/01；interim，pending ADR-0002）。
+//! Whole-pipeline 预算测量（docs/rendering/01；ADR-0002 Accepted）。
 //!
 //! 测量而非声明：
 //!

@@ -1,4 +1,4 @@
-//! Whole-pipeline 预算测试（docs/rendering/01；interim，pending ADR-0002）。
+//! Whole-pipeline 预算测试（docs/rendering/01；ADR-0002 Accepted 2026-09-23）。
 //!
 //! 对每条 (Class × Tier) 变体统计 per-stage 总用量：
 //!
@@ -253,7 +253,7 @@ fn whole_pipeline_budget_fits_baseline_models() {
     }
 
     let report = PipelineBudgetReport {
-        note: "interim whole-pipeline budget (provisional, pending ADR-0002); \
+        note: "whole-pipeline budget (ADR-0002 Accepted); \
                view = reflected mesh view layout (empty key); mesh evaluated \
                per target model; hero-fallback 为逻辑用量（fixed layout 仍绑定 \
                全部槽位，真正减绑需 per-tier 材质变体）",

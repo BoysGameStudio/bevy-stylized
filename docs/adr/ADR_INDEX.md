@@ -5,7 +5,7 @@
 | ID | Title | Status | File |
 |---|---|---|---|
 | ADR-0001 | Runtime Material Backend | Accepted | [`0001-runtime-material-backend.md`](0001-runtime-material-backend.md) |
-| ADR-0002 | Whole-Pipeline Resource Budget | Proposed | [`0002-whole-pipeline-resource-budget.md`](0002-whole-pipeline-resource-budget.md) |
+| ADR-0002 | Whole-Pipeline Resource Budget | Accepted | [`0002-whole-pipeline-resource-budget.md`](0002-whole-pipeline-resource-budget.md) |
 | ADR-0003 | Fixed Binding / Bindless Strategy | Accepted | [`0003-bindless-strategy.md`](0003-bindless-strategy.md) |
 | ADR-0004 | NPR Instance Data Transport | Accepted | [`0004-instance-data-transport.md`](0004-instance-data-transport.md) |
 | ADR-0005 | Profile Boundary | Accepted | [`0005-profile-boundary.md`](0005-profile-boundary.md) |

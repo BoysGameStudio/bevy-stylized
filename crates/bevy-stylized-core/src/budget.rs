@@ -1,5 +1,5 @@
-//! Whole-pipeline 资源预算模型（docs/rendering/01；interim，pending
-//! ADR-0002）。
+//! Whole-pipeline 资源预算模型（docs/rendering/01；ADR-0002 Accepted
+//! 2026-09-23）。
 //!
 //! 预算对象不是单个材质，而是整条 pipeline 的 per-stage 可见性：
 //!
@@ -137,7 +137,7 @@ impl StylizedPipelineBudget {
     }
 }
 
-/// 建议的 safety margin（interim 值，pending ADR-0002 实测校准）。
+/// Safety margin（ADR-0002 ratified 固定值；重校准按 ADR-0029 测量流程）。
 pub const INTERIM_SAFETY_MARGIN: StylizedStageUsage = StylizedStageUsage {
     textures: 2,
     samplers: 1,

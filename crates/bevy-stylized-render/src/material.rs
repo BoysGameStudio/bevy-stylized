@@ -9,7 +9,7 @@
 //!
 //! - 不依赖 bindless / FP16 / subgroup / compute / HDR；
 //! - 固定 binding：1 UBO + 3 texture + 3 sampler（材质自身子预算
-//!   ≤2 UBO / ≤6 texture / ≤3 sampler，interim 阈值 pending ADR-0002）；
+//!   ≤2 UBO / ≤6 texture / ≤3 sampler，阈值见 ADR-0002 预算模型）；
 //! - 无 per-frame material asset mutation：View 层数据经
 //!   [`crate::view`] 同步进 Bevy 的 `DirectionalLight` / 相机 `Exposure`，
 //!   shader 从 `mesh_view_bindings` 只读。
