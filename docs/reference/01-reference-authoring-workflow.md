@@ -121,15 +121,16 @@ it does not qualify source transparency, effect meshes or animation.
 
 An unmodified upstream-effect diagnostic shows opaque patterned shells over the
 skirt. Gacha 3.6.9 assigns GI Body materials with noise/mask diffuse images and
-Alpha disabled, leaving the raw effect shader's dissolve/Fresnel behavior absent.
-Those fallback shells are evidence of an authoring gap, not a runtime reference
-for the original effects. The export contract describes the required separate
-adaptation boundary. The effects recipe (`genshin-static-effects-v1`) now renders
-both meshes with the decoded light basis and the HASHED→Mask mapping; the
-reference comparison on the qualified platform still fails the full-body cases
-in the effect region, attributed to this same unreconstructed path — image
-parity for the effect meshes remains unqualified (export contract, effect parity
-status).
+Alpha disabled; the raw effect JSON's dissolve/Fresnel behavior is absent from
+this import, and the "Genshin Alpha" group itself is inert in this static build
+(`Use Alpha = 0`). Those fallback shells are evidence of an authoring gap, not a
+runtime reference for the original effects. The export contract describes the
+required separate adaptation boundary. The effects recipe
+(`genshin-static-effects-v1`) renders both meshes with the decoded light basis,
+the shared body ramp, and the HASHED→Mask mapping; on the qualified platform
+`full_body-front` passes the unchanged criteria and the side-view cases remain
+diagnostic on a sub-pixel edge fill-rule residual (export contract, effect
+parity status).
 
 The `gacha369-emission-full-isolation-2` run additionally rebuilt the emission
 variant from verified raw inputs with networking disabled, no sibling repositories

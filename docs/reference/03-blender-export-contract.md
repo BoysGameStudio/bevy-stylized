@@ -199,42 +199,64 @@ when the parameter is enabled.
 Transparency mapping: the source effect materials are `blend_method = HASHED`
 (dithered). ADR-0023 qualifies Opaque/Mask only, so the handoff maps them to
 Mask with an explicit cutoff (`alpha_mask = 0.5`; required for the effect role;
-the exporter fails closed if the source blend method changes). The baked diffuse
-alpha is uniform 1.0 in this static build, so the mask currently discards
-nothing; reconstructing the source dissolve/noise alpha (the "Genshin Alpha"
-group driven by mask/noise textures) remains parity scope, together with
-transparent ordering/depth and time-dependent reference cases.
+the exporter fails closed if the source blend method changes). Inspected for
+the alpha-path reconstruction (2026-09-23): the source's own "Genshin Alpha"
+group is **inert** in this static build — `Use Alpha = 0` and the
+emission/transparency switch sits at Emission, so the group outputs the lit
+input unchanged, and single-sample renders confirm alpha = 1 everywhere. The
+Mask mapping on the uniform baked alpha is therefore faithful to the locked
+source state, not an approximation of an active dissolve. Should a future
+authoring lock enable the alpha path, its fixed-time reference value must be
+defined first (the reference captures pin frame 1; the raw dissolve graph is
+time-scrolled).
 
-### Effect parity status (2026-09-23, effects recipe)
+Ramp/ILM reconstruction (2026-09-23, verified by bisect renders): the effect
+materials use the shared body-shader ramp (`Use Shadow Ramp = 1`); the base GI
+Body variant carries both body and hair ramps and the material's
+`Body / Hair` switch selects (0 = body for both Eff materials). ILM follows the
+material's actual `Lightmap Lerp` wiring (Eff_002 feeds its mask image as the
+lightmap; a `*_Lightmap.png` name search would drop it). The decisive vertex
+semantic: the Eff meshes carry **no** `Col` vertex-color attribute, and EEVEE
+reads a missing/unset color attribute as black (measured with probe renders).
+The source ramp width term therefore divides by zero (Blender divide → 0) and
+`ramp_x = 1`: the ribbons are force-lit regardless of orientation. The runtime
+matches this by defaulting the ramp width vertex factor to 0 when the mesh has
+no vertex colors (meshes with `COLOR_0` are unchanged).
+
+### Effect parity status (2026-09-23, ramp/ILM/vertex-color reconstruction)
 
 Reference comparison of the effects build's matched case (the six standard
 cases; [criteria](08-golden-tolerance-and-cross-layer-criteria.md) unchanged)
 on the qualified Linux/Vulkan platform (RTX 5090; the Metal diagnostic run
 agrees within cross-vendor rounding):
 
-- `face_closeup-{front,left,right}`: PASS — the effect meshes are out of frame;
-  metrics match the frozen scope.
-- `full_body-{front,left,right}`: FAIL — non-edge max delta 0.345 (> 16/255),
-  shadow-mask IoU ≈ 0.35 (< 0.95), silhouette IoU ≈ 0.957 (< 0.99); mean delta
-  ≈ 0.005 and PSNR ≈ 30.2 pass. Every pixel above the 16/255 threshold lies in
-  the skirt band (rows 209–320, columns 165–346 of 512²); the a-priori upper
-  region (rows < 200, head/torso/legs) stays within criteria.
+- `full_body-front`: **PASS / qualified** — non-edge max 0.035, mean ≈ 0,
+  PSNR 64.8, sharp-light-factor IoU 0.9994, center coverage 0.99997, both
+  repeats byte-identical.
+- `face_closeup-{front,left,right}`: PASS (the effect meshes are out of frame;
+  metrics match the frozen scope).
+- `full_body-{left,right}`: **diagnostic, not qualified** — non-edge max
+  0.094–0.098 (> 16/255) on 90–154 pixels at the outer ribbon panel's hem edge
+  transition; every other criterion passes by wide margins (mean ≈ 0.0001,
+  PSNR 55–57, sharp-light-factor IoU ≥ 0.9996, center coverage 0.99997). The
+  residual is a sub-pixel coverage/fill-rule difference between EEVEE and wgpu
+  at the thin ribbon edge (exported geometry verified vertex-exact to 3e-8;
+  both renderers are run-to-run deterministic). It is not an unimplemented
+  shading feature; closing it would require relaxing reference/08, which is
+  not on the table.
 
-Attribution: the gap is confined to the effect meshes and the dress area they
-cover. The source renders the ribbons through the unreconstructed
-dissolve/noise/Fresnel alpha path (dithered see-through coverage,
-view-dependent iridescent tint); the runtime renders the implemented scope
-(decoded light basis, body-shader lighting, Mask 0.5 over uniform baked alpha).
-The effect meshes are therefore **not** Blender-parity qualified; the full-body
-effects cases are diagnostic evidence of the documented authoring gap, and the
-frozen emission scope's qualification is unchanged.
+The slice-4 attribution of the full-body gap to the unreconstructed
+dissolve/noise/Fresnel alpha path was **wrong** and is corrected here: that
+path is disabled in the source. The dominant gap was the missing ramp/ILM
+wiring plus the vertex-color force-lit semantics, both now implemented.
 
 Qualified for the effect meshes today: the data handoff (sidecar
 `effect_lighting`), the compile-time light-basis fold, the scoped per-material
 light-direction override (GPU evidence: an azimuth flip changes exactly the
-effect meshes' pixels), and the HASHED→Mask mapping. Not qualified: image
-parity, dissolve/noise/Fresnel alpha, transparent ordering/depth, and
-time-dependent behavior.
+effect meshes' pixels), the HASHED→Mask mapping, the shared ramp/ILM shading,
+and the `full_body-front` matched case. Not qualified: `full_body-left/right`
+(edge fill-rule residual above), any future active dissolve/alpha behavior, and
+time-dependent animation (the static scope pins frame 1).
 
 | Surface | Current producer behavior |
 | --- | --- |
