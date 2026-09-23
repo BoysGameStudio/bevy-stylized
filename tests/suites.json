@@ -72,6 +72,18 @@
     "alpha_probe": [
       "alpha_mask_cutout_probe",
       "native_mask_prepass_preserves_cutouts_for_all_classes"
+    ],
+    "showcase_golden": [
+      "showcase_golden_overview",
+      "showcase_golden_lighting",
+      "showcase_golden_hair",
+      "showcase_golden_metal",
+      "showcase_golden_reference",
+      "showcase_golden_performance",
+      "showcase_golden_lod",
+      "showcase_golden_environment_day",
+      "showcase_golden_environment_dusk",
+      "showcase_golden_environment_night"
     ]
   },
   "asset-integration": [
