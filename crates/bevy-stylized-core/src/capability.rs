@@ -11,7 +11,7 @@
 //! 本模块不依赖 wgpu 类型（core 依赖边界）；wgpu 映射在 facade 中完成。
 //!
 //! Tier 需求表（[`STYLIZED_TIER_REQUIREMENTS`]）当前为 **provisional**：
-//! 数值将在 It-7 随 ADR-0010 / 0021 / 0026 关闭时按平台证据定稿。
+//! 数值经 ADR-0010 / 0021 / 0026（均 Accepted）按平台证据定稿。
 //! 唯一已冻结的不变量：Portable 档不得要求
 //! [`PORTABLE_FORBIDDEN_REQUIREMENTS`] 中的任何特性。
 
@@ -167,7 +167,7 @@ const HIGH_LIMITS: StylizedGpuLimits = StylizedGpuLimits {
     max_uniform_buffers_per_shader_stage: 12,
 };
 
-/// Tier 需求表（**provisional**，pending ADR-0010 / 0021 / 0026）。
+/// Tier 需求表（ADR-0010 / 0021 / 0026 ratified；变更需新证据）。
 ///
 /// 已冻结不变量：Portable 条目不包含
 /// [`PORTABLE_FORBIDDEN_REQUIREMENTS`] 中的任何特性（有测试钉死）。
