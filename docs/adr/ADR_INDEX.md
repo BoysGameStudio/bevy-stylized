@@ -9,7 +9,7 @@
 | ADR-0003 | Fixed Binding / Bindless Strategy | Accepted | [`0003-bindless-strategy.md`](0003-bindless-strategy.md) |
 | ADR-0004 | NPR Instance Data Transport | Accepted | [`0004-instance-data-transport.md`](0004-instance-data-transport.md) |
 | ADR-0005 | Profile Boundary | Accepted | [`0005-profile-boundary.md`](0005-profile-boundary.md) |
-| ADR-0006 | Texture Packing and Semantic Preservation | Proposed | [`0006-texture-packing-and-semantics.md`](0006-texture-packing-and-semantics.md) |
+| ADR-0006 | Texture Packing and Semantic Preservation | Accepted | [`0006-texture-packing-and-semantics.md`](0006-texture-packing-and-semantics.md) |
 | ADR-0007 | Reference Renderer and Golden Chain | Accepted | [`0007-reference-renderer-and-golden-chain.md`](0007-reference-renderer-and-golden-chain.md) |
 | ADR-0008 | Outline Architecture | Accepted | [`0008-outline-architecture.md`](0008-outline-architecture.md) |
 | ADR-0009 | Lighting Backends | Accepted | [`0009-lighting-backends.md`](0009-lighting-backends.md) |

@@ -6,8 +6,10 @@
 //! ## 预算（超出 Cel 的 interim 子预算，实际计数见 interim_budget 测试输出）
 //!
 //! 8 纹理 / 8 sampler / 1 UBO（base + ILM + face SDF + authored ramp +
-//! packed normal + matcap + spec ramp）。ILM 通道约定：R=AO、G=hair mask、
-//! B=metal mask、A=emission mask。Portable 合法性：全部 fixed binding +
+//! packed normal + matcap + spec ramp）。ILM 通道约定（ADR-0006，与
+//! character/hero shader decode 一致）：R=metal mask(>0.9)、G=AO、B=高光
+//! 抑制(1.03−B)、A=材质分带 ID；emission mask 在 base alpha，不是 ILM 通道。
+//! Portable 合法性：全部 fixed binding +
 //! filterable float 纹理，无 storage/compute/bindless——超限的是
 //! **数量**而非特性；Hero@Portable fallback（[`apply_hero_portable_fallback`]）
 //! 关闭 matcap / spec ramp / packed normal 三个最贵路径。
