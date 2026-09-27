@@ -311,21 +311,27 @@ def run_showcase(project, out):
     command(['cargo', 'build', '--offline', '--release', '--target', 'wasm32-unknown-unknown', '-p', 'browser-showcase'], project.root, 'wasm-build', 600)
     command([bindgen, '--target', 'web', '--out-dir', str(site/'pkg'),
              str(project.root/'target/wasm32-unknown-unknown/release/browser-showcase.wasm')], project.root, 'wasm-bindgen')
-    command(['cargo', 'build', '--offline', '--release', '-p', 'browser-showcase'], project.root, 'native-build', 600)
-    # Same-machine native captures: the reference/08 §5 domain is browser
-    # (Dawn/Tint) vs native (wgpu/naga) on one machine — never cross-platform.
+    # Same-machine native reference per scene (reference/08 §5 domain is
+    # browser vs native on one machine). On the canonical host (Linux/Vulkan)
+    # the canonical golden IS the native reference: the showcase_golden lane
+    # proves byte-exact same-host reproduction (52/52); no re-capture needed.
+    # Elsewhere (macOS) the host binary captures fresh references locally.
+    import sys
+    canonical_host = sys.platform != 'darwin'
     native_dir = out/'native'
-    native_dir.mkdir()
-    for scene in scenes:
-        log = (out/(f'native-{scene}.log')).open('w')
-        result = invoke([str(project.root/'target/release/browser-showcase')], cwd=project.root,
-                        env=dict(os.environ, CARGO_INCREMENTAL='0',
-                                 STYLIZED_BROWSER_SCENE=scene,
-                                 STYLIZED_CAPTURE_OUT=str(native_dir/f'{scene}.json')),
-                        stdout=log, stderr=subprocess.STDOUT, timeout=120)
-        log.close()
-        if result.returncode or not (native_dir/f'{scene}.json').is_file():
-            raise CheckFailed(f'native reference capture failed for {scene}; inspect native-{scene}.log')
+    if not canonical_host:
+        command(['cargo', 'build', '--offline', '--release', '-p', 'browser-showcase'], project.root, 'native-build', 600)
+        native_dir.mkdir()
+        for scene in scenes:
+            log = (out/(f'native-{scene}.log')).open('w')
+            result = invoke([str(project.root/'target/release/browser-showcase')], cwd=project.root,
+                            env=dict(os.environ, CARGO_INCREMENTAL='0',
+                                     STYLIZED_BROWSER_SCENE=scene,
+                                     STYLIZED_CAPTURE_OUT=str(native_dir/f'{scene}.json')),
+                            stdout=log, stderr=subprocess.STDOUT, timeout=120)
+            log.close()
+            if result.returncode or not (native_dir/f'{scene}.json').is_file():
+                raise CheckFailed(f'native reference capture failed for {scene}; inspect native-{scene}.log')
     handler = partial(SimpleHTTPRequestHandler, directory=str(site))
     server = ThreadingHTTPServer(('127.0.0.1', 0), handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -345,7 +351,6 @@ def run_showcase(project, out):
     # Native-leg baseline = the current platform's accepted baseline: on macOS
     # the macos-metal overlay holds the native-wgpu platform truth; Linux has
     # no overlay and resolves to canonical. No browser-specific baselines.
-    import sys
     overlay = baselines/'macos-metal' if sys.platform == 'darwin' else None
     reports = {}
     for scene in scenes:
@@ -359,8 +364,12 @@ def run_showcase(project, out):
             continue
         browser_data = bytes(rgba)
         Image.frombytes('RGBA', (512, 512), browser_data).save(captures/f'{scene}.png')
-        native = json.loads((native_dir/f'{scene}.json').read_text())
-        native_data = bytes(native['rgba'])
+        if canonical_host:
+            native_data = Image.open(baselines/f'{scene}.png').convert('RGBA').tobytes()
+            native = {'backend': 'native-canonical-host', 'device': 'see golden provenance'}
+        else:
+            native = json.loads((native_dir/f'{scene}.json').read_text())
+            native_data = bytes(native['rgba'])
         # Chain of judgments, both per scene and never hidden:
         # (1) browser vs same-machine native — reference/08 §5 (exact preferred,
         #     approved envelope fallback for the Dawn/Tint vs naga domain only);
