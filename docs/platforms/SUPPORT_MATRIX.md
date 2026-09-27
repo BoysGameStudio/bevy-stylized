@@ -251,3 +251,19 @@ tier2-edge-confined). The recorded Linux Chrome 153 divergence (6 px / 18 ch /
 max 31) passes the envelope; the macOS Chrome 153 run remains exact. This is
 still not a general browser-support claim: other browsers, versions, drivers
 and feature scope are unmeasured until individually recorded.
+
+### Browser showcase record, 2026-09-27
+
+The `browser-showcase` lane ([Contributing](../../CONTRIBUTING.md#browser-showcase-lane))
+executes the full 18-scene catalog in the browser through the CaseDriver host
+(`apps/browser-showcase`, per-frame pumping, the shared showcase capture
+profile) and judges per scene against the canonical showcase goldens
+(browser vs same-machine native reference: exact preferred, the reference/08 §5
+envelope is the only fallback). Canonical host (Chrome 153.0.8010.52 headless,
+Dawn/Vulkan, NVIDIA Blackwell, driver 615.71.09): **18/18 PASS, all exact** —
+the envelope was not needed. The macOS diagnostic run (Chrome, Dawn/Metal, M4
+Pro) passes 16/18; `lod` (1 px, ±1, flat region) and `outline-advanced` (3 px
+at frame row 0) fail the envelope's edge-confinement and are reported as
+FAIL-with-evidence, not hidden; the macOS native-vs-golden leg passes all 18
+(via the macos-metal overlay where accepted). Per-version scope unchanged: this
+records Chrome 153 on the two measured hosts only.

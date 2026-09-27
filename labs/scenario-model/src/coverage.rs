@@ -117,7 +117,9 @@ fn scene(id: &str, family: &str, judgment: Judgment, android: CoverageState) -> 
         family: family.to_string(),
         pc,
         android,
-        browser: CoverageState::Pending,
+        // Browser 列：browser-showcase lane 的全目录执行证据（Chrome 153，
+        // canonical host 18/18 exact；docs/platforms 记录的判定链）。
+        browser: CoverageState::Verified,
         judgment,
     }
 }
@@ -272,7 +274,7 @@ pub fn coverage_report() -> CoverageReport {
             "overview 同时展示三个 surface class，归入 lighting / environment（默认光照/视图语义）".to_string(),
             "reference 的六视角参考验收合同归 labs/reference 独立合同，不作为本表判定凭据".to_string(),
             "Metal host 的既有 golden 超差（sphere_outline/face_sdf_instances/outline-advanced hull）是 host 限定问题，合格 Linux host 的 golden 判定不受影响".to_string(),
-            "browser 列全部待实现：wasm32 编译证明不构成执行证据；webgpu lane 缺 wasm-bindgen-cli".to_string(),
+            "browser 列证据 = browser-showcase lane（Chrome 153 headless，Dawn/Vulkan NVIDIA）：全 18 场景执行 + 逐场景判定（vs canonical showcase 基线，exact 18/18，envelope 未动用）；macOS 诊断运行 lod/outline-advanced 各有亚 LSB 非边缘分歧像素， envelope 判 FAIL 并如实记录，不构成缺陷证据".to_string(),
         ],
     }
 }
@@ -328,8 +330,8 @@ mod tests {
             );
             assert_eq!(
                 coverage.browser,
-                CoverageState::Pending,
-                "{} browser must stay pending (no execution evidence)",
+                CoverageState::Verified,
+                "{} browser must be verified (browser-showcase lane evidence)",
                 coverage.scene
             );
             if coverage.pc == CoverageState::Verified {

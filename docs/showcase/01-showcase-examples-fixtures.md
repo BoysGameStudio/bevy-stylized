@@ -37,6 +37,15 @@
 > 当前可执行入口见[运行手册](02-running-the-showcase-suite.md)。以上为本地证据，不构成
 > V1 就绪或新平台合格声明；[SUPPORT_MATRIX](../platforms/SUPPORT_MATRIX.md) 不变。
 > 本设计不改变既有 Golden、性能、参考验收规则。
+>
+> **2026-09-27 更新：** 覆盖映射闭合到 PC 18/18 验证（showcase golden 判定）+
+> Browser 18/18 验证（`browser-showcase` lane：全目录经 CaseDriver 逐帧泵送
+> 在浏览器执行；canonical host Chrome 153/Dawn/Vulkan 18/18 exact）。浏览器
+> 宿主接入（R1 的遗留项）已由 `apps/browser-showcase` 交付；判定基线统一为
+> `fixtures/golden/showcase/`（套件验证场景另有其专属捕获合同，不变）。
+> macOS 诊断运行：`lod`（1 px 亚 LSB 非边缘舍入）与 `outline-advanced`
+> （帧首行 3 px）未过 §5 envelope，如实记录为 FAIL，不构成缺陷证据；
+> envelope 与阈值未变。
 
 ## 目标与边界
 
