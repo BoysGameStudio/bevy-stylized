@@ -238,6 +238,24 @@ and GPU errors, and compares actual RGBA readbacks exactly. A failed comparison
 is retained, never rebaselined. This lane currently qualifies this Linux adapter;
 it is not a portable browser support claim.
 
+## Browser showcase lane
+
+`python3 tools/dev.py check --lane browser-showcase --out target/stylized/NEW_BROWSER_SHOWCASE`
+runs every registered catalog scene in the browser through the
+`apps/browser-showcase` host (CaseDriver per-frame pumping; the shared
+`showcase::capture_profile_graph` capture contract) and judges per scene:
+browser (Dawn/Tint) vs fresh same-machine native capture of the same host
+binary — exact preferred, the reference/08 §5 envelope is the only fallback —
+plus the native capture vs the platform's accepted showcase golden at the
+golden tolerance (Linux: canonical `fixtures/golden/showcase/`; macOS: the
+`macos-metal` overlay where accepted). Both judgments are reported per scene;
+a scene failing either is a FAIL with evidence. No browser baselines are
+created. Per-scene failures are isolated and all results are reported.
+
+Prerequisites match the webgpu lane (same executables/env), except no compiled
+character asset is required: the catalog scenes are procedural, and the
+`reference` scene's first-party fixture is served from `fixtures/`.
+
 Prerequisites: pinned Rust `wasm32-unknown-unknown` target, cached standalone Cargo
 dependencies, Node 22+, Pillow, a local display, Chromium and wasm-bindgen-cli
 matching the workspace lock. Select executables with `STYLIZED_CHROME` and

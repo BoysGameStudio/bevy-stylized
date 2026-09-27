@@ -43,7 +43,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--run-id');parser.add_argument('--root');parser.add_argument('--config');parser.add_argument('--cache')
     sub=parser.add_subparsers(dest='command',required=True);sub.add_parser('paths')
-    check=sub.add_parser('check');check.add_argument('--lane',choices=['docs','architecture','schema','cpu','gpu','asset-integration','character-reference','inspector','realtime','performance','workloads','webgpu','independence','consumers','inspector-cpu'],required=True)
+    check=sub.add_parser('check');check.add_argument('--lane',choices=['docs','architecture','schema','cpu','gpu','asset-integration','character-reference','inspector','realtime','performance','workloads','webgpu','browser-showcase','independence','consumers','inspector-cpu'],required=True)
     check.add_argument('--fetch',action='store_true',help='prepare independent consumer dependencies online');check.add_argument('--required',action='store_true');check.add_argument('--asset');check.add_argument('--case');check.add_argument('--pack',default='synthetic');check.add_argument('--out')
     check.add_argument('--suite', action='append', help='GPU lane only: select an exact registered test binary; reports partial coverage')
     check.add_argument('--recipe', help='independence lane only: rebuild this repository authoring recipe')
@@ -201,6 +201,10 @@ def execute(project, args):
         if not args.asset or not args.out or args.case:raise CheckFailed('webgpu requires --asset and a new --out, without --case')
         from checks.browser import run as browser
         print(json.dumps(browser(project,args.asset,args.out),indent=2))
+    elif lane=='browser-showcase':
+        if not args.out or args.asset or args.case:raise CheckFailed('browser-showcase requires a new --out, without --asset/--case')
+        from checks.browser import run_showcase
+        print(json.dumps(run_showcase(project,args.out),indent=2))
     elif lane=='realtime':
         if not args.asset or not args.out or args.case:raise CheckFailed('realtime requires --asset and a new --out, without --case')
         from checks.realtime import run as realtime

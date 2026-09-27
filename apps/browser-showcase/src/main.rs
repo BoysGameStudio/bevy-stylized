@@ -53,12 +53,21 @@ fn current_scene() -> String {
 /// 宿主侧场景选择：沿用 showcase `all_cases` 的注册绑定；浏览器侧的资产根
 /// 覆盖（reference 的第一方 fixture 经 HTTP 提供）归本宿主记录。
 fn host_asset_root(scene: &str) -> Option<&'static str> {
-    // 与 apps/showcase `all_cases` 的 reference 资产根同一内容，经 HTTP 提供。
+    // 与 apps/showcase `all_cases` 的 reference 资产根同一内容；wasm 侧经
+    // HTTP 提供，本机侧直接读仓库 fixture。
+    #[cfg(target_arch = "wasm32")]
     if scene == "reference" {
-        Some("assets/reference-scene")
-    } else {
-        None
+        return Some("assets/reference-scene");
     }
+    #[cfg(not(target_arch = "wasm32"))]
+    if scene == "reference" {
+        return Some(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../fixtures/synthetic/reference-scene"
+        ));
+    }
+    let _ = scene;
+    None
 }
 
 /// 逐帧泵送状态（R1：宿主拥有事件循环；driver 每帧最多推进一步）。
@@ -117,8 +126,10 @@ fn main() {
         scene,
         sent: false,
     });
-    app.finish();
-    app.cleanup();
+    // No explicit finish/cleanup: on wasm the render device initializes
+    // asynchronously and the winit runner finishes the app at the right time
+    // (an explicit finish would take the resource mutex across the async
+    // boundary and panic under no_threads).
     app.add_systems(Startup, build_driver);
     app.add_systems(Update, pump);
     app.run();
@@ -222,11 +233,12 @@ fn pump(world: &mut World) {
                 .to_string(),
             );
             host.sent = true;
+            #[cfg(not(target_arch = "wasm32"))]
+            world.write_message(bevy::app::AppExit::Success);
         }
         DriverStatus::Failed(error) => {
             publish(
-                &json!({"status":"FAIL","scene":host.scene,"reason":error.to_string()})
-                    .to_string(),
+                &json!({"status":"FAIL","scene":host.scene,"reason":error.to_string()}).to_string(),
             );
             host.sent = true;
         }

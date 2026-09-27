@@ -1,0 +1,15 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Stylized browser showcase</title>
+<style>body{margin:0;background:#222;color:#ddd}canvas{width:512px;height:512px;display:block}#status{font:14px monospace}</style></head>
+<body><canvas id="scene" width="512" height="512"></canvas><div id="status">Loading</div>
+<script>
+globalThis.stylizedErrors=[];
+if (globalThis.GPUAdapter && globalThis.GPUDevice) {
+const requestDevice=GPUAdapter.prototype.requestDevice;
+GPUAdapter.prototype.requestDevice=async function(...args){const device=await requestDevice.apply(this,args);device.addEventListener('uncapturederror',e=>stylizedErrors.push({kind:'gpu',message:e.error.message}));return device;};
+const createShader=GPUDevice.prototype.createShaderModule;
+GPUDevice.prototype.createShaderModule=function(desc){const module=createShader.call(this,desc);module.getCompilationInfo().then(info=>{const messages=[...info.messages].filter(x=>x.type==='error').map(x=>({message:x.message,line:x.lineNum,column:x.linePos}));if(messages.length)stylizedErrors.push({kind:'shader',messages,code:desc.code});});return module;};
+}
+addEventListener('error',e=>stylizedErrors.push(String(e.message)));
+addEventListener('unhandledrejection',e=>stylizedErrors.push(String(e.reason)));
+</script><script type="module">
+try{if(!navigator.gpu || !await navigator.gpu.requestAdapter()){globalThis.stylizedResult={status:'BLOCKED',reason:'required WebGPU adapter unavailable'};document.querySelector('#status').textContent='BLOCKED';}else{const {default:init}=await import('./pkg/browser-showcase.js');await init();}}catch(e){globalThis.stylizedResult={status:'FAIL',reason:String(e)};document.querySelector('#status').textContent='FAIL';}</script></body></html>

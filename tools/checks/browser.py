@@ -258,3 +258,153 @@ def run(project, asset, out):
     if result['status'] != 'PASS':
         raise CheckFailed('same-fixture browser/native pixels differ beyond the approved envelope; inspect captures without rebaselining')
     return result
+
+def run_showcase(project, out):
+    """Browser showcase lane: every catalog scene executes in the disposable
+    browser through the CaseDriver host (apps/browser-showcase) and is judged
+    against the canonical showcase golden (fixtures/golden/showcase/) — exact
+    match preferred, reference/08 §5 envelope as the only fallback. Browser
+    baselines are never created; a scene failing both is a FAIL with evidence.
+    """
+    out = project.resolve(out)
+    if out.exists():
+        raise CheckFailed('browser-showcase output exists; use a new candidate directory')
+    chrome = shutil.which(os.environ.get('STYLIZED_CHROME', 'google-chrome'))
+    node = shutil.which('node')
+    bindgen = shutil.which(os.environ.get('STYLIZED_WASM_BINDGEN', 'wasm-bindgen'))
+    if not all([chrome, node, bindgen]):
+        raise ResourceBlocked('browser showcase needs Chromium, Node 22+ and matching wasm-bindgen-cli')
+    lock = tomllib.loads((project.root/'Cargo.lock').read_text())
+    versions = {p['version'] for p in lock['package'] if p['name'] == 'wasm-bindgen'}
+    if len(versions) != 1:
+        raise CheckFailed('ambiguous wasm-bindgen lock version')
+    wasm_version = versions.pop()
+    if subprocess.check_output([bindgen, '--version'], text=True).strip() != f'wasm-bindgen {wasm_version}':
+        raise ResourceBlocked(f'wasm-bindgen-cli {wasm_version} required')
+    if int(subprocess.check_output([node, '--version'], text=True).strip().lstrip('v').split('.')[0]) < 22:
+        raise ResourceBlocked('Node 22+ required for built-in WebSocket')
+    flags = json.loads(os.environ.get('STYLIZED_CHROME_FLAGS', '[]'))
+    if not isinstance(flags, list) or any(not isinstance(s, str) for s in flags):
+        raise CheckFailed('STYLIZED_CHROME_FLAGS must be a JSON string array')
+    suites = json.loads((project.root/'tests/suites.json').read_text())
+    identities = suites['gpu']['showcase_golden']
+    scenes = [s.removeprefix('showcase_golden_').replace('_', '-') for s in identities]
+    baselines = project.root/'fixtures/golden/showcase'
+    missing = [s for s in scenes if not (baselines/f'{s}.png').is_file()]
+    if missing:
+        raise CheckFailed(f'canonical showcase baselines missing for: {missing}')
+    out.mkdir(parents=True)
+    site = out/'site'
+    site.mkdir()
+    shutil.copyfile(project.root/'apps/browser-showcase/index.html', site/'index.html')
+    shutil.copytree(project.root/'fixtures/synthetic/reference-scene', site/'assets/reference-scene')
+
+    def command(args, cwd, name, timeout=None):
+        with (out/(name+'.log')).open('w') as stream:
+            result = invoke(args, cwd=cwd, env=dict(os.environ, CARGO_INCREMENTAL='0'), stdout=stream, stderr=subprocess.STDOUT, timeout=timeout)
+        if result.returncode:
+            text = (out/(name+'.log')).read_text()
+            if any(s in text for s in ["target may not be installed", 'failed to download', 'attempting to make an HTTP request', 'no matching package named']):
+                raise ResourceBlocked(f'browser-showcase toolchain/cache missing; inspect {out/(name+".log")}')
+            raise CheckFailed(f'browser-showcase {name} failed; inspect {out/(name+".log")}')
+
+    command(['cargo', 'build', '--offline', '--release', '--target', 'wasm32-unknown-unknown', '-p', 'browser-showcase'], project.root, 'wasm-build', 600)
+    command([bindgen, '--target', 'web', '--out-dir', str(site/'pkg'),
+             str(project.root/'target/wasm32-unknown-unknown/release/browser-showcase.wasm')], project.root, 'wasm-bindgen')
+    command(['cargo', 'build', '--offline', '--release', '-p', 'browser-showcase'], project.root, 'native-build', 600)
+    # Same-machine native captures: the reference/08 §5 domain is browser
+    # (Dawn/Tint) vs native (wgpu/naga) on one machine — never cross-platform.
+    native_dir = out/'native'
+    native_dir.mkdir()
+    for scene in scenes:
+        log = (out/(f'native-{scene}.log')).open('w')
+        result = invoke([str(project.root/'target/release/browser-showcase')], cwd=project.root,
+                        env=dict(os.environ, CARGO_INCREMENTAL='0',
+                                 STYLIZED_BROWSER_SCENE=scene,
+                                 STYLIZED_CAPTURE_OUT=str(native_dir/f'{scene}.json')),
+                        stdout=log, stderr=subprocess.STDOUT, timeout=120)
+        log.close()
+        if result.returncode or not (native_dir/f'{scene}.json').is_file():
+            raise CheckFailed(f'native reference capture failed for {scene}; inspect native-{scene}.log')
+    handler = partial(SimpleHTTPRequestHandler, directory=str(site))
+    server = ThreadingHTTPServer(('127.0.0.1', 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        command([node, str(project.root/'tools/checks/browser_showcase.mjs'), chrome,
+                 f'http://127.0.0.1:{server.server_port}/', str(out), json.dumps(flags), json.dumps(scenes)],
+                project.root, 'browser-run', max(240, 60*len(scenes)))
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()
+    captured = json.loads((out/'browser-showcase-capture.json').read_text())
+    from PIL import Image
+    captures = out/'captures'
+    captures.mkdir()
+    # Native-leg baseline = the current platform's accepted baseline: on macOS
+    # the macos-metal overlay holds the native-wgpu platform truth; Linux has
+    # no overlay and resolves to canonical. No browser-specific baselines.
+    import sys
+    overlay = baselines/'macos-metal' if sys.platform == 'darwin' else None
+    reports = {}
+    for scene in scenes:
+        entry = captured['scenes'].get(scene, {'status': 'FAIL', 'reason': 'scene absent from browser capture'})
+        if entry.get('status') != 'PASS':
+            reports[scene] = {'status': entry.get('status', 'FAIL'), 'reason': entry.get('reason'), 'errors': entry.get('errors', [])}
+            continue
+        rgba = entry.get('rgba', [])
+        if len(rgba) != 512*512*4 or any(type(x) is not int or not 0 <= x <= 255 for x in rgba):
+            reports[scene] = {'status': 'FAIL', 'reason': 'invalid browser readback'}
+            continue
+        browser_data = bytes(rgba)
+        Image.frombytes('RGBA', (512, 512), browser_data).save(captures/f'{scene}.png')
+        native = json.loads((native_dir/f'{scene}.json').read_text())
+        native_data = bytes(native['rgba'])
+        # Chain of judgments, both per scene and never hidden:
+        # (1) browser vs same-machine native — reference/08 §5 (exact preferred,
+        #     approved envelope fallback for the Dawn/Tint vs naga domain only);
+        # (2) native vs the platform's accepted golden (canonical on Linux;
+        #     macos-metal overlay where accepted) at the golden tolerance
+        #     (the same judgment the showcase_golden lane applies).
+        exact = browser_data == native_data
+        envelope = None if exact else evaluate_browser_envelope(browser_data, native_data)
+        browser_passed = exact or (envelope is not None and envelope['pass'])
+        baseline_path = overlay/f'{scene}.png' if overlay and (overlay/f'{scene}.png').is_file() else baselines/f'{scene}.png'
+        canonical = baseline_path.read_bytes()
+        reference = Image.open(baseline_path).convert('RGBA').tobytes()
+        diffs = [abs(x-y) for x, y in zip(native_data, reference)]
+        mean = sum(diffs)/len(diffs)
+        import math
+        mse = sum(d*d for d in diffs)/len(diffs)
+        psnr = 99.0 if mse == 0 else 20*math.log10(255.0/math.sqrt(mse))
+        native_passed = max(diffs, default=0) <= 4 and mean <= 0.5 and psnr >= 40.0
+        identity = {key: entry.get(key) for key in
+                    ['backend', 'device', 'resolved_tier', 'generation', 'experiment_tick', 'stamp', 'engine_git_commit']}
+        identity['native_backend'] = native.get('backend')
+        identity['native_device'] = native.get('device')
+        passed = browser_passed and native_passed
+        reports[scene] = {'status': 'PASS' if passed else 'FAIL',
+                          'browser_vs_native': 'exact' if exact else ('envelope' if browser_passed else 'fail'),
+                          'envelope': envelope,
+                          'native_vs_canonical': {'pass': native_passed, 'max_channel_delta': max(diffs, default=0),
+                                                  'mean_channel_delta': mean, 'psnr_db': psnr},
+                          'identity': identity, 'errors': entry.get('errors', []),
+                          'capture_sha256': hashlib.sha256(browser_data).hexdigest(),
+                          'native_sha256': hashlib.sha256(native_data).hexdigest(),
+                          'baseline': str(baseline_path.relative_to(project.root)),
+                          'baseline_sha256': hashlib.sha256(canonical).hexdigest()}
+    exact_count = sum(1 for r in reports.values() if r.get('browser_vs_native') == 'exact')
+    envelope_count = sum(1 for r in reports.values() if r.get('browser_vs_native') == 'envelope')
+    failed = [s for s, r in reports.items() if r['status'] != 'PASS']
+    result = dict(schema='bevy_stylized.browser-showcase/v1',
+                  status='PASS' if not failed else 'FAIL',
+                  scenes=reports, total=len(scenes), exact=exact_count, envelope=envelope_count, failed=failed,
+                  browser=captured.get('browser'), browser_adapter=captured.get('adapter'),
+                  flags=flags, source=project.source_identity(),
+                  scope='per-scene browser-WebGPU execution of the full catalog; browser vs same-machine native (exact preferred, reference/08 §5 envelope is the only fallback); native vs canonical Linux/Vulkan golden at golden tolerance; no browser baselines are created')
+    (out/'report.json').write_text(json.dumps(result, indent=2)+'\n')
+    project.report('browser-showcase', result)
+    if result['status'] != 'PASS':
+        raise CheckFailed(f'browser showcase scenes failed: {failed}; inspect {out}/report.json')
+    return result
