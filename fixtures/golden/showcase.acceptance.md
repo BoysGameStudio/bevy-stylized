@@ -63,13 +63,21 @@ preset owns its own baseline, matching the per-scene catalog entries.
 - `showcase/environment-night.png` — `cf70c315…6124b0`
 - `showcase/effects.png` — `e249cdae…340d17`
 
-**macOS/Metal note (2026-09-23):** ten of eleven cases match these canonical
-baselines on the M4 Pro within tolerance (max 1–2/255 cross-vendor rounding,
-mean < 0.03). `showcase/effects` differs by exactly one pixel (delta 29 at
-(376, 305), on the flipped-sphere boundary — the same root-caused platform-truth
-class as the existing `macos-metal` overlays) and is accepted into the overlay
-at `showcase/macos-metal/effects.png` (SHA-256 `5784b37c…daff2a`; captured at
-engine commit `7431c331`, sidecar provenance alongside).
+**macOS/Metal note (2026-09-23/27):** of the eleven cases, ten match these
+canonical baselines on the M4 Pro within tolerance (max 1–2/255 cross-vendor
+rounding, mean < 0.03). `showcase/effects` differs by exactly one pixel (delta
+29 at (376, 305), on the flipped-sphere boundary — the same root-caused
+platform-truth class as the existing `macos-metal` overlays) and is accepted
+into the overlay at `showcase/macos-metal/effects.png` (SHA-256
+`5784b37c…daff2a`; captured at engine commit `7431c331`, sidecar provenance
+alongside). The full-catalog extension adds three more overlay cases, all in
+the root-caused classes (reviewed per the same diff-map discipline):
+`showcase/macos-metal/face` (2 px, max 21, SDF threshold boundary),
+`showcase/macos-metal/stress` (4 px, max 49, hull silhouette rounding),
+`showcase/macos-metal/outline-advanced` (5288 px on screen-outline edge lines,
+max 186 — the same class as the accepted outline-advanced suite overlays);
+captured at engine commit `cf077981`. The remaining 14 cases match canonical
+within tolerance and have no overlay.
 
 **Scope of this acceptance:** these images are the canonical baselines for the
 `showcase_golden` lane suite (`tests/suites.json`, ten identities). Judgment is
