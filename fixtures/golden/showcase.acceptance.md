@@ -28,6 +28,24 @@ declares; non-trivial content confirmed, no placeholder frames):
 | `environment-night` | Same layout, dark night palette | `views::environment_night` preset |
 | `effects` | Three spheres: view-lit, +Z override, −Z flipped (dimmer right) | `builders::effects` per-material light-basis override contrast (captured at engine commit `a7732894`) |
 
+**Full-catalog extension (2026-09-27, same acceptance act rules):** the browser
+host judges against this set uniformly, so the seven scenes already verified
+through their own suites also received showcase-path baselines (captured at
+engine commit `00c1ca67`, same canonical host). Their own suites keep their
+specialized capture setups and coverage credentials; these images serve the
+showcase-path and browser comparison. Reviewed content: `ramp` (colored ramp
+banding on spheres), `face` (half-lit SDF spheres), `outline` (rotated hull
+box), `animation` (posed skinned box), `post` (bloom/vignette spheres),
+`stress` (1000-instance grid), `outline-advanced` (hull + screen hybrid).
+
+- `showcase/ramp.png` — `c7647257…0a6802b9`
+- `showcase/face.png` — `57ee7c04…900cf28f`
+- `showcase/outline.png` — `d66ab313…b22c9f5`
+- `showcase/animation.png` — `c863c2c6…85dfc66`
+- `showcase/post.png` — `79a9745c…e52090a`
+- `showcase/stress.png` — `01d4293a…35ab788`
+- `showcase/outline-advanced.png` — `01f377dc…0acc0f1`
+
 The three environment images share one builder with three view presets; each
 preset owns its own baseline, matching the per-scene catalog entries.
 
