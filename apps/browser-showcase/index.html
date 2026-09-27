@@ -12,4 +12,7 @@ GPUDevice.prototype.createShaderModule=function(desc){const module=createShader.
 addEventListener('error',e=>stylizedErrors.push(String(e.message)));
 addEventListener('unhandledrejection',e=>stylizedErrors.push(String(e.reason)));
 </script><script type="module">
-try{if(!navigator.gpu || !await navigator.gpu.requestAdapter()){globalThis.stylizedResult={status:'BLOCKED',reason:'required WebGPU adapter unavailable'};document.querySelector('#status').textContent='BLOCKED';}else{const {default:init}=await import('./pkg/browser-showcase.js');await init();}}catch(e){globalThis.stylizedResult={status:'FAIL',reason:String(e)};document.querySelector('#status').textContent='FAIL';}</script></body></html>
+try{
+let adapter=null;
+for(let i=0;i<40 && !adapter;i++){adapter=navigator.gpu ? await navigator.gpu.requestAdapter() : null; if(!adapter) await new Promise(r=>setTimeout(r,250));}
+if(!adapter){globalThis.stylizedResult={status:'BLOCKED',reason:'required WebGPU adapter unavailable'};document.querySelector('#status').textContent='BLOCKED';}else{const {default:init}=await import('./pkg/browser-showcase.js');await init();}}catch(e){globalThis.stylizedResult={status:'FAIL',reason:String(e)};document.querySelector('#status').textContent='FAIL';}</script></body></html>
