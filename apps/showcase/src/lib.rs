@@ -105,7 +105,9 @@ fn configured_headless_app(
 }
 
 /// 通用 view 默认值（昼间 + 斜上 key light；交互会话的视图基线）。
-fn default_view_descriptor() -> StylizedViewDescriptor {
+///
+/// 公共契约：showcase PC 捕获与 browser host 共享同一视图基线。
+pub fn default_view_descriptor() -> StylizedViewDescriptor {
     StylizedViewDescriptor {
         key_light_direction: Vec3::new(0.5, 0.8, 0.6).normalize(),
         key_light_color: LinearRgba::WHITE,
@@ -120,7 +122,10 @@ fn default_view(world: &mut bevy::prelude::World) {
 }
 
 /// 捕获 profile 的动作图：`fixed_step{22} → observe`（帧语义见 crate 文档）。
-fn capture_profile_graph() -> ActionGraph {
+///
+/// 公共契约：showcase PC 捕获与 browser host（apps/browser-showcase）共享
+/// 同一动作图；改动它即改动两侧捕获的帧语义。
+pub fn capture_profile_graph() -> ActionGraph {
     ActionGraph {
         nodes: vec![
             ActionNode {

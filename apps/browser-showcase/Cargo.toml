@@ -1,0 +1,29 @@
+[package]
+name = "browser-showcase"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+description = "Browser (WebGPU) showcase host: scene catalog over CaseDriver per-frame pumping with golden-capture evidence."
+
+[lints]
+workspace = true
+
+[dependencies]
+bevy = { workspace = true, features = [
+    "bevy_animation",
+    "bevy_gltf",
+    "bevy_scene",
+    "bevy_winit",
+    "png",
+    "reflect_auto_register",
+    "webgpu",
+    "x11",
+] }
+bevy-stylized = { path = "../../crates/bevy-stylized" }
+scenes = { path = "../../labs/scenes", features = ["build"] }
+scene-runtime = { path = "../../labs/scene-runtime" }
+showcase = { path = "../showcase" }
+scenario-model = { path = "../../labs/scenario-model" }
+golden-harness = { path = "../../tests/harness" }
+serde_json.workspace = true
+wasm-bindgen = "=0.2.126"

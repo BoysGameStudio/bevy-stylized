@@ -84,7 +84,14 @@
       "showcase_golden_environment_day",
       "showcase_golden_environment_dusk",
       "showcase_golden_environment_night",
-      "showcase_golden_effects"
+      "showcase_golden_effects",
+      "showcase_golden_ramp",
+      "showcase_golden_face",
+      "showcase_golden_outline",
+      "showcase_golden_animation",
+      "showcase_golden_post",
+      "showcase_golden_stress",
+      "showcase_golden_outline_advanced"
     ]
   },
   "asset-integration": [

@@ -142,3 +142,13 @@ scene_case!(showcase_golden_environment_day, "environment-day");
 scene_case!(showcase_golden_environment_dusk, "environment-dusk");
 scene_case!(showcase_golden_environment_night, "environment-night");
 scene_case!(showcase_golden_effects, "effects");
+// The remaining catalog scenes also get showcase-path baselines: the browser
+// lane judges against this set uniformly (their own suites keep their
+// specialized capture setups and coverage credentials).
+scene_case!(showcase_golden_ramp, "ramp");
+scene_case!(showcase_golden_face, "face");
+scene_case!(showcase_golden_outline, "outline");
+scene_case!(showcase_golden_animation, "animation");
+scene_case!(showcase_golden_post, "post");
+scene_case!(showcase_golden_stress, "stress");
+scene_case!(showcase_golden_outline_advanced, "outline-advanced");
