@@ -228,6 +228,27 @@ packaged only into ignored local build outputs. To return to the procedural
 fixture, unset `STYLIZED_ANDROID_CHARACTER_DIR`, rebuild without `--features
 character`, then repackage/reinstall. Both modes use the same application ID.
 
+### Android catalog lane
+
+`python3 tools/dev.py check --lane android-catalog --out target/stylized/NEW_ANDROID_CATALOG`
+builds the APK once, then runs every registered catalog scene in a fresh
+process on the emulator (`Tenacity_API35`, `-gpu host`): the runner writes the
+scene id to a one-shot control file in the app files dir, force-stops, clears
+stale per-scene outputs, starts the app, waits for the structured report and
+pulls report + capture. Judgment is the golden tolerance against the canonical
+`fixtures/golden/showcase/` baselines, with the `android-vulkan` overlay where
+accepted; `GOLDEN_REBASELINE=1` writes overlay candidates for review (review
+and commit separately; the lane never overwrites canonical baselines). The
+reference scene's first-party fixture rides the APK assets
+(`STYLIZED_ANDROID_CATALOG_DIR`, staged by the lane). Per-scene failures are
+isolated and all results land in `report.json`. Evidence is emulator evidence
+only; no physical-device claim.
+
+Prerequisites match the Android smoke flow (cargo-ndk, JDK 26, SDK/NDK pins),
+plus a booted emulator (`adb devices` must show the target; select the serial
+with `STYLIZED_ANDROID_SERIAL`). The procedural smoke fixture and its replay
+contract are unchanged in default mode (no control file).
+
 ## Browser WebGPU
 
 `python3 tools/dev.py check --lane webgpu --required --asset BUILD/compiled/character.glb --out target/stylized/NEW_WEBGPU`

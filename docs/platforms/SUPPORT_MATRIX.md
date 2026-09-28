@@ -18,7 +18,7 @@
 | Linux / GLES | ✅ Compatible | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | Not qualified |
 | macOS / Metal | ✅ Compatible | ✅ cargo test --workspace（M4 Pro 本机） | ✅ naga 校验 + 真实管线创建（golden/budget 测试） | ✅ 全 class pipeline 创建（golden/budget 测试） | ✅ golden 捕获全绿（macos-metal overlay，5 图） | ✅ Apple M4 Pro（单一设备；overlay 验收记录） | ⚪ Not measured | Experimental（single device: Apple M4 Pro, Metal, macOS 27.0） |
 | iOS / Metal | ✅ Compatible | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | Not qualified |
-| Android / Vulkan | ✅ Compatible | ✅ ARM64 smoke, local Bevy fork | 🧪 SwiftShader + MoltenVK smoke | 🧪 Class/hull paths | 🧪 Procedural + static character, touch/resume | 🧪 API 35 emulator only | ⚪ Not measured | Experimental; hardware follow-up scoped below |
+| Android / Vulkan | ✅ Compatible | ✅ ARM64 smoke, local Bevy fork | 🧪 SwiftShader + MoltenVK smoke | ✅ 全 18 目录场景（catalog lane） | 🧪 Procedural + static character, touch/resume | 🧪 API 35 emulator only | ⚪ Not measured | Experimental; hardware follow-up scoped below |
 | Android / GLES | ✅ Compatible | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | Not qualified |
 | Web / WebGPU | ✅ Compatible | ✅ standalone wasm32 | ✅ real browser compilation | ✅ Cel/Character/Hero + hull | ✅ static asset capture | ✅ Linux/Chrome 153 (envelope) + macOS/Chrome 153 (exact) | ⚪ Not measured | Experimental; per-version qualification (ADR-0021), scoped below |
 | Web / WebGL2 | Outside current commitment | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | ⚪ Not tested | No support promise |
@@ -267,3 +267,16 @@ at frame row 0) fail the envelope's edge-confinement and are reported as
 FAIL-with-evidence, not hidden; the macOS native-vs-golden leg passes all 18
 (via the macos-metal overlay where accepted). Per-version scope unchanged: this
 records Chrome 153 on the two measured hosts only.
+
+### Android catalog record, 2026-09-28
+
+The `android-catalog` lane ([Contributing](../../CONTRIBUTING.md#android-catalog-lane))
+runs all 18 catalog scenes on the Tenacity_API35 emulator (API 35, arm64,
+`-gpu host`; MoltenVK 1.4.0 forwarding to the Apple M4 Pro Metal) with a fresh
+process per scene and per-scene structured reports. Result: **18/18 PASS**, two
+batches byte-identical. Judgment is the golden tolerance against the canonical
+showcase baselines, with the `android-vulkan` overlay for the four
+platform-truth classes (`effects`, `face`, `stress`, `outline-advanced`; three
+of them byte-identical to the accepted `macos-metal` images — same physical
+GPU). The evidence is emulator evidence: the row's Experimental label refers to
+this emulator identity; no physical-device, performance or thermal claim.

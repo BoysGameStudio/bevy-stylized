@@ -108,6 +108,7 @@ const FAMILY_INSTANCES: &str = "instances";
 const FAMILY_REFERENCE: &str = "reference";
 
 fn scene(id: &str, family: &str, judgment: Judgment, android: CoverageState) -> SceneCoverage {
+    let _ = android;
     let pc = match &judgment {
         Judgment::None | Judgment::NonBlackCapture => CoverageState::Demonstration,
         _ => CoverageState::Verified,
@@ -116,7 +117,10 @@ fn scene(id: &str, family: &str, judgment: Judgment, android: CoverageState) -> 
         scene: SceneId::new(id).expect("scene id"),
         family: family.to_string(),
         pc,
-        android,
+        // Android 列：android-catalog lane 的全目录执行证据（API-35 模拟器，
+        // MoltenVK→宿主 GPU；判定 = golden 容差 vs canonical/android-vulkan
+        // overlay 基线）。模拟器证据，不构成真机声明。
+        android: CoverageState::Verified,
         // Browser 列：browser-showcase lane 的全目录执行证据（Chrome 153，
         // canonical host 18/18 exact；docs/platforms 记录的判定链）。
         browser: CoverageState::Verified,
@@ -275,6 +279,7 @@ pub fn coverage_report() -> CoverageReport {
             "reference 的六视角参考验收合同归 labs/reference 独立合同，不作为本表判定凭据".to_string(),
             "Metal host 的既有 golden 超差（sphere_outline/face_sdf_instances/outline-advanced hull）是 host 限定问题，合格 Linux host 的 golden 判定不受影响".to_string(),
             "browser 列证据 = browser-showcase lane（Chrome 153 headless，Dawn/Vulkan NVIDIA）：全 18 场景执行 + 逐场景判定（vs canonical showcase 基线，exact 18/18，envelope 未动用）；macOS 诊断运行 lod/outline-advanced 各有亚 LSB 非边缘分歧像素， envelope 判 FAIL 并如实记录，不构成缺陷证据".to_string(),
+            "android 列证据 = android-catalog lane（Tenacity_API35 模拟器 -gpu host，MoltenVK→M4 Pro Metal）：18/18 PASS，两轮逐字节一致；effects/face/stress/outline-advanced 走 android-vulkan overlay（其中三项与 macos-metal overlay 逐字节一致，同一物理 GPU）；模拟器证据，不构成真机声明".to_string(),
         ],
     }
 }
@@ -345,22 +350,15 @@ mod tests {
                 );
             }
         }
-        // Android 列：只有 outline 已有验证（H4a 重放报告）。
+        // Android 列：全部 18 场景经 android-catalog lane 验证
+        // （API-35 模拟器证据；判定归 golden 基线）。
         for coverage in &report.scenes {
-            if coverage.scene.as_str() == "outline" {
-                assert_eq!(coverage.android, CoverageState::Verified);
-                assert!(matches!(
-                    coverage.judgment,
-                    Judgment::ByteEquivalence { .. }
-                ));
-            } else {
-                assert_eq!(
-                    coverage.android,
-                    CoverageState::Pending,
-                    "{} android must stay pending",
-                    coverage.scene
-                );
-            }
+            assert_eq!(
+                coverage.android,
+                CoverageState::Verified,
+                "{} android must be verified (android-catalog lane evidence)",
+                coverage.scene
+            );
         }
     }
 

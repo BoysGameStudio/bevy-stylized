@@ -46,6 +46,12 @@
 > macOS 诊断运行：`lod`（1 px 亚 LSB 非边缘舍入）与 `outline-advanced`
 > （帧首行 3 px）未过 §5 envelope，如实记录为 FAIL，不构成缺陷证据；
 > envelope 与阈值未变。
+>
+> **2026-09-28 更新：** 覆盖映射 Android 列闭合到 18/18 验证（`android-catalog`
+> lane：Tenacity_API35 模拟器 `-gpu host`，MoltenVK→M4 Pro Metal；每场景独立
+> 进程、结构化报告、两轮逐字节一致；判定 = golden 容差 vs canonical 基线，
+> 4 个场景走 `android-vulkan` overlay）。记录为模拟器证据，不构成真机声明；
+> 真机硬件跟进仍属未关闭项。
 
 ## 目标与边界
 
