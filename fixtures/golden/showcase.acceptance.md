@@ -63,6 +63,20 @@ preset owns its own baseline, matching the per-scene catalog entries.
 - `showcase/environment-night.png` — `cf70c315…6124b0`
 - `showcase/effects.png` — `e249cdae…340d17`
 
+**Android emulator note (2026-09-28, owner-delegated review):** the
+`android-vulkan` overlay holds the four scenes that exceed the golden tolerance
+on the Tenacity_API35 emulator (`-gpu host`, MoltenVK 1.4.0 forwarding to the
+Apple M4 Pro; API 35, arm64). Reviewed against canonical and the root-cause
+classes: `effects` (1 px, max 29), `face` (2 px, max 21, SDF threshold
+boundary) and `stress` (4 px, max 49, hull rounding) are byte-identical to the
+accepted `macos-metal` overlay images (same physical GPU); `outline-advanced`
+(1 px, max 49) is the emulator's own smaller hull-class delta (the macOS screen
+edge-line class does not reproduce through the emulator path). Captured at
+engine commit `862277f3` via the `android-catalog` lane; sidecars carry the
+device adapter (MoltenVK 1.4.0 → Apple M4 Pro, Vulkan), the build commit and
+timestamps. The remaining 14 scenes match canonical within tolerance. This is
+emulator evidence only — no physical-device claim (ADR-0010).
+
 **macOS/Metal note (2026-09-23/27):** of the eleven cases, ten match these
 canonical baselines on the M4 Pro within tolerance (max 1–2/255 cross-vendor
 rounding, mean < 0.03). `showcase/effects` differs by exactly one pixel (delta
