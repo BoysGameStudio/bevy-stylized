@@ -4,6 +4,7 @@
 #[cfg(feature = "character")]
 mod character;
 
+mod catalog;
 mod driver_host;
 
 #[cfg(not(feature = "character"))]
@@ -46,12 +47,23 @@ pub fn main() {
     // harness 中性探针（driver 的捕获/就绪前置；R1：平台事件循环不变）。
     golden_harness::capture::install(&mut app);
     golden_harness::readiness::install(&mut app);
-    app.init_resource::<driver_host::ReplayHost>().add_systems(
-        Update,
-        (input_and_lifecycle, heartbeat, driver_host::pump_replay),
-    );
+    // Catalog mode（runner 控制文件驱动）：每进程一个目录场景，共享捕获
+    // 合同；缺省 = 既有程序化/角色 fixture 与重放合同不变。
+    // 控制文件读取一次性消耗（读后删除）；只读一次并复用结果。
+    let catalog_scene = catalog::requested_scene();
+    let catalog_active = catalog_scene.is_some();
+    if let Some(scene) = catalog_scene {
+        catalog::configure(&mut app, &scene);
+    } else {
+        app.init_resource::<driver_host::ReplayHost>().add_systems(
+            Update,
+            (input_and_lifecycle, heartbeat, driver_host::pump_replay),
+        );
+    }
     #[cfg(not(feature = "character"))]
-    app.add_systems(Startup, setup);
+    if !catalog_active {
+        app.add_systems(Startup, setup);
+    }
     #[cfg(feature = "character")]
     app.add_plugins(bevy_stylized::StylizedAssetIntegrationPlugin)
         .init_resource::<character::CharacterState>()

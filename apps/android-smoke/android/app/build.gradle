@@ -27,6 +27,15 @@ android {
         }
         sourceSets.main.assets.srcDirs = [characterDir]
     }
+    // Catalog mode: the reference scene's first-party fixture rides the APK
+    // assets (procedural scenes need nothing). The runner stages this dir.
+    def catalogDir = System.getenv('STYLIZED_ANDROID_CATALOG_DIR')
+    if (catalogDir) {
+        if (!file("${catalogDir}/reference_scene.glb").isFile()) {
+            throw new GradleException('Catalog mode requires the staged reference_scene.glb fixture.')
+        }
+        sourceSets.main.assets.srcDirs += [catalogDir]
+    }
 }
 
 dependencies {

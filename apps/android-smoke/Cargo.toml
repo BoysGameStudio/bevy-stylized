@@ -16,6 +16,7 @@ scene-runtime = { path = "../../labs/scene-runtime" }
 scenes = { path = "../../labs/scenes", features = ["build"] }
 scenario-model = { path = "../../labs/scenario-model" }
 golden-harness = { path = "../../tests/harness" }
+showcase = { path = "../showcase" }
 serde_json = { workspace = true }
 
 [features]
