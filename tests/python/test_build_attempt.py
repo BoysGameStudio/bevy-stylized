@@ -68,7 +68,7 @@ class Attempts(unittest.TestCase):
             root = Path(temp)
             (root / 'output.glb').write_bytes(b'old success')
             finish(root, {})
-            self.assertEqual(completed_or_new(root, {}, verify_run), (root, None))
+            self.assertEqual(completed_or_new(root, {}, verify_run), (root.resolve(), None))
 
     def test_uncommitted_manifest_never_blocks_new_attempt(self):
         with tempfile.TemporaryDirectory() as temp:

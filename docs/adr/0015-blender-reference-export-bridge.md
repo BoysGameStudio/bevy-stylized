@@ -50,9 +50,10 @@ owns executable reproduction.
   attempts never blocking retry, stage failures recording partial outputs,
   legacy-success revalidation, uncommitted manifests never blocking,
   mismatched inputs rejected, corrupt completion manifests unreusable.
-  Linux: 7/7 PASS (cpu lane, 2026-09-22). macOS: 5/7 — the two remaining
-  failures are a pre-existing `/var` vs `/private/var` tempdir path-equality
-  issue in the test assertions, unrelated to bridge semantics.
+  Linux: 7/7 PASS (cpu lane, 2026-09-22). macOS: 7/7 — the two
+  pre-existing `/var` vs `/private/var` tempdir path-equality failures
+  were fixed 2026-09-28 (attempt paths resolve consistently across
+  `completed_or_new` branches; the test assertions compare resolved paths).
 - Fail-closed metric boundary: `labs/reference/src/character/metrics.rs`
   `empty_geometry_masks_cannot_pass` (a failed metric cannot be relabelled
   as success).

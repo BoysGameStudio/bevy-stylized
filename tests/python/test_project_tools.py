@@ -38,7 +38,7 @@ class ProjectTools(unittest.TestCase):
             (root/'Cargo.toml').write_text('[workspace]\nmembers=[]\n')
             cfg=root/'config';cfg.mkdir();(cfg/'settings.toml').write_text('[paths]\ncache="../my cache"\n')
             p=Project(root, cfg/'settings.toml')
-            self.assertEqual(p.cache,root/'my cache')
+            self.assertEqual(p.cache,(root/'my cache').resolve())
 
     def test_hash_failure_cannot_replace_prepared_pack(self):
         with tempfile.TemporaryDirectory() as tmp:

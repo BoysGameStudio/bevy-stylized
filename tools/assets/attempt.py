@@ -27,6 +27,10 @@ def completed_or_new(root, inputs, verify):
     The legacy root-level manifest stays readable. Incomplete roots and attempts
     are preserved, including after an uncatchable termination.
     """
+    # 返回路径在所有分支一致解析（verify_run 的重用分支本就 resolve；
+    # 新建分支此前返回未解析路径——同一目录在 macOS 上会呈现为 /var 与
+    # /private/var 两种身份）。
+    root = Path(root).resolve()
     if (root / 'build-manifest.json').is_file():
         result = verify(root)
         if json.loads((root / 'build-manifest.json').read_text())['inputs'] != inputs:

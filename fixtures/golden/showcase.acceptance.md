@@ -38,29 +38,29 @@ banding on spheres), `face` (half-lit SDF spheres), `outline` (rotated hull
 box), `animation` (posed skinned box), `post` (bloom/vignette spheres),
 `stress` (1000-instance grid), `outline-advanced` (hull + screen hybrid).
 
-- `showcase/ramp.png` — `c7647257…0a6802b9`
-- `showcase/face.png` — `57ee7c04…900cf28f`
-- `showcase/outline.png` — `d66ab313…b22c9f5`
-- `showcase/animation.png` — `c863c2c6…85dfc66`
-- `showcase/post.png` — `79a9745c…e52090a`
-- `showcase/stress.png` — `01d4293a…35ab788`
-- `showcase/outline-advanced.png` — `01f377dc…0acc0f1`
+- `showcase/ramp.png` — `c7647257…dc6322`
+- `showcase/face.png` — `57ee7c04…68db87`
+- `showcase/outline.png` — `d66ab313…f35b33`
+- `showcase/animation.png` — `c863c2c6…7729d6`
+- `showcase/post.png` — `79a9745c…152b83`
+- `showcase/stress.png` — `01d4293a…5eca96`
+- `showcase/outline-advanced.png` — `01f377dc…9d774c`
 
 The three environment images share one builder with three view presets; each
 preset owns its own baseline, matching the per-scene catalog entries.
 
 **Accepted images** (SHA-256 of PNG bytes; FNV-1a-64 in each `.golden.json`):
 
-- `showcase/overview.png` — `3ad1e3e9…ce3dc1`
-- `showcase/lighting.png` — `ab3cfb9e…d472b8`
-- `showcase/hair.png` — `576c7f9c…c53025`
-- `showcase/metal.png` — `9a6b7cd2…c2e97a`
-- `showcase/reference.png` — `0244695d…9a25bb`
-- `showcase/performance.png` — `b55451de…74b21b`
-- `showcase/lod.png` — `ecc8029b…eba3e4`
-- `showcase/environment-day.png` — `3abb9223…d47291`
-- `showcase/environment-dusk.png` — `f5b6cf29…9079c6`
-- `showcase/environment-night.png` — `cf70c315…6124b0`
+- `showcase/overview.png` — `3ad1e3e9…a8c4e0`
+- `showcase/lighting.png` — `ab3cfb9e…d7021b`
+- `showcase/hair.png` — `576c7f9c…73a1b9`
+- `showcase/metal.png` — `9a6b7cd2…0e45a5`
+- `showcase/reference.png` — `0244695d…ecc54a`
+- `showcase/performance.png` — `b55451de…643c9f`
+- `showcase/lod.png` — `ecc8029b…6f43fc`
+- `showcase/environment-day.png` — `3abb9223…3572e2`
+- `showcase/environment-dusk.png` — `f5b6cf29…fc3ba6`
+- `showcase/environment-night.png` — `cf70c315…72580a`
 - `showcase/effects.png` — `e249cdae…340d17`
 
 **Android emulator note (2026-09-28, owner-delegated review):** the

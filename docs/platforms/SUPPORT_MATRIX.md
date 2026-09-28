@@ -189,10 +189,11 @@ root-caused platform truth above) are captured on the device and accepted in
 `outline-advanced/{hull_only,screen_only,hybrid}` (the earlier "three deltas"
 named suites; outline-advanced contributes three cases because its lane runs
 stopped at the first assertion). With the overlay, the local `gpu --required`
-lane passes 52/52 on the M4 Pro (41 prior identities + the 11-scene
-`showcase_golden` suite, of which 10 scenes match the canonical baselines
-within tolerance and `showcase/effects` uses the overlay); removing the overlay
-returns exactly the three suite failures (negative proof). Canonical baselines are byte-untouched and the
+lane passes 41/41 on the M4 Pro (the lane at acceptance); removing the overlay
+returns exactly the three suite failures (negative proof). The lane later grew
+with the showcase_golden suite (52/52 from 2026-09-23's coverage expansion,
+59/59 since 2026-09-27's full-catalog baselines; the macOS run passes 59/59
+with the overlay). Canonical baselines are byte-untouched and the
 Linux lane is unaffected (overlay never consulted on the canonical host).
 Non-goals unchanged: no multi-device claim, no performance qualification, no
 "Supported" label.
