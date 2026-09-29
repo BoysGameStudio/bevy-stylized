@@ -28,7 +28,9 @@ pub mod recipe;
 pub mod registry;
 
 #[cfg(feature = "build")]
-pub use builders::SceneTarget;
+pub use builders::{
+    CourtyardFlagsPose, CourtyardOutlineMode, CourtyardSettings, CourtyardTimeOfDay, SceneTarget,
+};
 #[cfg(feature = "build")]
 pub use recipe::{CameraAttachment, CameraRecipe};
 #[cfg(feature = "build")]

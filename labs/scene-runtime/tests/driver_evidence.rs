@@ -2,8 +2,9 @@
 //! 级拒绝另有 CPU 覆盖见同文件末尾与 crate 单测）。
 //!
 //! 对应 docs/showcase/01 R1/R12/R13 与验收矩阵生命周期行的本地证据：
-//! 单步捕获的帧身份、等待泵送节奏不改变实验状态、A→B→A 场景切换无残留、
+//! 单步捕获的帧身份、等待泵送节奏不改变实验状态、切换/重建无残留、
 //! 动作稳定次序与结构化计划拒绝。内容一律复用 scenes 注册表构建器。
+//! （05 §10 退役后目录单场景：A→B→A 为同场景重建循环，语义不变。）
 
 use bevy::{
     DefaultPlugins,
@@ -34,7 +35,11 @@ fn evidence_app(resources: RenderResources) -> App {
         DefaultPlugins
             .build()
             .set(AssetPlugin {
-                file_path: "assets".to_string(),
+                file_path: concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/../../fixtures/synthetic/reference-scene"
+                )
+                .to_string(),
                 meta_check: AssetMetaCheck::Never,
                 ..Default::default()
             })
@@ -49,7 +54,10 @@ fn evidence_app(resources: RenderResources) -> App {
                 ..Default::default()
             }),
     );
-    app.add_plugins(StylizedPlugin::default());
+    app.add_plugins((
+        StylizedPlugin::default(),
+        bevy_stylized::StylizedAssetIntegrationPlugin,
+    ));
     capture::install(&mut app);
     readiness::install(&mut app);
     app.finish();
@@ -136,7 +144,7 @@ fn single_step_capture_binds_experiment_tick_and_stamp() {
     let mut driver = CaseDriver::new(
         app.world(),
         SessionId::new("s1").expect("session"),
-        binding("outline"),
+        binding("courtyard"),
         ActionGraph {
             nodes: vec![fixed_step("step", 2), observe("shot", "rgba8", &["step"])],
         },
@@ -212,7 +220,7 @@ fn wait_pumping_cadence_does_not_change_experiment_state() {
         let mut driver = CaseDriver::new(
             app.world(),
             SessionId::new("s1").expect("session"),
-            binding("outline"),
+            binding("courtyard"),
             plan(),
             DriverLimits::default(),
         )
@@ -287,7 +295,7 @@ fn scene_switch_a_b_a_returns_to_baseline() {
     let mut driver = CaseDriver::new(
         app.world(),
         SessionId::new("s1").expect("session"),
-        binding("outline"),
+        binding("courtyard"),
         plan(),
         DriverLimits::default(),
     )
@@ -300,14 +308,14 @@ fn scene_switch_a_b_a_returns_to_baseline() {
     assert_eq!(driver.generation().get(), 0);
 
     driver
-        .switch_scene(app.world_mut(), binding("animation"))
+        .switch_scene(app.world_mut(), binding("courtyard"))
         .into_completed()
         .expect("switch A→B accepted");
     run_to_completion(&mut app, &mut driver, 1200).expect("B completes");
     assert_eq!(driver.generation().get(), 1);
 
     driver
-        .switch_scene(app.world_mut(), binding("outline"))
+        .switch_scene(app.world_mut(), binding("courtyard"))
         .into_completed()
         .expect("switch B→A accepted");
     run_to_completion(&mut app, &mut driver, 1200).expect("A completes again");
@@ -335,7 +343,7 @@ fn in_flight_observation_is_voided_on_scene_switch() {
     let mut driver = CaseDriver::new(
         app.world(),
         SessionId::new("s1").expect("session"),
-        binding("outline"),
+        binding("courtyard"),
         ActionGraph {
             nodes: vec![observe("shot", "rgba8", &[])],
         },
@@ -355,7 +363,7 @@ fn in_flight_observation_is_voided_on_scene_switch() {
     }
     assert_eq!(driver.state_name(), "AwaitObservation");
     driver
-        .switch_scene(app.world_mut(), binding("animation"))
+        .switch_scene(app.world_mut(), binding("courtyard"))
         .into_completed()
         .expect("switch during pending observation");
     run_to_completion(&mut app, &mut driver, 1200).expect("B completes");
@@ -395,7 +403,7 @@ fn action_graph_executes_in_stable_order() {
     let mut driver = CaseDriver::new(
         app.world(),
         SessionId::new("s1").expect("session"),
-        binding("outline"),
+        binding("courtyard"),
         ActionGraph {
             nodes: vec![apply("c", &["a", "b"]), apply("b", &[]), apply("a", &[])],
         },
@@ -436,7 +444,7 @@ fn same_tick_write_conflict_is_a_structured_plan_error() {
     let result = CaseDriver::new(
         app.world(),
         SessionId::new("s1").expect("session"),
-        binding("outline"),
+        binding("courtyard"),
         ActionGraph {
             nodes: vec![write("a"), write("b")],
         },

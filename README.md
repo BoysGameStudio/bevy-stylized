@@ -17,7 +17,7 @@ Use the checked-in Rust toolchain and Python 3.11+. From this directory:
 ```sh
 cargo fetch --locked
 CARGO_INCREMENTAL=0 cargo check --locked
-cargo run -p showcase --features interactive -- overview
+cargo run -p showcase --features interactive -- courtyard
 ```
 
 Ordinary builds and the procedural showcase need no Blender or third-party art.

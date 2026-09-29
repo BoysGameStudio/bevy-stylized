@@ -1,7 +1,8 @@
 //! 配方编译器 → CaseDriver 的端到端证据（GPU-gated，无 GPU graceful skip）。
 //!
-//! - 编译的 outline 配方与 showcase 既有捕获逐字节一致（declare→execute
-//!   闭环的等价证据；相机/AA/视图/暖场语义见 compiler 模块文档）；
+//! - 编译的 courtyard 配方与 showcase 既有 golden 基线逐字节一致
+//!   （declare→execute 闭环的等价证据；相机/AA/视图/暖场语义见 compiler
+//!   模块文档）；
 //! - apply_params 按声明作用域写入实例参数：不同声明阈值产出可测差异，
 //!   同一配方产出逐字节一致；
 //! - deform 经稳定逻辑 ID 绑定 strip root：不同声明旋转产出差异，
@@ -35,7 +36,11 @@ fn evidence_app(resources: RenderResources) -> App {
         DefaultPlugins
             .build()
             .set(AssetPlugin {
-                file_path: "assets".to_string(),
+                file_path: concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/../../fixtures/synthetic/reference-scene"
+                )
+                .to_string(),
                 meta_check: AssetMetaCheck::Never,
                 ..Default::default()
             })
@@ -50,7 +55,10 @@ fn evidence_app(resources: RenderResources) -> App {
                 ..Default::default()
             }),
     );
-    app.add_plugins(StylizedPlugin::default());
+    app.add_plugins((
+        StylizedPlugin::default(),
+        bevy_stylized::StylizedAssetIntegrationPlugin,
+    ));
     capture::install(&mut app);
     readiness::install(&mut app);
     // showcase 宿主视图基线（byte-match 前提）。
@@ -88,29 +96,48 @@ fn capture_run(recipe: &SceneRecipe) -> RunSpec {
     }
 }
 
-/// 编译的 outline 配方（相机/AA/暖场与 showcase 捕获 profile 等价）→
-/// 与 /tmp/showcase-pre-driver/outline.png 逐字节一致。
+/// 编译的 courtyard 配方（panorama 相机/AA/暖场与 showcase 捕获 profile
+/// 等价）→ 与 courtyard-day golden 基线（canonical；本平台 overlay 优先）
+/// 逐字节一致。
 #[test]
 #[ignore = "requires explicit GPU execution"]
-fn compiled_outline_recipe_matches_showcase_capture() {
+fn compiled_courtyard_recipe_matches_showcase_capture() {
     let Some(resources) = capture::probe_render_resources() else {
         eprintln!("compiler evidence: no GPU adapter available; skipping");
         return;
     };
-    let recipe = support_recipes::outline_recipe();
+    let recipe = support_recipes::courtyard_recipe();
     let run = capture_run(&recipe);
     let plan = compile(&recipe, &run, None).expect("compile");
-    let mut app = evidence_app(resources);
+    let mut app = evidence_app(resources.clone());
     let receipt = run_plan(&mut app, plan, 700);
     assert_eq!(receipt.experiment_tick, 22);
 
-    let baseline_path = std::path::Path::new("/tmp/showcase-pre-driver/outline.png");
-    let baseline_bytes = std::fs::read(baseline_path)
-        .unwrap_or_else(|error| panic!("baseline missing ({error}); regenerate showcase captures"));
+    // 平台身份来自实际渲染后端（绝不猜）；overlay 优先于 canonical。
+    let mut probe = evidence_app(resources);
+    let backend = probe
+        .world()
+        .get_resource::<bevy::render::renderer::RenderAdapterInfo>()
+        .map(|info| format!("{:?}", info.backend))
+        .unwrap_or_else(|| "unknown".to_string());
+    let platform = golden_harness::current_golden_platform(&backend);
+    let paths = golden_harness::resolve_baseline_paths(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/golden/showcase")
+            .as_path(),
+        "courtyard-day",
+        &platform,
+    );
+    let baseline_bytes = std::fs::read(&paths.png).unwrap_or_else(|error| {
+        panic!(
+            "baseline missing at {} ({error}); canonical 缺席 = BLOCKED（参考宿主捕获后重跑）",
+            paths.png.display()
+        )
+    });
     let baseline = golden_harness::decode_png(&baseline_bytes).expect("decode baseline");
     assert_eq!(
         receipt.image.data, baseline.data,
-        "compiled outline recipe must match the showcase capture byte-for-byte"
+        "compiled courtyard recipe must match the showcase capture byte-for-byte"
     );
 }
 

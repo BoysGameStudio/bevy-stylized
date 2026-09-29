@@ -22,6 +22,8 @@ validation = { path = "../../labs/validation" }
 
 [dev-dependencies]
 tempfile.workspace = true
+scenes = { path = "../../labs/scenes" }
+scenario-model = { path = "../../labs/scenario-model" }
 
 [lints]
 workspace = true

@@ -170,9 +170,9 @@
       ]
     },
     {
-      "name": "outline_advanced_hull_screen_hybrid",
+      "name": "showcase_golden_courtyard_outline_hybrid",
       "sources": [
-        "tests/integration/tests/outline_advanced.rs"
+        "tests/integration/tests/showcase_golden.rs"
       ]
     },
     {
@@ -353,7 +353,7 @@
     "tests/integration/tests/instance_table.rs",
     "tests/integration/tests/interim_budget.rs",
     "tests/integration/tests/morph_skinning.rs",
-    "tests/integration/tests/outline_advanced.rs",
+    "tests/integration/tests/showcase_golden.rs",
     "tests/integration/tests/semantics_matrix.rs",
     "tests/integration/tests/shader_validation.rs",
     "tests/integration/tests/spike_instance_transport.rs"

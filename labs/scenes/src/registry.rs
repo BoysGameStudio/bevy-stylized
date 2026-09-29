@@ -10,7 +10,6 @@ use bevy_stylized_core::StylizedViewDescriptor;
 
 use crate::builders;
 use crate::recipe::CameraRecipe;
-use crate::views;
 
 /// 内容构建器签名：组装内容，返回相机配方。
 ///
@@ -34,120 +33,15 @@ pub struct SceneBinding {
     pub view: Option<(&'static str, ViewPresetFn)>,
 }
 
-/// 全部 18 条绑定（顺序与 catalog 一致）。
+/// 全部绑定（顺序与 catalog 一致；05 §10 退役 18 个旧场景后只有 courtyard）。
 #[must_use]
 pub fn bindings() -> Vec<SceneBinding> {
-    use builders as b;
-    vec![
-        SceneBinding {
-            id: "overview",
-            symbol: "builders::overview",
-            build: b::overview,
-            view: None,
-        },
-        SceneBinding {
-            id: "ramp",
-            symbol: "builders::ramp",
-            build: b::ramp,
-            view: None,
-        },
-        SceneBinding {
-            id: "lighting",
-            symbol: "builders::lighting",
-            build: b::lighting,
-            view: None,
-        },
-        SceneBinding {
-            id: "face",
-            symbol: "builders::face",
-            build: b::face,
-            view: None,
-        },
-        SceneBinding {
-            id: "hair",
-            symbol: "builders::hair",
-            build: b::hair,
-            view: None,
-        },
-        SceneBinding {
-            id: "metal",
-            symbol: "builders::metal",
-            build: b::metal,
-            view: None,
-        },
-        SceneBinding {
-            id: "outline",
-            symbol: "builders::outline",
-            build: b::outline,
-            view: None,
-        },
-        SceneBinding {
-            id: "animation",
-            symbol: "builders::animation",
-            build: b::animation,
-            view: None,
-        },
-        SceneBinding {
-            id: "post",
-            symbol: "builders::post",
-            build: b::post,
-            view: None,
-        },
-        SceneBinding {
-            id: "stress",
-            symbol: "builders::stress",
-            build: b::stress,
-            view: None,
-        },
-        SceneBinding {
-            id: "reference",
-            symbol: "builders::reference",
-            build: b::reference,
-            view: None,
-        },
-        SceneBinding {
-            id: "performance",
-            symbol: "builders::performance",
-            build: b::performance,
-            view: None,
-        },
-        SceneBinding {
-            id: "outline-advanced",
-            symbol: "builders::outline_advanced",
-            build: b::outline_advanced,
-            view: None,
-        },
-        SceneBinding {
-            id: "lod",
-            symbol: "builders::lod",
-            build: b::lod,
-            view: None,
-        },
-        SceneBinding {
-            id: "environment-day",
-            symbol: "builders::environment",
-            build: b::environment,
-            view: Some(("views::environment_day", views::environment_day)),
-        },
-        SceneBinding {
-            id: "environment-dusk",
-            symbol: "builders::environment",
-            build: b::environment,
-            view: Some(("views::environment_dusk", views::environment_dusk)),
-        },
-        SceneBinding {
-            id: "environment-night",
-            symbol: "builders::environment",
-            build: b::environment,
-            view: Some(("views::environment_night", views::environment_night)),
-        },
-        SceneBinding {
-            id: "effects",
-            symbol: "builders::effects",
-            build: b::effects,
-            view: None,
-        },
-    ]
+    vec![SceneBinding {
+        id: "courtyard",
+        symbol: "builders::courtyard",
+        build: builders::courtyard,
+        view: None,
+    }]
 }
 
 /// 绑定表核对失败。

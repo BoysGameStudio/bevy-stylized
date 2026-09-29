@@ -42,7 +42,7 @@ pub enum JournalEntryState {
 }
 
 /// 单条日志条目。
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct JournalEntry {
     /// 序号（从 0 单调）。
@@ -255,7 +255,7 @@ mod tests {
                 .enumerate()
                 .map(|(sequence, state)| JournalEntry {
                     sequence: sequence as u64,
-                    command: SessionCommand::SelectCase(SceneId::new("animation").expect("id")),
+                    command: SessionCommand::SelectCase(SceneId::new("courtyard").expect("id")),
                     generation_before: 0,
                     state,
                 })
@@ -267,7 +267,7 @@ mod tests {
     fn save_load_roundtrip_and_digest_stability() {
         let journal = journal_with(vec![
             JournalEntryState::Confirmed(CommandOutcome::Switched {
-                case: SceneId::new("animation").expect("id"),
+                case: SceneId::new("courtyard").expect("id"),
                 generation: scenario_model::ident::Generation::new(1),
             }),
             JournalEntryState::Confirmed(CommandOutcome::Refused(
@@ -328,5 +328,51 @@ mod tests {
             CommandJournal::from_json(&bytes),
             Err(JournalError::NonContiguousSequence)
         ));
+    }
+
+    /// V1 相机/参数命令变体（docs/showcase/05 §11.1）的持久化往返
+    /// （回放一致性证据见 controller 的 `camera_and_parameter_commands_replay_exactly`）。
+    #[test]
+    fn v1_camera_and_parameter_commands_roundtrip() {
+        let commands = [
+            SessionCommand::SetCameraPreset("center-trio".to_string()),
+            SessionCommand::CameraOrbit {
+                yaw: 0.5,
+                pitch: -0.25,
+            },
+            SessionCommand::CameraPan { dx: 1.0, dy: -0.5 },
+            SessionCommand::CameraZoom { factor: 1.5 },
+            SessionCommand::ResetView,
+            SessionCommand::SetParameter {
+                key: "time_of_day".to_string(),
+                value: serde_json::json!("night"),
+            },
+            SessionCommand::SetParameter {
+                key: "crowd".to_string(),
+                value: serde_json::json!(1000),
+            },
+        ];
+        let journal = CommandJournal {
+            schema: COMMAND_JOURNAL_SCHEMA,
+            session: SessionId::new("journal-v1").expect("session"),
+            initial_case: 18,
+            entries: commands
+                .into_iter()
+                .enumerate()
+                .map(|(sequence, command)| JournalEntry {
+                    sequence: sequence as u64,
+                    command,
+                    generation_before: 0,
+                    state: JournalEntryState::Confirmed(CommandOutcome::Applied),
+                })
+                .collect(),
+        };
+        let bytes = journal.to_json().expect("encode");
+        let back = CommandJournal::from_json(&bytes).expect("decode");
+        assert_eq!(journal, back);
+        assert_eq!(
+            journal.digest().expect("digest"),
+            back.digest().expect("digest")
+        );
     }
 }

@@ -332,9 +332,24 @@ mod tests {
         )
     }
 
+    /// courtyard 配方（声明 reference-scene 资产依赖；相机 = panorama 机位）。
+    pub fn courtyard_json(camera: &str, msaa: &str, actions: &str) -> String {
+        recipe_json("courtyard", camera, msaa, actions).replace(
+            r#""assets": []"#,
+            r#""assets": [{"id": "reference-scene", "source": "fixtures/synthetic/reference-scene", "sha256": null}]"#,
+        )
+    }
+
     pub const OUTLINE_CAMERA: &str = r#"{
         "position": [0.0, 0.4, 6.0],
         "target": [0.0, 0.0, 0.0],
+        "fov_degrees": 45.0
+    }"#;
+
+    /// panorama 机位相机（与 scenes::metadata::COURTYARD_CAMERA_PRESETS[0] 一致）。
+    pub const PANORAMA_CAMERA: &str = r#"{
+        "position": [0.0, 3.4, 16.0],
+        "target": [0.0, 1.3, -2.0],
         "fov_degrees": 45.0
     }"#;
 
@@ -345,9 +360,9 @@ mod tests {
          "kind": {"type": "observe", "observation": "capture", "view": null}}
     ]"#;
 
-    pub fn outline_recipe() -> SceneRecipe {
+    pub fn courtyard_recipe() -> SceneRecipe {
         SceneRecipe::from_json_slice(
-            recipe_json("outline", OUTLINE_CAMERA, "4", SETTLE_OBSERVE).as_bytes(),
+            courtyard_json(PANORAMA_CAMERA, "4", SETTLE_OBSERVE).as_bytes(),
         )
         .expect("recipe")
     }
@@ -377,11 +392,11 @@ mod tests {
     }
 
     #[test]
-    fn compiles_outline_recipe_to_executable_plan() {
-        let recipe = outline_recipe();
+    fn compiles_courtyard_recipe_to_executable_plan() {
+        let recipe = courtyard_recipe();
         let run = capture_run(&recipe);
         let plan = compile(&recipe, &run, None).expect("compile");
-        assert_eq!(plan.binding.id, "outline");
+        assert_eq!(plan.binding.id, "courtyard");
         assert_eq!(plan.resolution, (512, 512));
         assert_eq!(plan.msaa, Msaa::Sample4);
         assert!(
@@ -389,14 +404,14 @@ mod tests {
             "45° maps to engine default"
         );
         let eye = plan.camera.eye;
-        assert_eq!((eye.x, eye.y, eye.z), (0.0, 0.4, 6.0));
+        assert_eq!((eye.x, eye.y, eye.z), (0.0, 3.4, 16.0));
         assert_eq!(plan.actions.nodes.len(), 2);
         assert_eq!(plan.digest.len(), 64);
     }
 
     #[test]
     fn digest_is_stable_and_envelope_sensitive() {
-        let recipe = outline_recipe();
+        let recipe = courtyard_recipe();
         let run = capture_run(&recipe);
         let a = compile(&recipe, &run, None).expect("compile");
         let b = compile(&recipe, &run, None).expect("compile");
@@ -440,7 +455,7 @@ mod tests {
         ));
         // 声明 preset（catalog 未声明任何 preset）
         let preset = SceneRecipe::from_json_slice(
-            recipe_json("outline", OUTLINE_CAMERA, "4", SETTLE_OBSERVE)
+            courtyard_json(OUTLINE_CAMERA, "4", SETTLE_OBSERVE)
                 .replace("\"preset\": null", "\"preset\": \"hybrid\"")
                 .as_bytes(),
         )
@@ -451,7 +466,7 @@ mod tests {
         ));
         // 非空 parameters（schema 绑定属 H3）
         let params = SceneRecipe::from_json_slice(
-            recipe_json("outline", OUTLINE_CAMERA, "4", SETTLE_OBSERVE)
+            courtyard_json(OUTLINE_CAMERA, "4", SETTLE_OBSERVE)
                 .replace(
                     "\"parameters\": {}",
                     "\"parameters\": {\"rim_strength\": 0.5}",
@@ -465,8 +480,7 @@ mod tests {
         ));
         // Material 作用域动作
         let material_scope = SceneRecipe::from_json_slice(
-            recipe_json(
-                "outline",
+            courtyard_json(
                 OUTLINE_CAMERA,
                 "4",
                 r#"[{"id": "a", "tick": "0", "depends_on": [], "writes": [],
@@ -485,30 +499,22 @@ mod tests {
 
     #[test]
     fn rejects_catalog_contract_violations_and_reference_mismatch() {
-        // 未声明资产依赖：reference 配方不带 reference-scene 资产声明。
-        let reference = SceneRecipe::from_json_slice(
-            recipe_json("reference", OUTLINE_CAMERA, "4", SETTLE_OBSERVE).as_bytes(),
+        // 未声明资产依赖：courtyard 配方不带 reference-scene 资产声明。
+        let undeclared = SceneRecipe::from_json_slice(
+            recipe_json("courtyard", OUTLINE_CAMERA, "4", SETTLE_OBSERVE).as_bytes(),
         )
         .expect("recipe");
-        let run = capture_run(&reference);
+        let run = capture_run(&undeclared);
         assert!(matches!(
-            compile(&reference, &run, None),
+            compile(&undeclared, &run, None),
             Err(CompileError::Catalog(
                 CatalogError::UndeclaredAssetDependency { .. }
             ))
         ));
-        // tier 不足：outline-advanced 要求 Standard，配方未声明 tier（默认 Portable）。
-        let advanced = SceneRecipe::from_json_slice(
-            recipe_json("outline-advanced", OUTLINE_CAMERA, "4", SETTLE_OBSERVE).as_bytes(),
-        )
-        .expect("recipe");
-        let run = capture_run(&advanced);
-        assert!(matches!(
-            compile(&advanced, &run, None),
-            Err(CompileError::Catalog(CatalogError::InsufficientTier { .. }))
-        ));
+        // tier 交叉校验机制的单元覆盖在 scenario-model recipe 测试（合成条目）；
+        // 目录当前无 tier 门控场景（05 §10 退役后），此处不再重复。
         // ByHash 引用与配方身份不符。
-        let recipe = outline_recipe();
+        let recipe = courtyard_recipe();
         let mismatched = RunSpec {
             recipe: RecipeReference::ByHash {
                 hash: "0".repeat(64),
@@ -524,10 +530,10 @@ mod tests {
     #[test]
     fn parameters_lower_to_leading_apply_params_nodes() {
         let recipe = SceneRecipe::from_json_slice(
-            recipe_json("face", OUTLINE_CAMERA, "4", SETTLE_OBSERVE)
+            courtyard_json(OUTLINE_CAMERA, "4", SETTLE_OBSERVE)
                 .replace(
                     "\"parameters\": {}",
-                    "\"parameters\": {\"instances.1.face_threshold\": 0.2}",
+                    "\"parameters\": {\"trio.face.1.face_threshold\": 0.2}",
                 )
                 .as_bytes(),
         )
@@ -536,11 +542,11 @@ mod tests {
         let plan = compile(&recipe, &run, None).expect("compile");
         assert_eq!(plan.actions.nodes.len(), 3, "param node + 2 recipe actions");
         let first = &plan.actions.nodes[0];
-        assert_eq!(first.id.as_str(), "param.instances.1.face_threshold");
+        assert_eq!(first.id.as_str(), "param.trio.face.1.face_threshold");
         assert_eq!(first.tick.0, 0);
         match &first.kind {
             scenario_model::action::ActionKind::ApplyParams { target, params } => {
-                assert_eq!(target.id.as_str(), "instances.1");
+                assert_eq!(target.id.as_str(), "trio.face.1");
                 assert_eq!(params["face_threshold"], serde_json::json!(0.2));
             }
             other => panic!("lowered parameter must be apply_params: {other:?}"),
@@ -551,28 +557,28 @@ mod tests {
     fn rejects_undeclared_out_of_range_and_wrong_typed_parameters() {
         let recipe_with = |parameters: &str| {
             SceneRecipe::from_json_slice(
-                recipe_json("face", OUTLINE_CAMERA, "4", SETTLE_OBSERVE)
+                courtyard_json(OUTLINE_CAMERA, "4", SETTLE_OBSERVE)
                     .replace("\"parameters\": {}", parameters)
                     .as_bytes(),
             )
             .expect("recipe")
         };
         // 未声明键
-        let unknown = recipe_with("\"parameters\": {\"instances.1.not_a_param\": 1.0}");
+        let unknown = recipe_with("\"parameters\": {\"trio.face.1.not_a_param\": 1.0}");
         let run = capture_run(&unknown);
         assert!(matches!(
             compile(&unknown, &run, None),
             Err(CompileError::Parameters(_))
         ));
-        // 越界（profile_index ≤ 255）
-        let out_of_range = recipe_with("\"parameters\": {\"instances.1.profile_index\": 300}");
+        // 越界（crowd ≤ 1000）
+        let out_of_range = recipe_with("\"parameters\": {\"crowd\": 1001}");
         let run = capture_run(&out_of_range);
         assert!(matches!(
             compile(&out_of_range, &run, None),
             Err(CompileError::Parameters(_))
         ));
         // 类型不符（face_threshold 必须是 null 或有限数值）
-        let wrong_type = recipe_with("\"parameters\": {\"instances.1.face_threshold\": \"high\"}");
+        let wrong_type = recipe_with("\"parameters\": {\"trio.face.1.face_threshold\": \"high\"}");
         let run = capture_run(&wrong_type);
         assert!(matches!(
             compile(&wrong_type, &run, None),
@@ -583,8 +589,7 @@ mod tests {
     #[test]
     fn non_default_fov_maps_to_explicit_projection() {
         let recipe = SceneRecipe::from_json_slice(
-            recipe_json(
-                "outline",
+            courtyard_json(
                 r#"{"position": [0.0, 0.4, 6.0], "target": [0.0, 0.0, 0.0], "fov_degrees": 30.0}"#,
                 "4",
                 SETTLE_OBSERVE,

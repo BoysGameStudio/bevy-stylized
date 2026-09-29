@@ -1,5 +1,6 @@
-//! 命令日志 GPU 证据（Metal，GPU-gated）：A→B→A 命令录制 → 新鲜会话重放 →
-//! 末次捕获逐字节一致（逻辑身份 ⇒ 同设备像素身份）。
+//! 命令日志 GPU 证据（Metal，GPU-gated）：机位/参数命令录制 → 新鲜会话
+//! 重放 → 末次捕获逐字节一致（逻辑身份 ⇒ 同设备像素身份）。
+//! （05 §10 退役后目录单场景：录制/回放覆盖 V1 机位与参数命令。）
 
 use bevy::{
     DefaultPlugins,
@@ -18,7 +19,7 @@ use bevy_stylized::prelude::{
 use golden_harness::{CapturedImage, capture, readiness};
 use scenario_model::action::{ActionGraph, ActionKind, ActionNode, Step};
 use scenario_model::canon::CanonicalU64;
-use scenario_model::ident::{ActionId, SceneId, SessionId};
+use scenario_model::ident::{ActionId, SessionId};
 use scene_runtime::{
     CaseDriver, CommandJournal, CommandOutcome, DriverLimits, SessionCommand, SessionController,
     run_to_completion,
@@ -32,7 +33,11 @@ fn evidence_app(resources: RenderResources) -> App {
         DefaultPlugins
             .build()
             .set(AssetPlugin {
-                file_path: "assets".to_string(),
+                file_path: concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/../../fixtures/synthetic/reference-scene"
+                )
+                .to_string(),
                 meta_check: AssetMetaCheck::Never,
                 ..Default::default()
             })
@@ -47,7 +52,10 @@ fn evidence_app(resources: RenderResources) -> App {
                 ..Default::default()
             }),
     );
-    app.add_plugins(StylizedPlugin::default());
+    app.add_plugins((
+        StylizedPlugin::default(),
+        bevy_stylized::StylizedAssetIntegrationPlugin,
+    ));
     capture::install(&mut app);
     readiness::install(&mut app);
     *app.world_mut().resource_mut::<StylizedViewSettings>() =
@@ -97,17 +105,17 @@ fn capture_profile_graph() -> ActionGraph {
     }
 }
 
-fn controller_at_outline(world: &bevy::prelude::World) -> SessionController {
+fn controller_at_courtyard(world: &bevy::prelude::World) -> SessionController {
     let driver = CaseDriver::new(
         world,
         SessionId::new("journal-gpu").expect("session"),
-        binding("outline"),
+        binding("courtyard"),
         ActionGraph::default(),
         DriverLimits::default(),
     )
     .expect("plan");
     let mut controller =
-        SessionController::from_catalog(driver, 6, StylizedViewDescriptor::default())
+        SessionController::from_catalog(driver, 0, StylizedViewDescriptor::default())
             .expect("controller");
     controller.set_tier_ceiling(StylizedExecutionTier::Standard);
     controller
@@ -136,21 +144,29 @@ fn journal_replay_preserves_logical_and_pixel_identity() {
     };
     // 录制：A→B→A 经 command_recorded。
     let mut app = evidence_app(resources.clone());
-    let mut controller = controller_at_outline(app.world());
+    let mut controller = controller_at_courtyard(app.world());
     // 初始构建推进到 Done（命令只在 Done/AwaitObservation 可切换）。
     run_to_completion(&mut app, controller.driver_mut(), 700).expect("initial build");
-    let mut journal = CommandJournal::new(SessionId::new("journal-gpu").expect("session"), 6);
+    let mut journal = CommandJournal::new(SessionId::new("journal-gpu").expect("session"), 0);
     for command in [
-        SessionCommand::SelectCase(SceneId::new("animation").expect("id")),
-        SessionCommand::SelectCase(SceneId::new("outline").expect("id")),
+        SessionCommand::SetCameraPreset("lod-side".to_string()),
+        SessionCommand::SetParameter {
+            key: "crowd".to_string(),
+            value: serde_json::json!(0),
+        },
+        SessionCommand::SetParameter {
+            key: "crowd".to_string(),
+            value: serde_json::json!(100),
+        },
+        SessionCommand::SetCameraPreset("panorama".to_string()),
     ] {
         assert!(matches!(
             controller.command_recorded(app.world_mut(), &command, &mut journal),
-            CommandOutcome::Switched { .. }
+            CommandOutcome::Switched { .. } | CommandOutcome::Applied
         ));
         run_to_completion(&mut app, controller.driver_mut(), 700).expect("build completes");
     }
-    assert_eq!(journal.entries.len(), 2);
+    assert_eq!(journal.entries.len(), 4);
     assert!(
         journal
             .entries
@@ -161,7 +177,7 @@ fn journal_replay_preserves_logical_and_pixel_identity() {
 
     // 重放：新鲜会话 + 同一日志 → 逻辑结果逐条一致 + 末次捕获逐字节一致。
     let mut replay_app = evidence_app(resources);
-    let mut replay_controller = controller_at_outline(replay_app.world());
+    let mut replay_controller = controller_at_courtyard(replay_app.world());
     run_to_completion(&mut replay_app, replay_controller.driver_mut(), 700).expect("initial build");
     let report = replay_controller.replay(&mut replay_app, &journal);
     assert!(
@@ -169,7 +185,7 @@ fn journal_replay_preserves_logical_and_pixel_identity() {
         "replay mismatches: {:?}",
         report.mismatches
     );
-    assert_eq!(report.applied, 2);
+    assert_eq!(report.applied, 4);
     assert!(report.indeterminate.is_empty());
     let replayed = final_capture(&mut replay_app, &mut replay_controller);
     assert_eq!(
@@ -182,7 +198,7 @@ fn journal_replay_preserves_logical_and_pixel_identity() {
     let loaded = CommandJournal::from_json(&bytes).expect("decode");
     assert_eq!(journal, loaded);
     let mut second_app = evidence_app(capture::probe_render_resources().expect("GPU"));
-    let mut second = controller_at_outline(second_app.world());
+    let mut second = controller_at_courtyard(second_app.world());
     run_to_completion(&mut second_app, second.driver_mut(), 700).expect("initial build");
     let report = second.replay(&mut second_app, &loaded);
     assert!(
@@ -200,13 +216,13 @@ fn trailing_tentative_entry_is_indeterminate_not_reexecuted() {
         return;
     };
     let mut app = evidence_app(resources);
-    let mut controller = controller_at_outline(app.world());
+    let mut controller = controller_at_courtyard(app.world());
     run_to_completion(&mut app, controller.driver_mut(), 700).expect("initial build");
     let mut journal = CommandJournal::new(SessionId::new("journal-gpu").expect("session"), 6);
     // 模拟"接受后崩溃"：手工塞入一条 Tentative（不经 command_recorded）。
     journal.entries.push(scene_runtime::JournalEntry {
         sequence: 0,
-        command: SessionCommand::SelectCase(SceneId::new("animation").expect("id")),
+        command: SessionCommand::SetCameraPreset("lod-side".to_string()),
         generation_before: 0,
         state: scene_runtime::JournalEntryState::Tentative,
     });
@@ -215,7 +231,7 @@ fn trailing_tentative_entry_is_indeterminate_not_reexecuted() {
     assert_eq!(report.indeterminate, vec![0]);
     assert_eq!(
         controller.current().id.as_str(),
-        "outline",
+        "courtyard",
         "controller state must be unchanged"
     );
 }

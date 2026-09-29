@@ -7,14 +7,20 @@ use bevy_stylized_core::{
     StylizedEnvironment, StylizedFog, StylizedShadowTint, StylizedViewDescriptor,
 };
 
-/// 昼：浅蓝灰雾 + 淡蓝天色 + 轻阴影染色。
-pub fn environment_day(view: &mut StylizedViewDescriptor) {
+// ---------------------------------------------------------------------------
+// courtyard 时刻 preset（docs/showcase/05 §5）。
+// ---------------------------------------------------------------------------
+
+/// courtyard 昼：浅蓝灰雾 28–110 + 淡蓝天色 + 轻阴影染色（色板同旧
+/// environment_day；雾范围按庭院景深重调——展台环/中央对照组不受雾
+/// 染色，远景渐没；旧 environment_* preset 随旧场景退役删除）。
+pub fn courtyard_day(view: &mut StylizedViewDescriptor) {
     view.environment = StylizedEnvironment {
         fog: StylizedFog {
             enabled: true,
             color: LinearRgba::new(0.58, 0.68, 0.84, 1.0),
-            start: 14.0,
-            end: 80.0,
+            start: 28.0,
+            end: 110.0,
         },
         shadow_tint: StylizedShadowTint {
             color: LinearRgba::new(0.6, 0.68, 0.95, 1.0),
@@ -24,15 +30,15 @@ pub fn environment_day(view: &mut StylizedViewDescriptor) {
     };
 }
 
-/// 黄昏：暖橙雾 + 紫红天色 + 紫色阴影染色 + 暖 key light。
-pub fn environment_dusk(view: &mut StylizedViewDescriptor) {
+/// courtyard 黄昏：暖橙雾 14–70 + 紫红天色 + 紫色阴影染色 + 暖 key light。
+pub fn courtyard_dusk(view: &mut StylizedViewDescriptor) {
     view.key_light_color = LinearRgba::new(1.0, 0.75, 0.55, 1.0);
     view.environment = StylizedEnvironment {
         fog: StylizedFog {
             enabled: true,
             color: LinearRgba::new(0.85, 0.55, 0.38, 1.0),
-            start: 6.0,
-            end: 45.0,
+            start: 14.0,
+            end: 70.0,
         },
         shadow_tint: StylizedShadowTint {
             color: LinearRgba::new(0.55, 0.4, 0.7, 1.0),
@@ -42,15 +48,17 @@ pub fn environment_dusk(view: &mut StylizedViewDescriptor) {
     };
 }
 
-/// 夜：深蓝雾 + 深蓝天色 + 强冷色阴影染色 + 夜间 ambient。
-pub fn environment_night(view: &mut StylizedViewDescriptor) {
+/// courtyard 夜：深蓝雾 10–48（end 必须 > 灯阵纵深 ~27m；LOD very_far
+/// d≈60 没入雾中属预期，05 §5 已声明）+ 深蓝天色 + 强冷阴影染色 +
+/// 夜间 ambient。
+pub fn courtyard_night(view: &mut StylizedViewDescriptor) {
     view.day_night_factor = 0.0;
     view.environment = StylizedEnvironment {
         fog: StylizedFog {
             enabled: true,
             color: LinearRgba::new(0.08, 0.1, 0.2, 1.0),
-            start: 5.0,
-            end: 40.0,
+            start: 10.0,
+            end: 48.0,
         },
         shadow_tint: StylizedShadowTint {
             color: LinearRgba::new(0.45, 0.5, 0.85, 1.0),

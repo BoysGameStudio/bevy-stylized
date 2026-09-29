@@ -281,3 +281,26 @@ platform-truth classes (`effects`, `face`, `stress`, `outline-advanced`; three
 of them byte-identical to the accepted `macos-metal` images — same physical
 GPU). The evidence is emulator evidence: the row's Experimental label refers to
 this emulator identity; no physical-device, performance or thermal claim.
+
+2026-09-28 courtyard browser lane note (Apple M4 Pro, Metal, Chrome 153.0.8010.53 Dawn):
+two host-limited divergences recorded during the first browser-showcase run of
+the courtyard capture matrix.
+
+1. Vanilla Bevy PBR (`StandardMaterial` lit by the stylized key light) renders
+   pure black under Dawn/Metal while rendering correctly under wgpu/Metal in
+   the same process family. The reference GLB character exhibited this until
+   the courtyard stage was moved to NPR materials (see the 2026-09-28 entry in
+   `fixtures/golden/showcase.courtyard.acceptance.md`); the stylized NPR
+   pipeline itself is byte-identical across browser/native for all procedural
+   content. Root cause not investigated upstream (no minimal repro filed;
+   recorded here as a host-limited upstream Bevy/Dawn discrepancy, not a
+   defect in this repository's renderer).
+2. Screen-space outline (`courtyard-outline-hybrid`) diverges systematically
+   between Dawn (Tint) and wgpu/Metal (naga) on the same device: 2488
+   edge-confined pixels with deltas up to 216 versus the browser envelope
+   allowance of 13. Same class as the 2026-09-23 Metal screen-outline golden
+   delta recorded above (compiler-sensitive edge detection); it is a platform
+   variation, not a renderer defect. The capture fails the browser-vs-native
+   envelope on this host; acceptance of a widened tolerance is an owner-level
+   decision (per the macOS Experimental qualification precedent), not made
+   here.

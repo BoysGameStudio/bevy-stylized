@@ -20,11 +20,12 @@
 //!   （RFC 8785 JCS：UTF-16 码元属性排序、ECMAScript 数字表示、UTF-8）；
 //! - [`identity`]：recipe/session/execution/artifact 四域 SHA-256，
 //!   结构化长度前缀编码；
-//! - [`catalog`]：纯数据场景目录（`apps/showcase` 现有 18 个注册用例的
-//!   元数据；所有者位置与构建符号记录为数据，绑定核对由 `labs/scenes` 执行）。
+//! - [`catalog`]：纯数据场景目录（courtyard 单场景的元数据；
+//!   所有者位置与构建符号记录为数据，绑定核对由 `labs/scenes` 执行）。
 
 pub mod action;
 pub mod canon;
+pub mod capture_spec;
 pub mod catalog;
 pub mod coverage;
 pub mod ident;
@@ -39,13 +40,17 @@ pub use canon::{
     CANON_COMPILER_VERSION, CanonError, CanonicalSet, CanonicalU64, FiniteF32, FiniteF64,
     ParameterMap, canonical_bytes, ecmascript_number_string, jcs_bytes, parse_strict,
 };
+pub use capture_spec::{
+    CaptureSpec, CaptureSpecError, WholeFrameJudgment, courtyard_capture_specs,
+    validate_capture_specs,
+};
 pub use catalog::{
     BuilderBinding, CATALOG_LEN, CatalogEntry, CatalogError, ParameterError, ParameterKind,
     ParameterSpec, ParameterTarget, catalog, catalog_entry, require_declared_assets,
     validate_catalog, validate_parameters,
 };
 pub use coverage::{
-    CoverageReport, CoverageState, FamilyCoverage, Judgment, SceneCoverage, coverage_json,
+    CaptureCoverage, CoverageReport, CoverageState, FamilyCoverage, Judgment, coverage_json,
     coverage_report,
 };
 pub use ident::{

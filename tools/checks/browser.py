@@ -126,6 +126,59 @@ def evaluate_browser_envelope(a, b, width=512, height=512):
     }
 
 
+def _frame_stats(data):
+    """luma 均值/标准差（Rec.601；与 labs/validation frame.rs 同一公式）。"""
+    n = len(data) // 4
+    luma = [0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2] for i in range(0, len(data), 4)]
+    mean = sum(luma) / n
+    var = sum((v - mean) ** 2 for v in luma) / n
+    return mean, var ** 0.5
+
+
+def read_sidecar(baseline_path):
+    """读取基线 sidecar（<case>.golden.json；缺席 = None = strict 整图判定）。"""
+    sidecar_path = baseline_path.with_name(baseline_path.stem + '.golden.json')
+    if not sidecar_path.is_file():
+        return None
+    return json.loads(sidecar_path.read_text())
+
+
+def judge(capture, reference, sidecar=None):
+    """捕获判定（与 labs/validation 同一语义；见 android_catalog.py 注释）。
+
+    sidecar 带 regions（05 §9 additive 扩展）时：整图宽松包络 + 每区域
+    per-pixel 每通道阈值与失败像素比双层门限。
+    """
+    if not sidecar or not sidecar.get('regions'):
+        import math
+        diffs = [abs(x - y) for x, y in zip(capture, reference)]
+        mean = sum(diffs) / len(diffs)
+        mse = sum(d * d for d in diffs) / len(diffs)
+        psnr = 99.0 if mse == 0 else 20 * math.log10(255.0 / math.sqrt(mse))
+        return {'pass': max(diffs, default=0) <= 4 and mean <= 0.5 and psnr >= 40.0,
+                'mode': 'strict-whole-frame'}
+    base_mean, base_std = _frame_stats(reference)
+    cand_mean, cand_std = _frame_stats(capture)
+    violations = []
+    if not (cand_mean > 1.0 and cand_mean >= max(1.0, base_mean * 0.6)
+            and cand_mean <= base_mean * 1.4 + 10.0 and cand_std >= max(5.0, base_std * 0.6)):
+        violations.append('whole-frame loose envelope exceeded')
+    for region in sidecar['regions']:
+        rect = region['rect']
+        x0, y0, w, h = rect['x'], rect['y'], rect['width'], rect['height']
+        failing, total = 0, max(1, w * h)
+        for y in range(y0, y0 + h):
+            for x in range(x0, x0 + w):
+                i = (y * 512 + x) * 4
+                delta = max(abs(capture[i + k] - reference[i + k]) for k in range(3))
+                failing += delta > region['max_channel_delta']
+        ratio = failing / total
+        if ratio > region['max_fail_ratio']:
+            violations.append(
+                f"region {region['id']}: fail_ratio {ratio:.5f} > {region['max_fail_ratio']}")
+    return {'pass': not violations, 'mode': 'loose+rois', 'violations': violations}
+
+
 def primitive_count(asset):
     data = asset.read_bytes()
     if data[:4] != b'glTF' or data[16:20] != b'JSON':
@@ -260,11 +313,12 @@ def run(project, asset, out):
     return result
 
 def run_showcase(project, out):
-    """Browser showcase lane: every catalog scene executes in the disposable
-    browser through the CaseDriver host (apps/browser-showcase) and is judged
-    against the canonical showcase golden (fixtures/golden/showcase/) — exact
-    match preferred, reference/08 §5 envelope as the only fallback. Browser
-    baselines are never created; a scene failing both is a FAIL with evidence.
+    """Browser showcase lane: every courtyard capture spec executes in the
+    disposable browser through the CaseDriver host (apps/browser-showcase) and
+    is judged against the canonical showcase golden (fixtures/golden/showcase/)
+    — exact match preferred, reference/08 §5 envelope as the only fallback.
+    Browser baselines are never created; a capture failing both is a FAIL with
+    evidence. Canonical 庭院基线缺席时本 lane 显式 BLOCKED（不是 FAIL）。
     """
     out = project.resolve(out)
     if out.exists():
@@ -288,11 +342,21 @@ def run_showcase(project, out):
         raise CheckFailed('STYLIZED_CHROME_FLAGS must be a JSON string array')
     suites = json.loads((project.root/'tests/suites.json').read_text())
     identities = suites['gpu']['showcase_golden']
-    scenes = [s.removeprefix('showcase_golden_').replace('_', '-') for s in identities]
+    captures = [s.removeprefix('showcase_golden_').replace('_', '-') for s in identities]
     baselines = project.root/'fixtures/golden/showcase'
-    missing = [s for s in scenes if not (baselines/f'{s}.png').is_file()]
+    # 基线解析与 golden.rs 的 resolve_baseline_paths 一致：本平台 overlay
+    # 优先、canonical 兜底。必需基线缺席是 BLOCKED 不是 FAIL（05 §9：
+    # canonical 庭院基线由参考宿主产出；缺席且无 overlay 时本 lane 显式
+    # BLOCKED）。
+    import sys
+    overlay_dir = baselines/'macos-metal' if sys.platform == 'darwin' else None
+    def resolved_baseline(capture):
+        if overlay_dir and (overlay_dir/f'{capture}.png').is_file():
+            return overlay_dir/f'{capture}.png'
+        return baselines/f'{capture}.png'
+    missing = [s for s in captures if not resolved_baseline(s).is_file()]
     if missing:
-        raise CheckFailed(f'canonical showcase baselines missing for: {missing}')
+        raise ResourceBlocked(f'accepted showcase baselines missing for: {missing}')
     out.mkdir(parents=True)
     site = out/'site'
     site.mkdir()
@@ -311,10 +375,10 @@ def run_showcase(project, out):
     command(['cargo', 'build', '--offline', '--release', '--target', 'wasm32-unknown-unknown', '-p', 'browser-showcase'], project.root, 'wasm-build', 600)
     command([bindgen, '--target', 'web', '--out-dir', str(site/'pkg'),
              str(project.root/'target/wasm32-unknown-unknown/release/browser-showcase.wasm')], project.root, 'wasm-bindgen')
-    # Same-machine native reference per scene (reference/08 §5 domain is
+    # Same-machine native reference per capture (reference/08 §5 domain is
     # browser vs native on one machine). On the canonical host (Linux/Vulkan)
     # the canonical golden IS the native reference: the showcase_golden lane
-    # proves byte-exact same-host reproduction (52/52); no re-capture needed.
+    # proves byte-exact same-host reproduction; no re-capture needed.
     # Elsewhere (macOS) the host binary captures fresh references locally.
     import sys
     canonical_host = sys.platform != 'darwin'
@@ -322,55 +386,55 @@ def run_showcase(project, out):
     if not canonical_host:
         command(['cargo', 'build', '--offline', '--release', '-p', 'browser-showcase'], project.root, 'native-build', 600)
         native_dir.mkdir()
-        for scene in scenes:
-            log = (out/(f'native-{scene}.log')).open('w')
+        for capture in captures:
+            log = (out/(f'native-{capture}.log')).open('w')
             result = invoke([str(project.root/'target/release/browser-showcase')], cwd=project.root,
                             env=dict(os.environ, CARGO_INCREMENTAL='0',
-                                     STYLIZED_BROWSER_SCENE=scene,
-                                     STYLIZED_CAPTURE_OUT=str(native_dir/f'{scene}.json')),
+                                     STYLIZED_BROWSER_SPEC=capture,
+                                     STYLIZED_CAPTURE_OUT=str(native_dir/f'{capture}.json')),
                             stdout=log, stderr=subprocess.STDOUT, timeout=120)
             log.close()
-            if result.returncode or not (native_dir/f'{scene}.json').is_file():
-                raise CheckFailed(f'native reference capture failed for {scene}; inspect native-{scene}.log')
+            if result.returncode or not (native_dir/f'{capture}.json').is_file():
+                raise CheckFailed(f'native reference capture failed for {capture}; inspect native-{capture}.log')
     handler = partial(SimpleHTTPRequestHandler, directory=str(site))
     server = ThreadingHTTPServer(('127.0.0.1', 0), handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:
         command([node, str(project.root/'tools/checks/browser_showcase.mjs'), chrome,
-                 f'http://127.0.0.1:{server.server_port}/', str(out), json.dumps(flags), json.dumps(scenes)],
-                project.root, 'browser-run', max(240, 60*len(scenes)))
+                 f'http://127.0.0.1:{server.server_port}/', str(out), json.dumps(flags), json.dumps(captures)],
+                project.root, 'browser-run', max(240, 60*len(captures)))
     finally:
         server.shutdown()
         server.server_close()
         thread.join()
     captured = json.loads((out/'browser-showcase-capture.json').read_text())
     from PIL import Image
-    captures = out/'captures'
-    captures.mkdir()
+    capture_dir = out/'captures'
+    capture_dir.mkdir()
     # Native-leg baseline = the current platform's accepted baseline: on macOS
     # the macos-metal overlay holds the native-wgpu platform truth; Linux has
     # no overlay and resolves to canonical. No browser-specific baselines.
-    overlay = baselines/'macos-metal' if sys.platform == 'darwin' else None
+    overlay = overlay_dir
     reports = {}
-    for scene in scenes:
-        entry = captured['scenes'].get(scene, {'status': 'FAIL', 'reason': 'scene absent from browser capture'})
+    for capture in captures:
+        entry = captured['captures'].get(capture, {'status': 'FAIL', 'reason': 'capture absent from browser capture'})
         if entry.get('status') != 'PASS':
-            reports[scene] = {'status': entry.get('status', 'FAIL'), 'reason': entry.get('reason'), 'errors': entry.get('errors', [])}
+            reports[capture] = {'status': entry.get('status', 'FAIL'), 'reason': entry.get('reason'), 'errors': entry.get('errors', [])}
             continue
         rgba = entry.get('rgba', [])
         if len(rgba) != 512*512*4 or any(type(x) is not int or not 0 <= x <= 255 for x in rgba):
-            reports[scene] = {'status': 'FAIL', 'reason': 'invalid browser readback'}
+            reports[capture] = {'status': 'FAIL', 'reason': 'invalid browser readback'}
             continue
         browser_data = bytes(rgba)
-        Image.frombytes('RGBA', (512, 512), browser_data).save(captures/f'{scene}.png')
+        Image.frombytes('RGBA', (512, 512), browser_data).save(capture_dir/f'{capture}.png')
         if canonical_host:
-            native_data = Image.open(baselines/f'{scene}.png').convert('RGBA').tobytes()
+            native_data = Image.open(baselines/f'{capture}.png').convert('RGBA').tobytes()
             native = {'backend': 'native-canonical-host', 'device': 'see golden provenance'}
         else:
-            native = json.loads((native_dir/f'{scene}.json').read_text())
+            native = json.loads((native_dir/f'{capture}.json').read_text())
             native_data = bytes(native['rgba'])
-        # Chain of judgments, both per scene and never hidden:
+        # Chain of judgments, both per capture and never hidden:
         # (1) browser vs same-machine native — reference/08 §5 (exact preferred,
         #     approved envelope fallback for the Dawn/Tint vs naga domain only);
         # (2) native vs the platform's accepted golden (canonical on Linux;
@@ -379,24 +443,25 @@ def run_showcase(project, out):
         exact = browser_data == native_data
         envelope = None if exact else evaluate_browser_envelope(browser_data, native_data)
         browser_passed = exact or (envelope is not None and envelope['pass'])
-        baseline_path = overlay/f'{scene}.png' if overlay and (overlay/f'{scene}.png').is_file() else baselines/f'{scene}.png'
+        baseline_path = overlay/f'{capture}.png' if overlay and (overlay/f'{capture}.png').is_file() else baselines/f'{capture}.png'
         canonical = baseline_path.read_bytes()
         reference = Image.open(baseline_path).convert('RGBA').tobytes()
+        verdict = judge(native_data, reference, read_sidecar(baseline_path))
+        native_passed = verdict['pass']
         diffs = [abs(x-y) for x, y in zip(native_data, reference)]
         mean = sum(diffs)/len(diffs)
         import math
         mse = sum(d*d for d in diffs)/len(diffs)
         psnr = 99.0 if mse == 0 else 20*math.log10(255.0/math.sqrt(mse))
-        native_passed = max(diffs, default=0) <= 4 and mean <= 0.5 and psnr >= 40.0
         identity = {key: entry.get(key) for key in
                     ['backend', 'device', 'resolved_tier', 'generation', 'experiment_tick', 'stamp', 'engine_git_commit']}
         identity['native_backend'] = native.get('backend')
         identity['native_device'] = native.get('device')
         passed = browser_passed and native_passed
-        reports[scene] = {'status': 'PASS' if passed else 'FAIL',
+        reports[capture] = {'status': 'PASS' if passed else 'FAIL',
                           'browser_vs_native': 'exact' if exact else ('envelope' if browser_passed else 'fail'),
                           'envelope': envelope,
-                          'native_vs_canonical': {'pass': native_passed, 'max_channel_delta': max(diffs, default=0),
+                          'native_vs_canonical': {'pass': native_passed, 'mode': verdict.get('mode'), 'violations': verdict.get('violations'), 'max_channel_delta': max(diffs, default=0),
                                                   'mean_channel_delta': mean, 'psnr_db': psnr},
                           'identity': identity, 'errors': entry.get('errors', []),
                           'capture_sha256': hashlib.sha256(browser_data).hexdigest(),
@@ -408,12 +473,12 @@ def run_showcase(project, out):
     failed = [s for s, r in reports.items() if r['status'] != 'PASS']
     result = dict(schema='bevy_stylized.browser-showcase/v1',
                   status='PASS' if not failed else 'FAIL',
-                  scenes=reports, total=len(scenes), exact=exact_count, envelope=envelope_count, failed=failed,
+                  captures=reports, total=len(captures), exact=exact_count, envelope=envelope_count, failed=failed,
                   browser=captured.get('browser'), browser_adapter=captured.get('adapter'),
                   flags=flags, source=project.source_identity(),
-                  scope='per-scene browser-WebGPU execution of the full catalog; browser vs same-machine native (exact preferred, reference/08 §5 envelope is the only fallback); native vs canonical Linux/Vulkan golden at golden tolerance; no browser baselines are created')
+                  scope='per-capture browser-WebGPU execution of the courtyard capture matrix; browser vs same-machine native (exact preferred, reference/08 §5 envelope is the only fallback); native vs canonical Linux/Vulkan golden at golden tolerance; no browser baselines are created')
     (out/'report.json').write_text(json.dumps(result, indent=2)+'\n')
     project.report('browser-showcase', result)
     if result['status'] != 'PASS':
-        raise CheckFailed(f'browser showcase scenes failed: {failed}; inspect {out}/report.json')
+        raise CheckFailed(f'browser showcase captures failed: {failed}; inspect {out}/report.json')
     return result

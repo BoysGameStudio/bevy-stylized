@@ -28,6 +28,14 @@ fn main() {
         return;
     }
     let capture_mode = args.iter().any(|a| a == "--capture");
+    // 捕获规格模式（docs/showcase/05 §9）：`showcase -- courtyard --capture-spec <id|all>`。
+    if let Some(position) = args.iter().position(|a| a == "--capture-spec") {
+        let Some(id) = args.get(position + 1) else {
+            eprintln!("--capture-spec requires a capture id (or `all`)");
+            std::process::exit(2);
+        };
+        std::process::exit(showcase::capture_spec::run_capture_specs(id));
+    }
     let name = args
         .iter()
         .find(|a| !a.starts_with("--"))

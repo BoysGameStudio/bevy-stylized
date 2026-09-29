@@ -607,13 +607,13 @@ mod tests {
     pub fn minimal_recipe_json() -> String {
         r#"{
             "schema": {"major": 1, "minor": 0},
-            "scene": {"id": "outline", "preset": null},
+            "scene": {"id": "courtyard", "preset": null},
             "seed": "42",
             "rng": {"algorithm": "chacha", "version": "1"},
             "resolution": {"width": 512, "height": 512},
             "anti_aliasing": {"type": "msaa", "samples": 4},
             "tier": "portable",
-            "required_effects": ["outline"],
+            "required_effects": [],
             "assets": [],
             "camera": {
                 "position": [0.0, 1.0, 3.0],
@@ -630,7 +630,7 @@ mod tests {
     fn ingests_minimal_recipe() {
         let recipe = SceneRecipe::from_json_slice(minimal_recipe_json().as_bytes())
             .expect("minimal recipe ingests");
-        assert_eq!(recipe.scene.id.as_str(), "outline");
+        assert_eq!(recipe.scene.id.as_str(), "courtyard");
         assert_eq!(recipe.seed.0, 42);
     }
 
@@ -725,21 +725,37 @@ mod tests {
     #[test]
     fn cross_check_fails_undeclared_asset_and_low_tier() {
         let recipe = SceneRecipe::from_json_slice(minimal_recipe_json().as_bytes()).unwrap();
-        let reference = catalog::catalog_entry("reference").unwrap();
-        // reference 要求 reference-scene 资产依赖；最小配方未声明 → 执行前失败。
+        let courtyard = catalog::catalog_entry("courtyard").unwrap();
+        // courtyard 要求 reference-scene 资产依赖；最小配方未声明 → 执行前失败。
         assert!(matches!(
-            catalog::require_declared_assets(&recipe, &reference),
+            catalog::require_declared_assets(&recipe, &courtyard),
             Err(CatalogError::UndeclaredAssetDependency { .. })
         ));
-        // outline-advanced 要求 Standard；默认（未声明）tier 不足。
-        let outline_advanced = catalog::catalog_entry("outline-advanced").unwrap();
+        // tier 交叉校验（目录当前无 tier 门控条目；用合成条目测机制本身；
+        // 配方须先满足资产依赖——交叉校验先查资产再查 tier）。
+        let gated = catalog::CatalogEntry {
+            tier: Some(bevy_stylized_core::axis::StylizedExecutionTier::Standard),
+            assets: Vec::new(),
+            ..courtyard.clone()
+        };
         assert!(matches!(
-            catalog::require_declared_assets(&recipe, &outline_advanced),
+            catalog::require_declared_assets(&recipe, &gated),
             Err(CatalogError::InsufficientTier { .. })
         ));
-        // 普通条目通过。
-        let outline = catalog::catalog_entry("outline").unwrap();
-        assert_eq!(catalog::require_declared_assets(&recipe, &outline), Ok(()));
+        // 声明了资产依赖的配方通过。
+        let declared = SceneRecipe::from_json_slice(
+            minimal_recipe_json()
+                .replace(
+                    r#""assets": []"#,
+                    r#""assets": [{"id": "reference-scene", "source": "fixtures/synthetic/reference-scene", "sha256": null}]"#,
+                )
+                .as_bytes(),
+        )
+        .unwrap();
+        assert_eq!(
+            catalog::require_declared_assets(&declared, &courtyard),
+            Ok(())
+        );
     }
 
     #[test]

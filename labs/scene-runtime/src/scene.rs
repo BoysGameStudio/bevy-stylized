@@ -105,11 +105,15 @@ pub struct SceneCounts {
 }
 
 impl SceneCounts {
-    /// 取当前计数。
+    /// 取当前计数（实体数排除资源实体——Bevy 0.19 的资源存放在专用
+    /// 实体上；资源实体不是场景内容，与 [`SceneLedger::snapshot`] 的
+    /// 排除语义一致。参数命令插入的会话参数资源（CourtyardSettings 等）
+    /// 随会话保留，不构成场景泄漏）。
     #[must_use]
     pub fn capture(world: &World) -> Self {
+        let resource_entities = world.resource_entities().iter().count();
         Self {
-            entities: world.iter_entities().count(),
+            entities: world.iter_entities().count() - resource_entities,
             cameras: world
                 .iter_entities()
                 .filter(|entity| entity.get::<Camera3d>().is_some())

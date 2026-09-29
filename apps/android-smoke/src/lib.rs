@@ -43,14 +43,19 @@ pub fn main() {
     let mut app = App::new();
     app.insert_resource(ClearColor(Color::srgb(0.08, 0.10, 0.15)))
         .add_plugins(plugins)
-        .add_plugins(StylizedPlugin::default());
+        // courtyard 角色台的 NPR 材质 adoption（05 §4；程序化 fixture 不
+        // 使用 adoption，加挂无副作用）。
+        .add_plugins((
+            StylizedPlugin::default(),
+            bevy_stylized::StylizedAssetIntegrationPlugin,
+        ));
     // harness 中性探针（driver 的捕获/就绪前置；R1：平台事件循环不变）。
     golden_harness::capture::install(&mut app);
     golden_harness::readiness::install(&mut app);
     // Catalog mode（runner 控制文件驱动）：每进程一个目录场景，共享捕获
     // 合同；缺省 = 既有程序化/角色 fixture 与重放合同不变。
     // 控制文件读取一次性消耗（读后删除）；只读一次并复用结果。
-    let catalog_scene = catalog::requested_scene();
+    let catalog_scene = catalog::requested_capture();
     let catalog_active = catalog_scene.is_some();
     if let Some(scene) = catalog_scene {
         catalog::configure(&mut app, &scene);
@@ -65,8 +70,7 @@ pub fn main() {
         app.add_systems(Startup, setup);
     }
     #[cfg(feature = "character")]
-    app.add_plugins(bevy_stylized::StylizedAssetIntegrationPlugin)
-        .init_resource::<character::CharacterState>()
+    app.init_resource::<character::CharacterState>()
         .add_systems(Startup, character::setup)
         .add_systems(Update, character::check_loaded);
     app.run();

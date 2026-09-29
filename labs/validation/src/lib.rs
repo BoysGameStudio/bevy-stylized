@@ -13,6 +13,7 @@
 //! 后续阶段，本阶段不引入模型依赖。
 
 pub mod diff;
+pub mod frame;
 pub mod image;
 pub mod tier2;
 

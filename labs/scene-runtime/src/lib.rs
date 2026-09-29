@@ -39,7 +39,8 @@ pub mod session;
 pub use clock::ExperimentClock;
 pub use compiler::{CompileError, ScenePlan, compile};
 pub use controller::{
-    CaseEntry, CommandOutcome, CommandPlan, RefusalReason, SessionCommand, SessionController,
+    CameraViewInfo, CaseEntry, CommandOutcome, CommandPlan, RefusalReason, SessionCommand,
+    SessionController,
 };
 pub use cycle::{CaptureCycle, CycleResource, Settle, capture_in_app, set_cycle_projection};
 pub use driver::{CaseDriver, DriverLimits, DriverStatus};

@@ -3,7 +3,7 @@ name = "showcase"
 version = "0.1.0"
 edition.workspace = true
 publish = false
-description = "Showcase suite for bevy-stylized (17 fixed cases plus a static character inspector)."
+description = "Showcase suite for bevy-stylized (19 fixed cases plus a static character inspector)."
 
 [[bin]]
 name = "showcase"
@@ -28,16 +28,17 @@ serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 gltf.workspace = true
+validation = { path = "../../labs/validation" }
 bevy_egui = { version = "=0.41.1", optional = true, default-features = false, features = ["render", "default_fonts"] }
 
 [dev-dependencies]
 tempfile.workspace = true
 
 [features]
-# 开窗交互模式需要 winit（x11）。默认关闭：headless 捕获与测试不含
-# winit，避免事件循环进入测试线程的兼容性问题。
-interactive = ["bevy/bevy_winit", "bevy/x11"]
-inspector = ["interactive", "bevy/wayland", "dep:bevy_egui"]
+# 开窗交互模式需要 winit（x11）与 egui 叠加层。默认关闭：headless 捕获
+# 与测试不含 winit，避免事件循环进入测试线程的兼容性问题。
+interactive = ["bevy/bevy_winit", "bevy/x11", "dep:bevy_egui"]
+inspector = ["interactive", "bevy/wayland"]
 
 [lints]
 workspace = true

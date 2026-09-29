@@ -10,16 +10,16 @@ use bevy::{
     asset::{Assets, RenderAssetUsages},
     color::LinearRgba,
     image::Image,
-    math::{Mat4, Quat, Vec3, primitives::Sphere},
+    math::{Mat4, Quat, Vec3, primitives::Cylinder, primitives::Sphere},
     mesh::{Mesh, Meshable, skinning::SkinnedMesh},
     pbr::MeshMaterial3d,
-    prelude::{App, Entity, Mesh3d, Transform, World},
+    prelude::{App, Children, Entity, Mesh3d, Transform, World},
     render::render_resource::{Extent3d, TextureDimension, TextureFormat},
 };
 use bevy_stylized::prelude::*;
 use bevy_stylized::stylized_render::post::{StylizedDisplayTransform, StylizedPostProcess};
 
-use crate::metadata::LOD_LAYOUT;
+use crate::metadata::{COURTYARD_LOD_BALLS, COURTYARD_PODIUM_RING, COURTYARD_TRIO_BALLS};
 use crate::recipe::{CameraAttachment, CameraRecipe};
 
 /// 可寻址场景节点：稳定逻辑 ID 的注册组件（docs/showcase/01 line 92/224
@@ -70,6 +70,91 @@ pub fn ramp_image(rows: &[[u8; 4]]) -> Image {
     image
 }
 
+/// 程序化 matcap 纹理（径向金属渐变；metal/lod/courtyard 共用）。
+pub fn matcap_image(size: usize) -> Image {
+    let mut data = Vec::with_capacity(size * size * 4);
+    for y in 0..size {
+        for x in 0..size {
+            let dx = x as f32 / size as f32 - 0.5;
+            let dy = y as f32 / size as f32 - 0.5;
+            let r = (dx * dx + dy * dy).sqrt();
+            let v = ((1.0 - (r * 2.0).clamp(0.0, 1.0)) * 255.0) as u8;
+            data.extend_from_slice(&[v, v / 2, 255 - v, 255]);
+        }
+    }
+    let mut image = Image::new_fill(
+        Extent3d {
+            width: size as u32,
+            height: size as u32,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        &[0, 0, 0, 255],
+        TextureFormat::Rgba8Unorm,
+        RenderAssetUsages::default(),
+    );
+    image.data = Some(data);
+    image
+}
+
+/// courtyard 专用银灰 matcap（金属银灰：中心亮银 (0.90,0.92,0.95) →
+/// 边缘深灰蓝 (0.25,0.28,0.34)）。默认 [`matcap_image`] 的紫蓝配色服务
+/// metal/lod 旧场景的 golden 基线，不动；courtyard 的 Hero+matcap 球
+/// （LOD 轴、metal 排）统一用本变体降噪。
+pub fn matcap_image_silver(size: usize) -> Image {
+    let center = [0.90f32, 0.92, 0.95];
+    let edge = [0.25f32, 0.28, 0.34];
+    let mut data = Vec::with_capacity(size * size * 4);
+    for y in 0..size {
+        for x in 0..size {
+            let dx = x as f32 / size as f32 - 0.5;
+            let dy = y as f32 / size as f32 - 0.5;
+            let r = (dx * dx + dy * dy).sqrt();
+            let t = 1.0 - (r * 2.0).clamp(0.0, 1.0);
+            let px = [0, 1, 2].map(|c| {
+                ((edge[c] + (center[c] - edge[c]) * t).clamp(0.0, 1.0) * 255.0).round() as u8
+            });
+            data.extend_from_slice(&[px[0], px[1], px[2], 255]);
+        }
+    }
+    let mut image = Image::new_fill(
+        Extent3d {
+            width: size as u32,
+            height: size as u32,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        &[0, 0, 0, 255],
+        TextureFormat::Rgba8Unorm,
+        RenderAssetUsages::default(),
+    );
+    image.data = Some(data);
+    image
+}
+
+/// 程序化 ILM 纹理（上游布局：R=metal mask，G=AO 全 1；16×16 纯色）。
+/// metal/lod/courtyard metal 排用 `metal_mask = 255`（全金属）；
+/// courtyard hair 排用 0（对应 hair 场景的 ILM）。
+pub fn ilm_image(metal_mask: u8) -> Image {
+    let mut data = Vec::with_capacity(16 * 16 * 4);
+    for _ in 0..16 * 16 {
+        data.extend_from_slice(&[metal_mask, 255, 0, 0]);
+    }
+    let mut image = Image::new_fill(
+        Extent3d {
+            width: 16,
+            height: 16,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        &[0, 0, 0, 255],
+        TextureFormat::Rgba8Unorm,
+        RenderAssetUsages::default(),
+    );
+    image.data = Some(data);
+    image
+}
+
 // ---------------------------------------------------------------------------
 // 共享原语：无相机的条带与实例组合
 // ---------------------------------------------------------------------------
@@ -84,6 +169,16 @@ pub fn build_strip(app: &mut App) -> Entity {
 
 /// [`build_strip`] 的 `&mut World` 形式（同一实现；App 形式仅为适配）。
 pub fn build_strip_world(world: &mut World) -> Entity {
+    let material = cel_material(world);
+    build_strip_world_with_material(world, material)
+}
+
+/// [`build_strip_world`] 的材质可指定变体（courtyard 旗帜配色用；
+/// 几何/蒙皮同一份实现）。
+pub fn build_strip_world_with_material(
+    world: &mut World,
+    material: bevy::prelude::Handle<StylizedCelMaterial>,
+) -> Entity {
     // 竖直条带：两段关节权重。
     let (cols, rows) = (2usize, 16usize);
     let mut positions = Vec::new();
@@ -143,7 +238,6 @@ pub fn build_strip_world(world: &mut World) -> Entity {
                 Mat4::IDENTITY,
             ],
         ));
-    let material = cel_material(world);
     world.spawn((
         Mesh3d(mesh),
         MeshMaterial3d(material),
@@ -221,114 +315,244 @@ pub fn build_portable_instances_world(world: &mut World, n: u32) {
 }
 
 // ---------------------------------------------------------------------------
-// 00 overview：三个 class 并排
+// courtyard（docs/showcase/05）：庭院展台合成场景——全部渲染特性作为分区
+// 同屏出现；参数面（§8）经 CourtyardSettings 资源进入构建（缺席 = §0 默认
+// 状态 day/hull/100/false/rest/None）。
 // ---------------------------------------------------------------------------
-pub fn overview(world: &mut World) -> CameraRecipe {
-    let mesh = sphere(world, 0.9);
-    let cel = cel_material(world);
-    let character = world
-        .resource_mut::<Assets<StylizedCharacterMaterial>>()
-        .add(StylizedCharacterMaterial {
-            params: StylizedCharacterParams::default()
-                .with_hair_specular(24.0, 0.4)
-                .with_emission(LinearRgba::new(1.0, 0.7, 0.3, 1.0), 0.6),
-            ..StylizedCharacterMaterial::default()
-        });
-    let ramp = world
-        .resource_mut::<Assets<Image>>()
-        .add(ramp_image(&[[120, 120, 200, 255]]));
-    let hero = world
-        .resource_mut::<Assets<StylizedHeroMaterial>>()
-        .add(StylizedHeroMaterial {
-            params: StylizedHeroParams::default().with_ramp_rows(1.0),
-            ramp_texture: Some(ramp),
-            ..StylizedHeroMaterial::default()
-        });
-    world.spawn((
-        Mesh3d(mesh.clone()),
-        MeshMaterial3d(cel),
-        Transform::from_xyz(-2.4, 0.0, 0.0),
-    ));
-    world.spawn((
-        Mesh3d(mesh.clone()),
-        MeshMaterial3d(character),
-        Transform::from_xyz(0.0, 0.0, 0.0),
-    ));
-    world.spawn((
-        Mesh3d(mesh.clone()),
-        MeshMaterial3d(hero),
-        Transform::from_xyz(2.4, 0.0, 0.0),
-    ));
-    CameraRecipe::new(Vec3::new(0.0, 0.5, 5.5), Vec3::ZERO)
+
+/// courtyard 时刻参数（§8：view preset 选择）。
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CourtyardTimeOfDay {
+    /// 昼（§0 默认）。
+    #[default]
+    Day,
+    /// 黄昏。
+    Dusk,
+    /// 夜。
+    Night,
 }
 
-// ---------------------------------------------------------------------------
-// 01 ramp：解析 ramp vs 纹理 ramp（行差异）
-// ---------------------------------------------------------------------------
-pub fn ramp(world: &mut World) -> CameraRecipe {
-    let mesh = sphere(world, 0.9);
-    let analytic = cel_material(world);
-    let ramp = world.resource_mut::<Assets<Image>>().add(ramp_image(&[
-        [80, 80, 220, 255],
-        [220, 80, 80, 255],
-        [80, 200, 80, 255],
-    ]));
-    let textured = world
+/// courtyard 描边模式（§8：P2/P3 内容 + 相机附件；hybrid 需 Standard）。
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CourtyardOutlineMode {
+    /// 无描边。
+    Off,
+    /// hull 描边（§0 默认）。
+    #[default]
+    Hull,
+    /// hull + screen-space 内部边缘。
+    Hybrid,
+}
+
+/// courtyard 旗帜姿态（§8：posed = root 旋转 0.5 rad 的确定性定姿态）。
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CourtyardFlagsPose {
+    /// 静止（§0 默认）。
+    #[default]
+    Rest,
+    /// 定姿态（root 旋转 0.5 rad）。
+    Posed,
+}
+
+/// courtyard 场景参数（§8 参数面的构建期通道；§0 默认状态 = `Default`：
+/// day / hull / crowd=100 / post off / flags rest / face_threshold None）。
+///
+/// builder 经 `world.get_resource::<CourtyardSettings>()` 读取，缺席用默认。
+#[derive(bevy::prelude::Resource, Clone, Copy, Debug, PartialEq)]
+pub struct CourtyardSettings {
+    /// 时刻（day/dusk/night）。
+    pub time_of_day: CourtyardTimeOfDay,
+    /// 描边模式（off/hull/hybrid）。
+    pub outline_mode: CourtyardOutlineMode,
+    /// 灯阵密度（0/100/1000）。
+    pub crowd: u32,
+    /// 后处理开关。
+    pub post: bool,
+    /// 旗帜姿态（rest/posed）。
+    pub flags: CourtyardFlagsPose,
+    /// 中央前排 face 组 SDF 阈值覆盖（None = 三阈值梯度 0.2/默认/0.8）。
+    pub face_threshold: Option<f32>,
+}
+
+impl Default for CourtyardSettings {
+    fn default() -> Self {
+        Self {
+            time_of_day: CourtyardTimeOfDay::Day,
+            outline_mode: CourtyardOutlineMode::Hull,
+            crowd: 100,
+            post: false,
+            flags: CourtyardFlagsPose::Rest,
+            face_threshold: None,
+        }
+    }
+}
+
+/// 庭院展台：分区合成（§3 布局；§4 分区详设）。
+pub fn courtyard(world: &mut World) -> CameraRecipe {
+    let settings = world
+        .get_resource::<CourtyardSettings>()
+        .copied()
+        .unwrap_or_default();
+    // time_of_day → 庭院专用视图 preset（雾范围按庭院景深重调，见
+    // views::courtyard_*；builder 在 driver 应用 binding.view 之后运行，
+    // 写 StylizedViewSettings 即生效，与 builders::lighting 同一通道）。
+    {
+        let mut view = world.resource_mut::<StylizedViewSettings>();
+        match settings.time_of_day {
+            CourtyardTimeOfDay::Day => crate::views::courtyard_day(&mut view.0),
+            CourtyardTimeOfDay::Dusk => crate::views::courtyard_dusk(&mut view.0),
+            CourtyardTimeOfDay::Night => crate::views::courtyard_night(&mut view.0),
+        }
+    }
+    courtyard_shell(world);
+    courtyard_trio(world, settings.face_threshold);
+    courtyard_p1_ramp(world);
+    courtyard_p2_outline(world);
+    courtyard_p3_hybrid(world);
+    courtyard_p4_effects(world);
+    courtyard_p5_flags(world, settings.flags);
+    courtyard_lod_axis(world);
+    courtyard_reference_stage(world);
+    courtyard_lamps(world, settings.crowd);
+    // CameraRecipe 只有单附件槽（多附件替换 API 是 §11.1 的后续阶段）；
+    // §9 捕获矩阵中 hybrid 与 post 不组合，hybrid 优先。
+    let attachment = match (settings.outline_mode, settings.post) {
+        (CourtyardOutlineMode::Hybrid, _) => CameraAttachment::ScreenOutline,
+        (_, true) => CameraAttachment::PostProcess(StylizedPostProcess {
+            vignette_strength: 0.5,
+            chromatic_aberration: 0.004,
+            display_transform: StylizedDisplayTransform::SimpleCompress,
+            ..StylizedPostProcess::default()
+        }),
+        (_, false) => CameraAttachment::None,
+    };
+    let panorama = &crate::metadata::COURTYARD_CAMERA_PRESETS[0];
+    CameraRecipe::with_attachment(panorama.eye, panorama.look, attachment)
+}
+
+/// 低饱和 Cel 材质（§2 色彩纪律：固有色低饱和，饱和度只出现在展品上）。
+fn courtyard_cel_material(
+    world: &mut World,
+    base_color: LinearRgba,
+) -> bevy::prelude::Handle<StylizedCelMaterial> {
+    world
         .resource_mut::<Assets<StylizedCelMaterial>>()
         .add(StylizedCelMaterial {
-            params: StylizedCelParams::default().with_ramp_rows(3.0),
-            ramp_texture: Some(ramp),
-            ..StylizedCelMaterial::default()
-        });
-    // 左：解析 ramp；右三：纹理 ramp 行 0/1/2。
-    world.spawn((
-        Mesh3d(mesh.clone()),
-        MeshMaterial3d(analytic),
-        Transform::from_xyz(-3.3, 0.0, 0.0),
-    ));
-    for (i, x) in [-1.1, 1.1, 3.3].into_iter().enumerate() {
-        world.spawn((
-            Mesh3d(mesh.clone()),
-            MeshMaterial3d(textured.clone()),
-            StylizedInstanceData {
-                profile_index: i as u32,
-                ..StylizedInstanceData::default()
+            params: StylizedCelParams {
+                base_color_factor: bevy::math::Vec4::new(
+                    base_color.red,
+                    base_color.green,
+                    base_color.blue,
+                    1.0,
+                ),
+                ..StylizedCelParams::default()
             },
-            Transform::from_xyz(x, 0.0, 0.0),
-        ));
-    }
-    CameraRecipe::new(Vec3::new(0.0, 0.5, 8.0), Vec3::ZERO)
+            ..StylizedCelMaterial::default()
+        })
 }
 
-// ---------------------------------------------------------------------------
-// 02 lighting：key light 方向 + palette + day/night（同帧三段经实例排布；
-// view 层昼间设定——昼夜极端见 view 参数测试与 golden 的 day/night 覆盖）
-// ---------------------------------------------------------------------------
-pub fn lighting(world: &mut World) -> CameraRecipe {
-    let mesh = sphere(world, 0.9);
-    let material = cel_material(world);
-    // 三个球分别：默认昼 / 夜（低 ambient 由 view 驱动不适用 per-instance，
-    // 此处展示 key light 方向响应梯度）——横向排布展示 NdotL 变化。
-    for x in [-2.4, 0.0, 2.4] {
+/// 场地壳（§3）：大地面 / 广场铺装 / 环形矮墙（四段弧墙，南留门）/
+/// 中央平台 / 展台环 6 座（同一形制，是画框不是展品）。
+///
+/// 固有色（美术定案）：深灰绿地面收底、暖白石材铺装、暖灰矮墙、暖白
+/// 展台——饱和度只出现在被演示的材质上（§2 色彩纪律）。
+fn courtyard_shell(world: &mut World) {
+    let ground_material = courtyard_cel_material(world, LinearRgba::new(0.32, 0.34, 0.33, 1.0));
+    let paving_material = courtyard_cel_material(world, LinearRgba::new(0.62, 0.60, 0.56, 1.0));
+    let wall_material = courtyard_cel_material(world, LinearRgba::new(0.48, 0.46, 0.43, 1.0));
+    let stand_material = courtyard_cel_material(world, LinearRgba::new(0.70, 0.68, 0.64, 1.0));
+
+    // 大地面：半径 60 圆盘，深灰。
+    let ground = world
+        .resource_mut::<Assets<Mesh>>()
+        .add(Cylinder::new(60.0, 0.1));
+    world.spawn((
+        Mesh3d(ground),
+        MeshMaterial3d(ground_material),
+        Transform::from_xyz(0.0, -0.05, 0.0),
+    ));
+    // 广场铺装：半径 12 圆盘，抬高 0.02，浅灰（描边可读底）。
+    let paving = world
+        .resource_mut::<Assets<Mesh>>()
+        .add(Cylinder::new(12.0, 0.04));
+    world.spawn((
+        Mesh3d(paving),
+        MeshMaterial3d(paving_material),
+        Transform::from_xyz(0.0, 0.0, 0.0),
+    ));
+    // 环形矮墙 r13（高 1.2、厚 0.4）：四段 80° 弧墙，南门开口 40°
+    // （方位角 0 = 南 +Z）；每段 5 根旋转 box 弦近似（全部弦等长，共享
+    // 一个 mesh）。
+    let (wall_radius, wall_height, wall_thickness) = (13.0f32, 1.2f32, 0.4f32);
+    let chord_span = 16.0f32; // 80°/段 ÷ 5 弦
+    let chord_length = 2.0 * wall_radius * (chord_span * 0.5).to_radians().sin() * 1.06;
+    let chord_mesh =
+        world
+            .resource_mut::<Assets<Mesh>>()
+            .add(bevy::math::primitives::Cuboid::from_size(Vec3::new(
+                chord_length,
+                wall_height,
+                wall_thickness,
+            )));
+    for segment in 0..4 {
+        let start = 20.0 + segment as f32 * 80.0;
+        for chord in 0..5 {
+            let azimuth = (start + (chord as f32 + 0.5) * chord_span).to_radians();
+            world.spawn((
+                Mesh3d(chord_mesh.clone()),
+                MeshMaterial3d(wall_material.clone()),
+                Transform::from_xyz(
+                    wall_radius * azimuth.sin(),
+                    wall_height * 0.5,
+                    wall_radius * azimuth.cos(),
+                )
+                .with_rotation(Quat::from_rotation_y(azimuth)),
+            ));
+        }
+    }
+    // 中央平台：半径 2.2、高 0.3 圆台。
+    let platform = world.resource_mut::<Assets<Mesh>>().add(Cylinder::new(
+        crate::metadata::COURTYARD_PLATFORM_RADIUS,
+        0.3,
+    ));
+    world.spawn((
+        Mesh3d(platform),
+        MeshMaterial3d(stand_material.clone()),
+        Transform::from_xyz(0.0, 0.15, 0.0),
+    ));
+    // 展台环：半径 5.5，60° 均布 6 座（0.8×0.8×1.0 方柱，顶面 y=1.0）。
+    let podium_mesh =
+        world
+            .resource_mut::<Assets<Mesh>>()
+            .add(bevy::math::primitives::Cuboid::from_size(Vec3::new(
+                0.8, 1.0, 0.8,
+            )));
+    for podium in COURTYARD_PODIUM_RING {
         world.spawn((
-            Mesh3d(mesh.clone()),
-            MeshMaterial3d(material.clone()),
-            Transform::from_xyz(x, 0.0, 0.0),
+            Mesh3d(podium_mesh.clone()),
+            MeshMaterial3d(stand_material.clone()),
+            Transform::from_xyz(podium.x, 0.5, podium.z),
         ));
     }
-    // palette[0] 暖色环境 + key light 侧向 → 明暗梯度清晰。
-    let mut settings = world.resource_mut::<StylizedViewSettings>();
-    settings.0.key_light_direction = Vec3::new(0.9, 0.2, 0.2).normalize();
-    settings.0.palette = vec![LinearRgba::new(0.9, 0.75, 0.6, 1.0)];
-    CameraRecipe::new(Vec3::new(0.0, 0.5, 6.5), Vec3::ZERO)
 }
 
-// ---------------------------------------------------------------------------
-// 03 face：face SDF 逐实例阈值扫描
-// ---------------------------------------------------------------------------
-pub fn face(world: &mut World) -> CameraRecipe {
-    let mesh = sphere(world, 0.9);
-    // 程序化 face SDF：左亮右暗线性渐变。
+/// 中央平台：三对照组 7 球（§4；face 前排 / hair 中排 / metal 后排，
+/// 全部面朝南 +Z，坐标与半径来自 metadata::COURTYARD_TRIO_BALLS）。
+fn courtyard_trio(world: &mut World, face_threshold: Option<f32>) {
+    // 基座：顶面 y=1.0（平台顶 0.3 + 柱高 0.7；球心 y=1.32/1.40 按 §4 锁定）。
+    let pedestal_mesh = world
+        .resource_mut::<Assets<Mesh>>()
+        .add(Cylinder::new(0.12, 0.7));
+    let pedestal_material = courtyard_cel_material(world, LinearRgba::new(0.70, 0.68, 0.64, 1.0));
+    for (center, _) in COURTYARD_TRIO_BALLS {
+        world.spawn((
+            Mesh3d(pedestal_mesh.clone()),
+            MeshMaterial3d(pedestal_material.clone()),
+            Transform::from_xyz(center.x, 0.65, center.z),
+        ));
+    }
+
+    // face 前排：Character + face SDF（builders::face 的 128×128 线性渐变）。
     let (w, h) = (128usize, 128usize);
     let mut data = Vec::with_capacity(w * h * 4);
     for _y in 0..h {
@@ -350,172 +574,154 @@ pub fn face(world: &mut World) -> CameraRecipe {
     );
     sdf.data = Some(data);
     let sdf = world.resource_mut::<Assets<Image>>().add(sdf);
-
-    let material = world
+    // 对照组底色（美术定案）：face 肤色底（阈值梯度语义不变）。
+    let mut face_params = StylizedCharacterParams::default()
+        .with_face_forward(Vec3::Z, 0.05)
+        .with_face_threshold_bias(0.5);
+    face_params.cel.base_color_factor = bevy::math::Vec4::new(0.85, 0.72, 0.65, 1.0);
+    let face_material = world
         .resource_mut::<Assets<StylizedCharacterMaterial>>()
         .add(StylizedCharacterMaterial {
-            params: StylizedCharacterParams::default()
-                .with_face_forward(Vec3::Z, 0.05)
-                .with_face_threshold_bias(0.5),
+            params: face_params,
             face_sdf_texture: Some(sdf),
             ..StylizedCharacterMaterial::default()
         });
-    for (i, x) in [-2.4, 0.0, 2.4].into_iter().enumerate() {
-        let threshold = [Some(0.2), None, Some(0.8)][i];
+    let face_mesh = sphere(world, 0.32);
+    let defaults = [Some(0.2), None, Some(0.8)];
+    for (i, (center, _)) in COURTYARD_TRIO_BALLS[..3].iter().enumerate() {
         let target = match i {
-            0 => "instances.0",
-            1 => "instances.1",
-            _ => "instances.2",
+            0 => "trio.face.0",
+            1 => "trio.face.1",
+            _ => "trio.face.2",
         };
         world.spawn((
-            Mesh3d(mesh.clone()),
-            MeshMaterial3d(material.clone()),
+            Mesh3d(face_mesh.clone()),
+            MeshMaterial3d(face_material.clone()),
             StylizedInstanceData {
-                face_threshold: threshold,
+                face_threshold: face_threshold.or(defaults[i]),
                 ..StylizedInstanceData::default()
             },
             SceneTarget(target),
-            Transform::from_xyz(x, 0.0, 0.0),
+            Transform::from_translation(*center),
         ));
     }
-    CameraRecipe::new(Vec3::new(0.0, 0.3, 6.5), Vec3::ZERO)
-}
 
-// ---------------------------------------------------------------------------
-// 04 hair：hair 高光 on/off（ILM.G mask）
-// ---------------------------------------------------------------------------
-pub fn hair(world: &mut World) -> CameraRecipe {
-    let mesh = sphere(world, 0.9);
-    // ILM（上游布局）：R=metal(0)，G=AO(255)，B=高光抑制(0)，A=band(0)。
-    let (w, h) = (16usize, 16usize);
-    let mut data = Vec::with_capacity(w * h * 4);
-    for _ in 0..w * h {
-        data.extend_from_slice(&[0, 255, 0, 0]);
-    }
-    let mut ilm = Image::new_fill(
-        Extent3d {
-            width: w as u32,
-            height: h as u32,
-            depth_or_array_layers: 1,
-        },
-        TextureDimension::D2,
-        &[0, 0, 0, 255],
-        TextureFormat::Rgba8Unorm,
-        RenderAssetUsages::default(),
-    );
-    ilm.data = Some(data);
-    let ilm = world.resource_mut::<Assets<Image>>().add(ilm);
-
-    let off = world
+    // hair 中排：Character + ILM（hair 布局 R=metal 0），off/on 对照；
+    // 深发色底（美术定案；off/on 语义不变）。
+    let hair_ilm = world.resource_mut::<Assets<Image>>().add(ilm_image(0));
+    let hair_base = bevy::math::Vec4::new(0.16, 0.14, 0.18, 1.0);
+    let mut hair_off_params = StylizedCharacterParams::default();
+    hair_off_params.cel.base_color_factor = hair_base;
+    let hair_off = world
         .resource_mut::<Assets<StylizedCharacterMaterial>>()
         .add(StylizedCharacterMaterial {
-            params: StylizedCharacterParams::default(),
-            ilm_texture: Some(ilm.clone()),
+            params: hair_off_params,
+            ilm_texture: Some(hair_ilm.clone()),
             ..StylizedCharacterMaterial::default()
         });
-    let on = world
+    let mut hair_on_params = StylizedCharacterParams::default().with_hair_specular(32.0, 0.9);
+    hair_on_params.cel.base_color_factor = hair_base;
+    let hair_on = world
         .resource_mut::<Assets<StylizedCharacterMaterial>>()
         .add(StylizedCharacterMaterial {
-            params: StylizedCharacterParams::default().with_hair_specular(32.0, 0.9),
-            ilm_texture: Some(ilm),
+            params: hair_on_params,
+            ilm_texture: Some(hair_ilm),
             ..StylizedCharacterMaterial::default()
         });
-    world.spawn((
-        Mesh3d(mesh.clone()),
-        MeshMaterial3d(off),
-        Transform::from_xyz(-1.4, 0.0, 0.0),
-    ));
-    world.spawn((
-        Mesh3d(mesh.clone()),
-        MeshMaterial3d(on),
-        Transform::from_xyz(1.4, 0.0, 0.0),
-    ));
-    CameraRecipe::new(Vec3::new(0.0, 0.3, 5.5), Vec3::ZERO)
-}
-
-// ---------------------------------------------------------------------------
-// 05 metal：matcap on/off（hero）
-// ---------------------------------------------------------------------------
-pub fn metal(world: &mut World) -> CameraRecipe {
-    let mesh = sphere(world, 0.9);
-    // 程序化 matcap：径向金属渐变。
-    let (w, h) = (128usize, 128usize);
-    let mut data = Vec::with_capacity(w * h * 4);
-    for y in 0..h {
-        for x in 0..w {
-            let dx = x as f32 / w as f32 - 0.5;
-            let dy = y as f32 / h as f32 - 0.5;
-            let r = (dx * dx + dy * dy).sqrt();
-            let v = ((1.0 - (r * 2.0).clamp(0.0, 1.0)) * 255.0) as u8;
-            data.extend_from_slice(&[v, v / 2, 255 - v, 255]);
-        }
+    let trio_mesh = sphere(world, 0.40);
+    for (material, (center, _)) in [hair_off, hair_on]
+        .into_iter()
+        .zip(COURTYARD_TRIO_BALLS[3..5].iter())
+    {
+        world.spawn((
+            Mesh3d(trio_mesh.clone()),
+            MeshMaterial3d(material),
+            Transform::from_translation(*center),
+        ));
     }
-    let mut matcap = Image::new_fill(
-        Extent3d {
-            width: w as u32,
-            height: h as u32,
-            depth_or_array_layers: 1,
-        },
-        TextureDimension::D2,
-        &[0, 0, 0, 255],
-        TextureFormat::Rgba8Unorm,
-        RenderAssetUsages::default(),
-    );
-    matcap.data = Some(data);
-    let matcap = world.resource_mut::<Assets<Image>>().add(matcap);
-    // ILM（上游布局）：R=metal mask 全 1，G=AO 全 1。
-    let mut ilm_data = Vec::new();
-    for _ in 0..16 * 16 {
-        ilm_data.extend_from_slice(&[255, 255, 0, 0]);
-    }
-    let mut ilm = Image::new_fill(
-        Extent3d {
-            width: 16,
-            height: 16,
-            depth_or_array_layers: 1,
-        },
-        TextureDimension::D2,
-        &[0, 0, 0, 255],
-        TextureFormat::Rgba8Unorm,
-        RenderAssetUsages::default(),
-    );
-    ilm.data = Some(ilm_data);
-    let ilm = world.resource_mut::<Assets<Image>>().add(ilm);
 
-    let off = world
+    // metal 后排：Hero + 银灰 matcap（courtyard 变体，降噪）+ 金属 ILM，
+    // 金属灰底；off/on 对照语义不变。
+    let metal_ilm = world.resource_mut::<Assets<Image>>().add(ilm_image(255));
+    let matcap = world
+        .resource_mut::<Assets<Image>>()
+        .add(matcap_image_silver(128));
+    let metal_base = bevy::math::Vec4::new(0.60, 0.62, 0.66, 1.0);
+    let mut metal_off_params = StylizedHeroParams::default();
+    metal_off_params.character.cel.base_color_factor = metal_base;
+    let metal_off =
+        world
+            .resource_mut::<Assets<StylizedHeroMaterial>>()
+            .add(StylizedHeroMaterial {
+                params: metal_off_params,
+                ilm_texture: Some(metal_ilm.clone()),
+                ..StylizedHeroMaterial::default()
+            });
+    let mut metal_on_params =
+        StylizedHeroParams::default().with_matcap(0.9, LinearRgba::new(1.0, 1.0, 1.0, 1.0));
+    metal_on_params.character.cel.base_color_factor = metal_base;
+    let metal_on = world
         .resource_mut::<Assets<StylizedHeroMaterial>>()
         .add(StylizedHeroMaterial {
-            ilm_texture: Some(ilm.clone()),
-            ..StylizedHeroMaterial::default()
-        });
-    let on = world
-        .resource_mut::<Assets<StylizedHeroMaterial>>()
-        .add(StylizedHeroMaterial {
-            params: StylizedHeroParams::default()
-                .with_matcap(0.9, LinearRgba::new(1.0, 0.9, 0.8, 1.0)),
-            ilm_texture: Some(ilm),
+            params: metal_on_params,
+            ilm_texture: Some(metal_ilm),
             matcap_texture: Some(matcap),
             ..StylizedHeroMaterial::default()
         });
-    world.spawn((
-        Mesh3d(mesh.clone()),
-        MeshMaterial3d(off),
-        Transform::from_xyz(-1.4, 0.0, 0.0),
-    ));
-    world.spawn((
-        Mesh3d(mesh.clone()),
-        MeshMaterial3d(on),
-        Transform::from_xyz(1.4, 0.0, 0.0),
-    ));
-    CameraRecipe::new(Vec3::new(0.0, 0.3, 5.5), Vec3::ZERO)
+    for (material, (center, _)) in [metal_off, metal_on]
+        .into_iter()
+        .zip(COURTYARD_TRIO_BALLS[5..7].iter())
+    {
+        world.spawn((
+            Mesh3d(trio_mesh.clone()),
+            MeshMaterial3d(material),
+            Transform::from_translation(*center),
+        ));
+    }
 }
 
-// ---------------------------------------------------------------------------
-// 06 outline：宽度 0/2/8 + 逐实例缩放（缩放开轮廓材质宽度仍全局；
-// 逐实例缩放为 ADR-0004 预留位，当前展示宽度梯度）
-// ---------------------------------------------------------------------------
-pub fn outline(world: &mut World) -> CameraRecipe {
-    let mesh = sphere(world, 0.8);
+/// P1 · ramp 展台（东）：4 小球横排，左 1 解析 ramp，右 3 纹理 ramp
+/// 行 0/1/2（回收 builders::ramp 的对照语义）。
+fn courtyard_p1_ramp(world: &mut World) {
+    let podium = COURTYARD_PODIUM_RING[0];
+    let mesh = sphere(world, 0.28);
+    let analytic = cel_material(world);
+    let ramp = world.resource_mut::<Assets<Image>>().add(ramp_image(&[
+        [80, 80, 220, 255],
+        [220, 80, 80, 255],
+        [80, 200, 80, 255],
+    ]));
+    let textured = world
+        .resource_mut::<Assets<StylizedCelMaterial>>()
+        .add(StylizedCelMaterial {
+            params: StylizedCelParams::default().with_ramp_rows(3.0),
+            ramp_texture: Some(ramp),
+            ..StylizedCelMaterial::default()
+        });
+    // 横排（沿 X，正对 panorama 相机），球心位于展台顶面高度。
+    world.spawn((
+        Mesh3d(mesh.clone()),
+        MeshMaterial3d(analytic),
+        Transform::from_xyz(podium.x - 1.05, 1.28, podium.z),
+    ));
+    for (i, dx) in [-0.35, 0.35, 1.05].into_iter().enumerate() {
+        world.spawn((
+            Mesh3d(mesh.clone()),
+            MeshMaterial3d(textured.clone()),
+            StylizedInstanceData {
+                profile_index: i as u32,
+                ..StylizedInstanceData::default()
+            },
+            Transform::from_xyz(podium.x + dx, 1.28, podium.z),
+        ));
+    }
+}
+
+/// P2 · 描边 hull 展台（东南，近相机）：3 球纵列，hull 宽度 0/2/8
+/// （回收 builders::outline 的宽度梯度）。
+fn courtyard_p2_outline(world: &mut World) {
+    let podium = COURTYARD_PODIUM_RING[1];
+    let mesh = sphere(world, 0.35);
     let material = cel_material(world);
     for (i, width) in [0.0, 2.0, 8.0].into_iter().enumerate() {
         let outline =
@@ -530,89 +736,19 @@ pub fn outline(world: &mut World) -> CameraRecipe {
         let mut entity = world.spawn((
             Mesh3d(mesh.clone()),
             MeshMaterial3d(material.clone()),
-            Transform::from_xyz((i as f32 - 1.0) * 2.2, 0.0, 0.0),
+            Transform::from_xyz(podium.x, 1.35, podium.z + (i as f32 - 1.0) * 0.75),
         ));
         if width > 0.0 {
             entity.insert(StylizedOutline::new(outline));
         }
     }
-    CameraRecipe::new(Vec3::new(0.0, 0.4, 6.0), Vec3::ZERO)
 }
 
-// ---------------------------------------------------------------------------
-// 07 animation：程序化双骨骼蒙皮条带摆动
-// ---------------------------------------------------------------------------
-pub fn animation(world: &mut World) -> CameraRecipe {
-    let root = build_strip_world(world);
-    // 摆一下再捕获：旋转 root 让条带弯曲。
-    world
-        .entity_mut(root)
-        .get_mut::<Transform>()
-        .expect("transform")
-        .rotation = Quat::from_rotation_z(0.5);
-    CameraRecipe::new(Vec3::new(0.0, 0.0, 5.0), Vec3::ZERO)
-}
-
-// ---------------------------------------------------------------------------
-// 08 post：vignette + chromatic + display transform hook（单 pass）
-// ---------------------------------------------------------------------------
-pub fn post(world: &mut World) -> CameraRecipe {
-    let mesh = sphere(world, 0.9);
-    let material = cel_material(world);
-    for x in [-1.3, 1.3] {
-        world.spawn((
-            Mesh3d(mesh.clone()),
-            MeshMaterial3d(material.clone()),
-            Transform::from_xyz(x, 0.0, 0.0),
-        ));
-    }
-    // 相机组件挂后处理参数（View 层开关默认开）；附件由宿主插入相机。
-    CameraRecipe::with_attachment(
-        Vec3::new(0.0, 0.3, 5.5),
-        Vec3::ZERO,
-        CameraAttachment::PostProcess(StylizedPostProcess {
-            vignette_strength: 0.5,
-            chromatic_aberration: 0.004,
-            display_transform: StylizedDisplayTransform::SimpleCompress,
-            ..StylizedPostProcess::default()
-        }),
-    )
-}
-
-// ---------------------------------------------------------------------------
-// 09 stress：1000 实例
-// ---------------------------------------------------------------------------
-pub fn stress(world: &mut World) -> CameraRecipe {
-    build_portable_instances_world(world, 1000);
-    CameraRecipe::new(Vec3::new(0.0, 6.0, 34.0), Vec3::ZERO)
-}
-
-// ---------------------------------------------------------------------------
-// 10 reference：fixture reference_scene.glb（production 路径）
-// ---------------------------------------------------------------------------
-pub fn reference(world: &mut World) -> CameraRecipe {
-    // 与三层对比同场景同机位（常数见 labs/reference）。
-    let scene = world
-        .resource::<bevy::asset::AssetServer>()
-        .load("reference_scene.glb#Scene0");
-    world.spawn(bevy::world_serialization::WorldAssetRoot(scene));
-    CameraRecipe::new(Vec3::new(0.0, 1.1, 4.2), Vec3::new(0.0, 0.9, 0.0))
-}
-
-// ---------------------------------------------------------------------------
-// 11 performance：benchmark 场景捕获 + 运行 JSON baseline 测量
-// ---------------------------------------------------------------------------
-pub fn performance(world: &mut World) -> CameraRecipe {
-    // 捕获面：hero_1 + portable_100 同帧。
-    build_hero_1_world(world);
-    build_portable_instances_world(world, 100);
-    CameraRecipe::new(Vec3::new(0.0, 4.0, 20.0), Vec3::ZERO)
-}
-
-// ---------------------------------------------------------------------------
-// outline-advanced（V2-a）：hybrid = hull 剪影 + screen-space 内部边缘
-// ---------------------------------------------------------------------------
-pub fn outline_advanced(world: &mut World) -> CameraRecipe {
+/// P3 · 描边 hybrid 展台（西南）：方块堆（2 cuboid + 1 小球），hull 剪影
+/// 始终在；screen-space 内部边缘经相机附件声明（outline_mode=Hybrid 时，
+/// 由 builders::courtyard 的 CameraRecipe 携带；Off/Hull 时 hull-only）。
+fn courtyard_p3_hybrid(world: &mut World) {
+    let podium = COURTYARD_PODIUM_RING[2];
     let material = cel_material(world);
     let outline =
         world
@@ -627,184 +763,34 @@ pub fn outline_advanced(world: &mut World) -> CameraRecipe {
         world
             .resource_mut::<Assets<Mesh>>()
             .add(bevy::math::primitives::Cuboid::from_size(Vec3::new(
-                2.0, 0.8, 1.6,
+                0.6, 0.25, 0.5,
             )));
     let small_box =
         world
             .resource_mut::<Assets<Mesh>>()
             .add(bevy::math::primitives::Cuboid::from_size(Vec3::new(
-                0.9, 0.9, 0.9,
+                0.3, 0.3, 0.3,
             )));
-    let ball = world.resource_mut::<Assets<Mesh>>().add(Sphere::new(0.55));
-    for (mesh, translation) in [
-        (big_box, Vec3::new(0.0, -0.4, 0.0)),
-        (small_box.clone(), Vec3::new(0.0, 0.45, 0.0)),
-        (small_box, Vec3::new(0.35, 0.45, 0.2)),
-        (ball, Vec3::new(0.7, 0.55, 0.1)),
+    let ball = world.resource_mut::<Assets<Mesh>>().add(Sphere::new(0.18));
+    for (mesh, offset) in [
+        (big_box, Vec3::new(0.0, 1.125, 0.0)),
+        (small_box, Vec3::new(-0.1, 1.4, 0.05)),
+        (ball, Vec3::new(0.15, 1.43, 0.1)),
     ] {
         world.spawn((
             Mesh3d(mesh),
             MeshMaterial3d(material.clone()),
             StylizedOutline::new(outline.clone()),
-            Transform::from_translation(translation),
+            Transform::from_translation(Vec3::new(podium.x, 0.0, podium.z) + offset),
         ));
     }
-    // per-camera opt-in：screen-space 内部边缘（Standard+）；附件由宿主插入相机。
-    CameraRecipe::with_attachment(
-        Vec3::new(2.2, 1.6, 3.4),
-        Vec3::new(0.0, 0.3, 0.0),
-        CameraAttachment::ScreenOutline,
-    )
 }
 
-// ---------------------------------------------------------------------------
-// lod（V2-b）：同一 hero 角色随距离梯度降级（near→very far；永不降 class）
-// ---------------------------------------------------------------------------
-pub fn lod(world: &mut World) -> CameraRecipe {
-    // 程序化 matcap（径向金属渐变）+ ILM（R=metal mask 全 1，G=AO 全 1）。
-    let (w, h) = (64usize, 64usize);
-    let mut data = Vec::with_capacity(w * h * 4);
-    for y in 0..h {
-        for x in 0..w {
-            let dx = x as f32 / w as f32 - 0.5;
-            let dy = y as f32 / h as f32 - 0.5;
-            let r = (dx * dx + dy * dy).sqrt();
-            let v = ((1.0 - (r * 2.0).clamp(0.0, 1.0)) * 255.0) as u8;
-            data.extend_from_slice(&[v, v / 2, 255 - v, 255]);
-        }
-    }
-    let mut matcap = Image::new_fill(
-        Extent3d {
-            width: w as u32,
-            height: h as u32,
-            depth_or_array_layers: 1,
-        },
-        TextureDimension::D2,
-        &[0, 0, 0, 255],
-        TextureFormat::Rgba8Unorm,
-        RenderAssetUsages::default(),
-    );
-    matcap.data = Some(data);
-    let matcap = world.resource_mut::<Assets<Image>>().add(matcap);
-    let mut ilm_data = Vec::new();
-    for _ in 0..16 * 16 {
-        ilm_data.extend_from_slice(&[255, 255, 0, 0]);
-    }
-    let mut ilm = Image::new_fill(
-        Extent3d {
-            width: 16,
-            height: 16,
-            depth_or_array_layers: 1,
-        },
-        TextureDimension::D2,
-        &[0, 0, 0, 255],
-        TextureFormat::Rgba8Unorm,
-        RenderAssetUsages::default(),
-    );
-    ilm.data = Some(ilm_data);
-    let ilm = world.resource_mut::<Assets<Image>>().add(ilm);
-
-    // 共享 hero 材质：matcap + hair 高光全开（near 全特性；远处经
-    // per-instance flags 削减，材质资产不变）。
-    let mut hero_params =
-        StylizedHeroParams::default().with_matcap(0.9, LinearRgba::new(1.0, 0.9, 0.8, 1.0));
-    hero_params.character = hero_params.character.with_hair_specular(28.0, 0.8);
-    let material = world
-        .resource_mut::<Assets<StylizedHeroMaterial>>()
-        .add(StylizedHeroMaterial {
-            params: hero_params,
-            ilm_texture: Some(ilm),
-            matcap_texture: Some(matcap),
-            ..StylizedHeroMaterial::default()
-        });
-
-    for (angle_deg, dist, radius) in LOD_LAYOUT {
-        let x = dist * angle_deg.to_radians().tan();
-        let position = Vec3::new(x, 0.0, -dist);
-        let mesh = world
-            .resource_mut::<Assets<Mesh>>()
-            .add(Sphere::new(radius));
-        // 几何 LOD：far 起换低模（band 2/3 声明了映射才换 Mesh3d）。
-        let low = world
-            .resource_mut::<Assets<Mesh>>()
-            .add(Sphere::new(radius).mesh().uv(8, 6));
-        let mut lod_meshes = StylizedLodMeshes::new(mesh.clone());
-        lod_meshes.band_meshes[2] = Some(low.clone());
-        lod_meshes.band_meshes[3] = Some(low);
-        world.spawn((
-            Mesh3d(mesh),
-            MeshMaterial3d(material.clone()),
-            StylizedInstanceData::default(),
-            lod_meshes,
-            Transform::from_translation(position),
-        ));
-    }
-    CameraRecipe::new(crate::metadata::LOD_CAMERA_EYE, Vec3::new(0.0, 0.0, -10.0))
-}
-
-// ---------------------------------------------------------------------------
-// environment（V2-d）：同一场景 × 三套环境调色板（昼雾 / 黄昏 / 夜，
-// 视图 preset 见 crate::views）
-// ---------------------------------------------------------------------------
-/// 共用场景：双列球体向远处递退 + 地面，雾的距离梯度可见。
-pub fn environment(world: &mut World) -> CameraRecipe {
-    // 着色基色（雾/阴影染色在有色表面上才可读）。
-    let sphere_params = StylizedCelParams {
-        base_color_factor: bevy::math::Vec4::new(0.85, 0.62, 0.55, 1.0),
-        ..StylizedCelParams::default()
-    };
-    let material = world
-        .resource_mut::<Assets<StylizedCelMaterial>>()
-        .add(StylizedCelMaterial {
-            params: sphere_params,
-            ..StylizedCelMaterial::default()
-        });
-    let ground_params = StylizedCelParams {
-        base_color_factor: bevy::math::Vec4::new(0.55, 0.6, 0.5, 1.0),
-        ..StylizedCelParams::default()
-    };
-    let ground_material =
-        world
-            .resource_mut::<Assets<StylizedCelMaterial>>()
-            .add(StylizedCelMaterial {
-                params: ground_params,
-                ..StylizedCelMaterial::default()
-            });
-    let mesh = sphere(world, 0.9);
-    for (i, z) in [-2.0, -6.0, -12.0, -20.0, -30.0, -45.0]
-        .into_iter()
-        .enumerate()
-    {
-        let x = if i % 2 == 0 { -1.5 } else { 1.5 };
-        world.spawn((
-            Mesh3d(mesh.clone()),
-            MeshMaterial3d(material.clone()),
-            Transform::from_xyz(x, 0.9, z),
-        ));
-    }
-    // 地面（大 cuboid）：雾在平面上的横向梯度。
-    let ground =
-        world
-            .resource_mut::<Assets<Mesh>>()
-            .add(bevy::math::primitives::Cuboid::from_size(Vec3::new(
-                60.0, 0.1, 120.0,
-            )));
-    world.spawn((
-        Mesh3d(ground),
-        MeshMaterial3d(ground_material),
-        Transform::from_xyz(0.0, -0.05, -40.0),
-    ));
-    CameraRecipe::new(Vec3::new(0.0, 2.5, 4.0), Vec3::new(0.0, 0.5, -15.0))
-}
-
-// ---------------------------------------------------------------------------
-// effects：效果网格光照基——per-material key light 覆盖（docs/reference/03
-// 效果网格光照基 decode 节）。同一 view 光下三个球体：左 = 无覆盖（随 view
-// key light）；中 = 锁定的上游解码方向（+Z，正对默认机位）；右 = 方位角
-// 翻转（-Z，正面落影）。覆盖的存在与作用域直接可读。
-// ---------------------------------------------------------------------------
-pub fn effects(world: &mut World) -> CameraRecipe {
-    let mesh = sphere(world, 0.85);
+/// P4 · 光照对照展台（西）：3 个 Hero 球横排——无覆盖 / key light 锁 +Z /
+/// 锁 −Z（`with_effect_light_dir`，回收 builders::effects 的对照语义）。
+fn courtyard_p4_effects(world: &mut World) {
+    let podium = COURTYARD_PODIUM_RING[3];
+    let mesh = sphere(world, 0.35);
     let base = StylizedHeroParams::default().with_ramp_rows(1.0);
     let mut locked = base;
     locked.character = locked.character.with_effect_light_dir(Vec3::Z);
@@ -819,12 +805,421 @@ pub fn effects(world: &mut World) -> CameraRecipe {
             },
         ));
     }
-    for (material, x) in materials.into_iter().zip([-1.9, 0.0, 1.9]) {
+    for (material, dx) in materials.into_iter().zip([-1.0, 0.0, 1.0]) {
         world.spawn((
             Mesh3d(mesh.clone()),
             MeshMaterial3d(material),
-            Transform::from_xyz(x, 1.0, 0.0),
+            Transform::from_xyz(podium.x + dx, 1.35, podium.z),
         ));
     }
-    CameraRecipe::new(Vec3::new(0.0, 1.0, 6.2), Vec3::new(0.0, 1.0, 0.0))
+}
+
+/// P5 · 旗帜（西北）：两根旗杆（高 2.6，立于展台顶面）挂双骨骼蒙皮条带
+/// 旗面（build_strip_world）；posed 时 root 旋转 0.5 rad（确定性定姿态，
+/// 回收 builders::animation 的姿态语义）。
+fn courtyard_p5_flags(world: &mut World, pose: CourtyardFlagsPose) {
+    let podium = COURTYARD_PODIUM_RING[4];
+    let pole_mesh = world
+        .resource_mut::<Assets<Mesh>>()
+        .add(Cylinder::new(0.05, 2.6));
+    // 美术定案：旗杆深灰、旗面砖红（不再是默认灰白卡片）。
+    let pole_material = courtyard_cel_material(world, LinearRgba::new(0.25, 0.25, 0.27, 1.0));
+    let flag_material = courtyard_cel_material(world, LinearRgba::new(0.75, 0.22, 0.20, 1.0));
+    const FLAG_TARGETS: [(&str, &str); 2] =
+        [("flags.0", "flags.0.tip"), ("flags.1", "flags.1.tip")];
+    for (i, pole_x) in [-3.15f32, -2.35].into_iter().enumerate() {
+        world.spawn((
+            Mesh3d(pole_mesh.clone()),
+            MeshMaterial3d(pole_material.clone()),
+            Transform::from_xyz(pole_x, 2.3, podium.z),
+        ));
+        let root = build_strip_world_with_material(world, flag_material.clone());
+        // 条带 bind 姿态占 y∈[-1.2,1.2]、root 关节在带底；root 放到
+        // (x, 1.2, z) 使旗面占 y∈[1.2,3.6]（自杆顶垂下），横向偏移
+        // +0.45 避免旗杆穿透旗面。
+        let (root_target, tip_target) = FLAG_TARGETS[i];
+        let tip = world
+            .get::<Children>(root)
+            .and_then(|children| children.first().copied())
+            .expect("strip has a tip joint");
+        {
+            let mut entity = world.entity_mut(root);
+            let mut transform = entity.get_mut::<Transform>().expect("transform");
+            transform.translation = Vec3::new(pole_x + 0.45, 1.2, podium.z);
+            if pose == CourtyardFlagsPose::Posed {
+                transform.rotation = Quat::from_rotation_z(0.5);
+            }
+        }
+        world.entity_mut(root).insert(SceneTarget(root_target));
+        world.entity_mut(tip).insert(SceneTarget(tip_target));
+        // 蒙皮条带的剔除 Aabb 按 bind 姿态（原点）计算；关节移到展台后
+        // 原点的包围盒会被非原点机位视锥剔除（旗面消失）——按旗面的实际
+        // 世界范围（含 posed 摆动极值）手工覆盖，并挂 NoAutoAabb 防止
+        // calculate_bounds 在网格资产事件后重算覆盖（bevy_camera
+        // visibility 的既有合同）。
+        let strip_entity = {
+            let mut query = world.query::<(Entity, &SkinnedMesh)>();
+            query
+                .iter(world)
+                .find(|(_, skinned)| skinned.joints.first() == Some(&root))
+                .expect("strip mesh entity")
+                .0
+        };
+        world.entity_mut(strip_entity).insert((
+            bevy::camera::primitives::Aabb::from_min_max(
+                Vec3::new(pole_x - 1.2, 0.9, podium.z - 0.2),
+                Vec3::new(pole_x + 0.95, 3.8, podium.z + 0.2),
+            ),
+            bevy::camera::visibility::NoAutoAabb,
+        ));
+    }
+}
+
+/// P6 · LOD 轴（§6）：四球递退，near→very_far 各落一带；共享 hero 材质
+/// （银灰 matcap + hair 高光全开；银灰版替代默认紫蓝以降低全景噪音），
+/// far 带起经 StylizedLodMeshes.band_meshes[2/3] 换低模（同 builders::lod
+/// 的几何 LOD 模式）。
+fn courtyard_lod_axis(world: &mut World) {
+    let matcap = world
+        .resource_mut::<Assets<Image>>()
+        .add(matcap_image_silver(64));
+    let ilm = world.resource_mut::<Assets<Image>>().add(ilm_image(255));
+    let mut hero_params =
+        StylizedHeroParams::default().with_matcap(0.9, LinearRgba::new(1.0, 1.0, 1.0, 1.0));
+    hero_params.character = hero_params.character.with_hair_specular(28.0, 0.8);
+    let material = world
+        .resource_mut::<Assets<StylizedHeroMaterial>>()
+        .add(StylizedHeroMaterial {
+            params: hero_params,
+            ilm_texture: Some(ilm),
+            matcap_texture: Some(matcap),
+            ..StylizedHeroMaterial::default()
+        });
+    for (center, radius) in COURTYARD_LOD_BALLS {
+        let mesh = world
+            .resource_mut::<Assets<Mesh>>()
+            .add(Sphere::new(radius));
+        let low = world
+            .resource_mut::<Assets<Mesh>>()
+            .add(Sphere::new(radius).mesh().uv(8, 6));
+        let mut lod_meshes = StylizedLodMeshes::new(mesh.clone());
+        lod_meshes.band_meshes[2] = Some(low.clone());
+        lod_meshes.band_meshes[3] = Some(low);
+        world.spawn((
+            Mesh3d(mesh),
+            MeshMaterial3d(material.clone()),
+            StylizedInstanceData::default(),
+            lod_meshes,
+            Transform::from_translation(center),
+        ));
+    }
+}
+
+/// 角色台（北 (0,0,−8)，§4 资产门控区）：reference-scene GLB 角色展示。
+/// 资产缺席 = 该 lane BLOCKED，不做空台降级（S4 决策）。
+///
+/// 角色经 `StylizedMaterialSet` 挂 NPR 材质（Character class，底色取 GLB
+/// 内联 baseColorFactor）：fixture 的 `_NPR_*` 语义与 §4「角色特性在角色
+/// 本体上的真实 NPR 效果展示」由此落实；同时消除 vanilla StandardMaterial
+/// 路径（其 PBR 在 Dawn/Metal 下渲染纯黑——host 限定上游差异，见
+/// docs/platforms）。宿主须在插件装配中加 `StylizedAssetIntegrationPlugin`
+/// （adoption 系统由宿主注册，材质集数据由本构建器提供）。
+fn courtyard_reference_stage(world: &mut World) {
+    let stage_material = courtyard_cel_material(world, LinearRgba::new(0.70, 0.68, 0.64, 1.0));
+    let stage = world
+        .resource_mut::<Assets<Mesh>>()
+        .add(Cylinder::new(1.5, 0.5));
+    world.spawn((
+        Mesh3d(stage),
+        MeshMaterial3d(stage_material),
+        Transform::from_xyz(0.0, 0.25, -8.0),
+    ));
+    let scene = world
+        .resource::<bevy::asset::AssetServer>()
+        .load("reference_scene.glb#Scene0");
+    let descriptor = |name: &str, base: [f32; 3]| StylizedMaterialDescriptor {
+        name: name.to_string(),
+        surface_class: StylizedSurfaceClass::Character,
+        static_flags: bevy_stylized::stylized_core::StylizedMaterialFlags {
+            double_sided: true,
+            ..Default::default()
+        },
+        static_params: [
+            ("base_color_r".to_string(), base[0]),
+            ("base_color_g".to_string(), base[1]),
+            ("base_color_b".to_string(), base[2]),
+            ("base_color_a".to_string(), 1.0),
+        ]
+        .into_iter()
+        .collect(),
+        ..StylizedMaterialDescriptor::default()
+    };
+    world.spawn((
+        bevy::world_serialization::WorldAssetRoot(scene),
+        bevy_stylized::StylizedMaterialSet {
+            materials: [
+                descriptor("FixtureMatBody", [0.72, 0.42, 0.30]),
+                descriptor("FixtureMatHead", [0.86, 0.66, 0.56]),
+                descriptor("FixtureMatHair", [0.32, 0.20, 0.11]),
+                descriptor("FixtureMatGround", [0.18, 0.20, 0.24]),
+            ]
+            .into_iter()
+            .map(|descriptor| (descriptor.name.clone(), descriptor))
+            .collect(),
+            texture_prefix: String::new(),
+        },
+        Transform::from_xyz(0.0, 0.5, -8.0),
+    ));
+}
+
+/// 实例灯阵（北半环 r8.5–11 四圈网格，纵深 ≤38m）：灯柱 + 发光灯球。
+/// 灯球用 Character 材质 + with_emission（同色——emission 是 per-material
+/// uniform，Cel 无 emission 字段；§4 已验证约束）；密度 = crowd 参数。
+/// 美术定案：灯柱深灰；灯球受光面经 base_color 染暖黄（Character 无
+/// ramp 通道——§4 注记的 profile_index 选行只存在于 Cel/Hero，此处以
+/// 底色替代），emission 不动。
+fn courtyard_lamps(world: &mut World, crowd: u32) {
+    if crowd == 0 {
+        return;
+    }
+    let mut lamp_params =
+        StylizedCharacterParams::default().with_emission(LinearRgba::new(1.0, 0.7, 0.3, 1.0), 0.8);
+    lamp_params.cel.base_color_factor = bevy::math::Vec4::new(0.95, 0.80, 0.50, 1.0);
+    let lamp_material = world
+        .resource_mut::<Assets<StylizedCharacterMaterial>>()
+        .add(StylizedCharacterMaterial {
+            params: lamp_params,
+            ..StylizedCharacterMaterial::default()
+        });
+    let ball_mesh = sphere(world, 0.12);
+    let pole_mesh = world
+        .resource_mut::<Assets<Mesh>>()
+        .add(Cylinder::new(0.04, 1.6));
+    let pole_material = courtyard_cel_material(world, LinearRgba::new(0.3, 0.3, 0.32, 1.0));
+    // 北半环（方位角 90°..270°，0=南 +Z）：四圈 r∈[8.5,11]，灯数按圈周长
+    // 比例分配（末圈吸收舍入余量；总量恰为 crowd，确定性排布）。
+    let rings = [8.8125f32, 9.4375, 10.0625, 10.6875];
+    let weight_sum: f32 = rings.iter().sum();
+    let mut remaining = crowd;
+    let mut registered = false;
+    for (ring, radius) in rings.iter().enumerate() {
+        let count = if ring + 1 == rings.len() {
+            remaining
+        } else {
+            let count = (crowd as f32 * radius / weight_sum).round() as u32;
+            let count = count.min(remaining);
+            remaining -= count;
+            count
+        };
+        for j in 0..count {
+            let azimuth = (90.0 + (j as f32 + 0.5) * 180.0 / count as f32).to_radians();
+            let x = radius * azimuth.sin();
+            let z = radius * azimuth.cos();
+            world.spawn((
+                Mesh3d(pole_mesh.clone()),
+                MeshMaterial3d(pole_material.clone()),
+                Transform::from_xyz(x, 0.8, z),
+            ));
+            let mut ball = world.spawn((
+                Mesh3d(ball_mesh.clone()),
+                MeshMaterial3d(lamp_material.clone()),
+                StylizedInstanceData::default(),
+                Transform::from_xyz(x, 1.72, z),
+            ));
+            if !registered {
+                ball.insert(SceneTarget("lamps"));
+                registered = true;
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod courtyard_tests {
+    //! courtyard builder 的纯 CPU 冒烟：默认/参数化构建的分区实体计数、
+    //! SceneTarget 唯一性、相机配方与附件选择（不触碰 GPU）。
+    use super::*;
+    use bevy::asset::AssetApp;
+
+    pub(super) fn test_app(settings: Option<CourtyardSettings>) -> App {
+        let mut app = App::new();
+        app.add_plugins(bevy::MinimalPlugins)
+            .add_plugins(bevy::asset::AssetPlugin::default());
+        app.init_asset::<bevy::world_serialization::WorldAsset>();
+        app.init_resource::<Assets<Mesh>>()
+            .init_resource::<Assets<Image>>()
+            .init_resource::<Assets<StylizedCelMaterial>>()
+            .init_resource::<Assets<StylizedCharacterMaterial>>()
+            .init_resource::<Assets<StylizedHeroMaterial>>()
+            .init_resource::<Assets<StylizedOutlineMaterial>>()
+            .init_resource::<Assets<bevy::mesh::skinning::SkinnedMeshInverseBindposes>>()
+            .insert_resource(StylizedViewSettings(StylizedViewDescriptor::default()));
+        if let Some(settings) = settings {
+            app.insert_resource(settings);
+        }
+        app
+    }
+
+    fn scene_targets(world: &mut World) -> Vec<&'static str> {
+        let mut query = world.query::<&SceneTarget>();
+        let mut targets: Vec<&'static str> = query.iter(world).map(|target| target.0).collect();
+        targets.sort_unstable();
+        targets
+    }
+
+    fn count<T: bevy::prelude::Component>(world: &mut World) -> usize {
+        world.query::<&T>().iter(world).count()
+    }
+
+    #[test]
+    fn courtyard_builds_all_zones_with_default_settings() {
+        let mut app = test_app(None);
+        let world = app.world_mut();
+        let mesh_before = count::<Mesh3d>(world);
+        let instance_before = count::<StylizedInstanceData>(world);
+        let recipe = courtyard(world);
+        // §7 panorama 机位；默认状态（hull/post off）无相机附件。
+        let panorama = &crate::metadata::COURTYARD_CAMERA_PRESETS[0];
+        assert_eq!(recipe.eye, panorama.eye);
+        assert_eq!(recipe.look, panorama.look);
+        assert!(matches!(recipe.attachment, CameraAttachment::None));
+        // 分区内容计数（相对构建前的增量，宿主插件的脚手架实体不计）：
+        // mesh 265 = 场地壳 29（地面/铺装/墙 20 弦/平台/展台 6）+ 三对照组
+        // 14（基座 7 + 球 7）+ P1 4 + P2 3 + P3 3 + P4 3 + P5 4（2 杆 +
+        // 2 蒙皮条带）+ LOD 4 + 角色台 1 + 灯阵 200（crowd=100：柱 + 球）。
+        assert_eq!(count::<Mesh3d>(world) - mesh_before, 265);
+        // 实例数据：face 3 + P1 ramp 3 + LOD 4 + 灯球 100。
+        assert_eq!(count::<StylizedInstanceData>(world) - instance_before, 110);
+        // hull 描边：P2 两球（宽度 2/8）+ P3 方块堆三件。
+        assert_eq!(count::<StylizedOutline>(world), 5);
+        // 蒙皮条带 ×2。
+        assert_eq!(count::<SkinnedMesh>(world), 2);
+        // SceneTarget：唯一且覆盖 §8 的稳定逻辑 ID。
+        let targets = scene_targets(world);
+        let unique: std::collections::BTreeSet<&&str> = targets.iter().collect();
+        assert_eq!(
+            unique.len(),
+            targets.len(),
+            "SceneTarget ids must be unique"
+        );
+        for expected in [
+            "trio.face.0",
+            "trio.face.1",
+            "trio.face.2",
+            "lamps",
+            "flags.0",
+            "flags.1",
+            "flags.0.tip",
+            "flags.1.tip",
+        ] {
+            assert!(
+                targets.contains(&expected),
+                "missing SceneTarget {expected}"
+            );
+        }
+        // 默认时刻 = day：庭院 preset 已落（雾 end=110），昼夜因子不动。
+        let view = world.resource::<StylizedViewSettings>();
+        assert_eq!(view.0.environment.fog.end, 110.0);
+        assert_eq!(view.0.day_night_factor, 1.0);
+        // face 组默认三阈值梯度 0.2/默认/0.8。
+        let mut query = world.query::<(&SceneTarget, &StylizedInstanceData)>();
+        let thresholds: Vec<(&str, Option<f32>)> = query
+            .iter(world)
+            .filter(|(target, _)| target.0.starts_with("trio.face."))
+            .map(|(target, data)| (target.0, data.face_threshold))
+            .collect();
+        assert_eq!(thresholds.len(), 3);
+        for (target, threshold) in thresholds {
+            let expected = match target {
+                "trio.face.0" => Some(0.2),
+                "trio.face.1" => None,
+                _ => Some(0.8),
+            };
+            assert_eq!(threshold, expected, "{target}");
+        }
+    }
+
+    #[test]
+    fn courtyard_parameters_drive_content_and_attachments() {
+        // crowd=0 → 无灯阵（少 200 实体），且无 lamps 落点。
+        let mut app = test_app(Some(CourtyardSettings {
+            crowd: 0,
+            ..CourtyardSettings::default()
+        }));
+        let world = app.world_mut();
+        let mesh_before = count::<Mesh3d>(world);
+        courtyard(world);
+        assert_eq!(count::<Mesh3d>(world) - mesh_before, 65);
+        assert!(!scene_targets(world).contains(&"lamps"));
+
+        // night → day_night_factor=0；post → PostProcess 附件；
+        // face_threshold 覆盖三实例。
+        let mut app = test_app(Some(CourtyardSettings {
+            time_of_day: CourtyardTimeOfDay::Night,
+            post: true,
+            face_threshold: Some(0.5),
+            ..CourtyardSettings::default()
+        }));
+        let recipe = courtyard(app.world_mut());
+        assert_eq!(
+            app.world_mut()
+                .resource::<StylizedViewSettings>()
+                .0
+                .day_night_factor,
+            0.0
+        );
+        assert!(matches!(
+            recipe.attachment,
+            CameraAttachment::PostProcess(_)
+        ));
+        let mut query = app
+            .world_mut()
+            .query::<(&SceneTarget, &StylizedInstanceData)>();
+        for (target, data) in query
+            .iter(app.world())
+            .filter(|(target, _)| target.0.starts_with("trio.face."))
+        {
+            assert_eq!(data.face_threshold, Some(0.5), "{}", target.0);
+        }
+
+        // hybrid → ScreenOutline 附件（优先于 post）；posed → 旗 root 旋转 0.5 rad。
+        let mut app = test_app(Some(CourtyardSettings {
+            outline_mode: CourtyardOutlineMode::Hybrid,
+            post: true,
+            flags: CourtyardFlagsPose::Posed,
+            ..CourtyardSettings::default()
+        }));
+        let recipe = courtyard(app.world_mut());
+        assert!(matches!(recipe.attachment, CameraAttachment::ScreenOutline));
+        let mut query = app.world_mut().query::<(&SceneTarget, &Transform)>();
+        let flag = query
+            .iter(app.world())
+            .find(|(target, _)| target.0 == "flags.0")
+            .expect("flags.0");
+        assert_eq!(flag.1.rotation, Quat::from_rotation_z(0.5));
+    }
+
+    /// 蒙皮旗面必须携带覆盖旗面实际位置的剔除 Aabb + NoAutoAabb
+    /// （关节移到展台后，bind 姿态的原点包围盒会被非原点机位剔除；
+    /// 且 calculate_bounds 会在网格资产事件后重算覆盖——两者缺一不可，
+    /// 回归证据：capture 矩阵的 flags 机位曾因此丢旗面）。
+    #[test]
+    fn flag_strips_carry_overridden_culling_aabb() {
+        let mut app = test_app(None);
+        courtyard(app.world_mut());
+        let mut query = app.world_mut().query::<(
+            &SkinnedMesh,
+            &bevy::camera::primitives::Aabb,
+            &bevy::camera::visibility::NoAutoAabb,
+        )>();
+        let strips: Vec<_> = query.iter(app.world()).collect();
+        assert_eq!(strips.len(), 2, "both flag strips carry overridden aabbs");
+        for (_, aabb, _) in strips {
+            assert!(
+                aabb.center.z == -4.7631 && aabb.center.y > 1.0,
+                "aabb must cover the flag zone, not the origin: {:?}",
+                aabb.center
+            );
+        }
+    }
 }

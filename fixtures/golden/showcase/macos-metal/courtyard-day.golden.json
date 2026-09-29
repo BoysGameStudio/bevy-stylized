@@ -1,0 +1,53 @@
+{
+  "reference_toolchain": "engine-golden-v1",
+  "blender": null,
+  "gacha_setup": "synthetic-fixtures",
+  "gacha_setup_commit": null,
+  "export_contract": "blender-gltf-npr-v1",
+  "profile_schema": "bevy_stylized.material/v1",
+  "fixture": "showcase/courtyard-day",
+  "renderer": "bevy-stylized-render-0.1.0",
+  "engine_git_commit": "888ae2598304802079cf53120b4c1410c7b63dc3",
+  "engine_source_revision": null,
+  "gpu": "Apple M4 Pro (Metal)",
+  "driver": " ",
+  "captured_unix_seconds": 1790608627,
+  "width": 512,
+  "height": 512,
+  "png_fnv1a64": "f8125dd996956d10",
+  "regions": [
+    {
+      "id": "trio",
+      "rect": {
+        "x": 158,
+        "y": 238,
+        "width": 196,
+        "height": 96
+      },
+      "max_channel_delta": 2,
+      "max_fail_ratio": 0.005
+    },
+    {
+      "id": "p1",
+      "rect": {
+        "x": 410,
+        "y": 253,
+        "width": 102,
+        "height": 65
+      },
+      "max_channel_delta": 2,
+      "max_fail_ratio": 0.005
+    },
+    {
+      "id": "p4",
+      "rect": {
+        "x": 0,
+        "y": 248,
+        "width": 103,
+        "height": 70
+      },
+      "max_channel_delta": 2,
+      "max_fail_ratio": 0.005
+    }
+  ]
+}

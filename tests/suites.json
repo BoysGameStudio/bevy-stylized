@@ -6,9 +6,6 @@
     "golden_character": [
       "character_synthetic_golden"
     ],
-    "outline_advanced": [
-      "outline_advanced_hull_screen_hybrid"
-    ],
     "instance_batching": [
       "instances_batch_with_per_instance_variation"
     ],
@@ -74,24 +71,16 @@
       "native_mask_prepass_preserves_cutouts_for_all_classes"
     ],
     "showcase_golden": [
-      "showcase_golden_overview",
-      "showcase_golden_lighting",
-      "showcase_golden_hair",
-      "showcase_golden_metal",
-      "showcase_golden_reference",
-      "showcase_golden_performance",
-      "showcase_golden_lod",
-      "showcase_golden_environment_day",
-      "showcase_golden_environment_dusk",
-      "showcase_golden_environment_night",
-      "showcase_golden_effects",
-      "showcase_golden_ramp",
-      "showcase_golden_face",
-      "showcase_golden_outline",
-      "showcase_golden_animation",
-      "showcase_golden_post",
-      "showcase_golden_stress",
-      "showcase_golden_outline_advanced"
+      "showcase_golden_courtyard_day",
+      "showcase_golden_courtyard_dusk",
+      "showcase_golden_courtyard_night",
+      "showcase_golden_courtyard_trio",
+      "showcase_golden_courtyard_outline_hull",
+      "showcase_golden_courtyard_outline_hybrid",
+      "showcase_golden_courtyard_lod",
+      "showcase_golden_courtyard_post",
+      "showcase_golden_courtyard_flags",
+      "showcase_golden_courtyard_stress"
     ]
   },
   "asset-integration": [

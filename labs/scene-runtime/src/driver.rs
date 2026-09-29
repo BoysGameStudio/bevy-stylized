@@ -27,12 +27,14 @@
 use std::collections::HashSet;
 
 use bevy::asset::Assets;
+use bevy::camera::Projection;
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::math::Vec3;
 use bevy::prelude::{Camera3d, Entity, Image, Transform, World};
 
 use bevy::render::view::Msaa;
 use bevy_stylized::prelude::{StylizedInstanceData, StylizedViewDescriptor, StylizedViewSettings};
+use bevy_stylized::stylized_render::post::StylizedPostProcess;
 use bevy_stylized::stylized_render::screen_outline::StylizedScreenOutline;
 use golden_harness::{CaptureRequest, capture, readiness};
 use scenario_model::action::{ActionGraph, ActionKind, ActionNode, Step, TargetRef, TargetScope};
@@ -130,6 +132,8 @@ pub struct CaseDriver {
     observation_target: Option<golden_harness::CaptureTarget>,
     observation_entity: Option<Entity>,
     camera_override: Option<CameraRecipe>,
+    built_recipe: Option<CameraRecipe>,
+    applied_recipe: Option<CameraRecipe>,
     msaa: Option<Msaa>,
     pending: Option<PendingObservation>,
     observations: Vec<ObservationReceipt>,
@@ -179,6 +183,8 @@ impl CaseDriver {
             observation_target: None,
             observation_entity: None,
             camera_override: None,
+            built_recipe: None,
+            applied_recipe: None,
             msaa: None,
             pending: None,
             observations: Vec::new(),
@@ -214,6 +220,77 @@ impl CaseDriver {
     #[must_use]
     pub fn observation_entity(&self) -> Option<Entity> {
         self.observation_entity
+    }
+
+    /// 构建期相机配方（构建器返回或宿主覆盖；不含构建后的相机替换）。
+    #[must_use]
+    pub fn built_recipe(&self) -> Option<&CameraRecipe> {
+        self.built_recipe.as_ref()
+    }
+
+    /// 最近一次应用到观测相机的配方（构建 + 构建后替换）。
+    #[must_use]
+    pub fn applied_recipe(&self) -> Option<&CameraRecipe> {
+        self.applied_recipe.as_ref()
+    }
+
+    /// 替换当前观测相机配方（docs/showcase/05 §11.1 的构建后相机替换
+    /// API）：移动 Transform、按新配方增删附件组件（PostProcess /
+    /// ScreenOutline / prepass）与投影，**不重建场景内容**。相机实体归属
+    /// 不变——仍记入代次账本，retire 时随整代 despawn；下一次场景构建
+    /// （含同场景重建）重新按构建期配方生成相机。
+    pub fn apply_camera_recipe(
+        &mut self,
+        world: &mut World,
+        recipe: &CameraRecipe,
+    ) -> Result<(), RuntimeError> {
+        let Some(camera) = self.observation_entity else {
+            return Err(RuntimeError::Scene(
+                "no observation camera to reconfigure (build has not run)".into(),
+            ));
+        };
+        let mut entity = world
+            .get_entity_mut(camera)
+            .map_err(|_| RuntimeError::Scene("observation camera entity is gone".into()))?;
+        entity.insert(Transform::from_translation(recipe.eye).looking_at(recipe.look, Vec3::Y));
+        // 附件全量替换：先移除全部已知附件组件，再按新配方插入。
+        entity.remove::<StylizedPostProcess>();
+        entity.remove::<StylizedScreenOutline>();
+        entity.remove::<(
+            bevy::core_pipeline::prepass::DepthPrepass,
+            bevy::core_pipeline::prepass::NormalPrepass,
+            bevy::core_pipeline::prepass::MotionVectorPrepass,
+        )>();
+        match &recipe.attachment {
+            CameraAttachment::None => {}
+            CameraAttachment::PostProcess(post) => {
+                entity.insert(*post);
+            }
+            CameraAttachment::ScreenOutline => {
+                entity.insert(StylizedScreenOutline::default());
+            }
+            CameraAttachment::Prepass {
+                depth,
+                normal,
+                motion_vector,
+            } => {
+                if *depth {
+                    entity.insert(bevy::core_pipeline::prepass::DepthPrepass);
+                }
+                if *normal {
+                    entity.insert(bevy::core_pipeline::prepass::NormalPrepass);
+                }
+                if *motion_vector {
+                    entity.insert(bevy::core_pipeline::prepass::MotionVectorPrepass);
+                }
+            }
+        }
+        match &recipe.projection {
+            Some(projection) => entity.insert(projection.clone()),
+            None => entity.insert(Projection::default()),
+        };
+        self.applied_recipe = Some(recipe.clone());
+        Ok(())
     }
 
     /// 从 `Done` 终态再执行一段动作序列（同一观测相机/同一代次内的
@@ -384,6 +461,8 @@ impl CaseDriver {
         let built = (self.scene.build)(world);
         let recipe = self.camera_override.clone().unwrap_or(built);
         self.spawn_observation_camera(world, &recipe);
+        self.built_recipe = Some(recipe.clone());
+        self.applied_recipe = Some(recipe);
         self.ledger =
             SceneLedger::record(Generation::new(self.ids.generation), &self.baseline, world);
         self.state = if self.limits.implicit_readiness {

@@ -1,7 +1,8 @@
-//! Per-scene golden judgment for the previously demonstration-only PC showcase
-//! scenes (credential for `labs/scenario-model` coverage; scenes render through
-//! the scenes registry → driver capture path, judged against the accepted
-//! baselines in `fixtures/golden/showcase/`).
+//! Per-capture golden judgment for the courtyard capture matrix
+//! (docs/showcase/05 §9；credential for `labs/scenario-model` coverage）。
+//! 每条捕获 = `showcase::capture_spec` 的同一条执行路径（钉参数 → 机位 →
+//! 捕获 profile → 判定），判定对象 = `fixtures/golden/showcase/` 的
+//! canonical 基线（本平台 overlay 优先解析）。
 
 use bevy::{
     DefaultPlugins,
@@ -10,7 +11,7 @@ use bevy::{
     render::{RenderPlugin, renderer::RenderAdapterInfo, settings::RenderCreation},
     window::{ExitCondition, WindowPlugin},
 };
-use golden_harness::{GoldenProvenance, Tolerance, capture, diff_rgba8};
+use golden_harness::{GoldenProvenance, capture};
 
 fn golden_dir() -> std::path::PathBuf {
     std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/golden/showcase")
@@ -20,6 +21,7 @@ fn adapter_info(resources: bevy::render::settings::RenderResources) -> (String, 
     let mut app = App::new();
     app.add_plugins(
         DefaultPlugins
+            .build()
             .set(AssetPlugin {
                 meta_check: bevy::asset::AssetMetaCheck::Never,
                 ..Default::default()
@@ -49,106 +51,129 @@ fn adapter_info(resources: bevy::render::settings::RenderResources) -> (String, 
         .unwrap_or_else(|| ("unknown".into(), "unknown".into(), "unknown".into()))
 }
 
-fn judge(scene: &str) {
+fn judge(capture_id: &str) {
     let Some(resources) = capture::probe_render_resources() else {
         eprintln!("showcase-golden: no GPU adapter available; skipping");
         return;
     };
-    let case = showcase::all_cases()
+    let spec = scenario_model::courtyard_capture_specs()
         .into_iter()
-        .find(|case| case.name == scene)
-        .expect("showcase case must be registered");
-    let captured = showcase::capture_case(&case, resources.clone());
+        .find(|spec| spec.capture_id == capture_id)
+        .expect("capture spec must be registered");
+    let captured = showcase::capture_spec::capture_spec_frame(&spec, resources.clone());
+    let regions = showcase::capture_spec::spec_regions(&spec);
     let (gpu, driver, backend) = adapter_info(resources);
     let platform = golden_harness::current_golden_platform(&backend);
-    let paths = golden_harness::resolve_baseline_paths(&golden_dir(), scene, &platform);
-    let mut provenance = GoldenProvenance::for_capture(
-        "engine-golden-v1",
-        None,
-        "synthetic-fixtures",
-        None,
-        "blender-gltf-npr-v1",
-        "bevy_stylized.material/v1",
-        &format!("showcase/{scene}"),
-        "bevy-stylized-render-0.1.0",
-        &gpu,
-        &driver,
-        &captured,
-    );
+    let paths = golden_harness::resolve_baseline_paths(&golden_dir(), capture_id, &platform);
     if !paths.baseline_exists() {
+        // 基线缺席 = BLOCKED（不静默通过）；显式 GOLDEN_REBASELINE 才写
+        // overlay 候选（canonical 只由参考宿主产出）。
         assert!(
             std::env::var("GOLDEN_REBASELINE").as_deref() == Ok("1"),
-            "accepted baseline missing; capture/accept explicitly"
+            "accepted baseline missing for {capture_id}; capture/accept explicitly (BLOCKED, not PASS)"
         );
-        let target = golden_harness::resolve_capture_paths(&golden_dir(), scene, &platform);
+        let mut provenance = GoldenProvenance::for_capture(
+            "engine-golden-v1",
+            None,
+            "synthetic-fixtures",
+            None,
+            "blender-gltf-npr-v1",
+            "bevy_stylized.material/v1",
+            &format!("showcase/{capture_id}"),
+            "bevy-stylized-render-0.1.0",
+            &gpu,
+            &driver,
+            &captured,
+        );
+        provenance.regions = regions.clone();
+        let target = golden_harness::resolve_capture_paths(&golden_dir(), capture_id, &platform);
         golden_harness::write_baseline(&target, &captured, &mut provenance)
             .expect("write baseline");
-        eprintln!("[baselined] showcase/{scene} -> {}", target.png.display());
+        eprintln!(
+            "[baselined] showcase/{capture_id} -> {}",
+            target.png.display()
+        );
         return;
     }
     let (baseline, _) = golden_harness::read_baseline(&paths).expect("read baseline");
-    let stats = diff_rgba8(&baseline.data, &captured.data).expect("same size");
-    let report = golden_harness::DiffReport::evaluate(
-        scene.to_owned(),
-        paths.png.to_string_lossy().into_owned(),
-        stats,
-        Tolerance::default(),
-    );
+    let verdict =
+        showcase::capture_spec::judge_against_baseline(&spec, &regions, &baseline, &captured);
     eprintln!(
-        "[{}] showcase/{scene} max_delta={} mean_delta={:.4} psnr={:.2}dB",
-        if report.passed { "matched" } else { "exceeded" },
-        report.stats.max_channel_delta,
-        report.stats.mean_absolute_delta,
-        report.stats.psnr_db,
+        "[{}] {} | {}{}",
+        if verdict.passed {
+            "matched"
+        } else {
+            "exceeded"
+        },
+        verdict.capture_id,
+        verdict.whole_frame,
+        if verdict.regions.is_empty() {
+            String::new()
+        } else {
+            format!(" | rois: {}", verdict.regions.join(", "))
+        }
     );
-    if !report.passed
+    if !verdict.passed
         && std::env::var("GOLDEN_REBASELINE").as_deref() == Ok("1")
         && platform != golden_harness::CANONICAL_GOLDEN_PLATFORM
     {
-        // Explicit platform-overlay capture: the canonical baseline stays
-        // untouched; the overlay image is a candidate until reviewed and
-        // accepted (fixtures/README.md).
-        let overlay = golden_harness::resolve_capture_paths(&golden_dir(), scene, &platform);
+        // 显式平台 overlay 候选捕获：canonical 基线绝不被覆写。
+        let mut provenance = GoldenProvenance::for_capture(
+            "engine-golden-v1",
+            None,
+            "synthetic-fixtures",
+            None,
+            "blender-gltf-npr-v1",
+            "bevy_stylized.material/v1",
+            &format!("showcase/{capture_id}"),
+            "bevy-stylized-render-0.1.0",
+            &gpu,
+            &driver,
+            &captured,
+        );
+        provenance.regions = regions;
+        let overlay = golden_harness::resolve_capture_paths(&golden_dir(), capture_id, &platform);
         golden_harness::write_baseline(&overlay, &captured, &mut provenance)
             .expect("write overlay candidate");
-        eprintln!("[overlay-candidate] {platform}/showcase/{scene} (canonical baseline unchanged)");
+        eprintln!(
+            "[overlay-candidate] {platform}/showcase/{capture_id} (canonical baseline unchanged)"
+        );
         return;
     }
     assert!(
-        report.passed,
-        "showcase/{scene} exceeded: {:?}",
-        report.violations
+        verdict.passed,
+        "showcase/{capture_id} exceeded: {}",
+        verdict.whole_frame
     );
 }
 
-macro_rules! scene_case {
-    ($name:ident, $scene:literal) => {
+macro_rules! capture_case {
+    ($name:ident, $capture:literal) => {
         #[test]
         #[ignore = "requires GPU; run the explicit GPU lane"]
         fn $name() {
-            judge($scene);
+            judge($capture);
         }
     };
 }
 
-scene_case!(showcase_golden_overview, "overview");
-scene_case!(showcase_golden_lighting, "lighting");
-scene_case!(showcase_golden_hair, "hair");
-scene_case!(showcase_golden_metal, "metal");
-scene_case!(showcase_golden_reference, "reference");
-scene_case!(showcase_golden_performance, "performance");
-scene_case!(showcase_golden_lod, "lod");
-scene_case!(showcase_golden_environment_day, "environment-day");
-scene_case!(showcase_golden_environment_dusk, "environment-dusk");
-scene_case!(showcase_golden_environment_night, "environment-night");
-scene_case!(showcase_golden_effects, "effects");
-// The remaining catalog scenes also get showcase-path baselines: the browser
-// lane judges against this set uniformly (their own suites keep their
-// specialized capture setups and coverage credentials).
-scene_case!(showcase_golden_ramp, "ramp");
-scene_case!(showcase_golden_face, "face");
-scene_case!(showcase_golden_outline, "outline");
-scene_case!(showcase_golden_animation, "animation");
-scene_case!(showcase_golden_post, "post");
-scene_case!(showcase_golden_stress, "stress");
-scene_case!(showcase_golden_outline_advanced, "outline-advanced");
+capture_case!(showcase_golden_courtyard_day, "courtyard-day");
+capture_case!(showcase_golden_courtyard_dusk, "courtyard-dusk");
+capture_case!(showcase_golden_courtyard_night, "courtyard-night");
+capture_case!(showcase_golden_courtyard_trio, "courtyard-trio");
+capture_case!(
+    showcase_golden_courtyard_outline_hull,
+    "courtyard-outline-hull"
+);
+// 显式展开（不经宏）：本测试是 tests/current-contracts.json 的
+// required_tests 锚点（旧 outline_advanced_hull_screen_hybrid 的语义
+// 由本捕获覆盖；presence 检查按 `fn <name>` 文本匹配）。
+#[test]
+#[ignore = "requires GPU; run the explicit GPU lane"]
+fn showcase_golden_courtyard_outline_hybrid() {
+    judge("courtyard-outline-hybrid");
+}
+capture_case!(showcase_golden_courtyard_lod, "courtyard-lod");
+capture_case!(showcase_golden_courtyard_post, "courtyard-post");
+capture_case!(showcase_golden_courtyard_flags, "courtyard-flags");
+capture_case!(showcase_golden_courtyard_stress, "courtyard-stress");

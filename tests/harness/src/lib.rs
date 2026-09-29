@@ -7,6 +7,7 @@
 pub mod capture;
 pub mod diff;
 pub mod golden;
+pub mod regions;
 pub mod tier2;
 
 pub use capture::{
@@ -20,6 +21,7 @@ pub use golden::{
     decode_png, encode_png, engine_git_commit, fnv1a64_hex, read_baseline, resolve_baseline_paths,
     resolve_capture_paths, write_baseline,
 };
+pub use regions::{GoldenRegion, ScreenRect, project_aabb_to_screen, validate_regions};
 pub use tier2::{
     Tier2RegionReport, Tier2Report, Tier2Thresholds, evaluate_tier2, evaluate_tier2_region,
 };

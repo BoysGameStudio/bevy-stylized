@@ -1,6 +1,7 @@
 //! 纯数据场景目录（docs/showcase/01 §依赖与代码所有权 / §场景、配方与验证身份）。
 //!
-//! 目录以注册定义为唯一源；本模块的内容是 18 个注册用例的元数据（稳定 ID、
+//! 目录以注册定义为唯一源；本模块的内容是庭院展台（courtyard，
+//! docs/showcase/05）的元数据（稳定 ID、
 //! 能力/tier 需求、资产依赖、参数 schema 占位）。元数据必须可在不启用
 //! renderer/glTF/UI 的构建中枚举——本模块不依赖任何渲染、glTF 或 UI 类型。
 //!
@@ -19,8 +20,8 @@ use bevy_stylized_core::axis::StylizedExecutionTier;
 use crate::ident::{PresetId, SceneId};
 use crate::recipe::{AssetDecl, SceneRecipe};
 
-/// 目录条目数量（`apps/showcase::all_cases` 的 18 个注册项，顺序固定）。
-pub const CATALOG_LEN: usize = 18;
+/// 目录条目数量（courtyard 单场景；docs/showcase/05 §10 退役 18 个旧场景后）。
+pub const CATALOG_LEN: usize = 1;
 
 /// 构建器绑定的数据记录（本阶段不做绑定，只记录所有者与符号）。
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -50,7 +51,8 @@ pub struct ParameterTarget {
     pub field: String,
 }
 
-/// 参数类型与合法范围（编译期校验合同）。
+/// 参数类型与合法范围（编译期校验合同）。`Enum` 的取值是 JSON 字符串，
+/// 必须落在 `options` 声明的集合内。
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schema", derive(schemars::JsonSchema))]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -71,6 +73,11 @@ pub enum ParameterKind {
     },
     /// 布尔。
     Bool,
+    /// 枚举（JSON 字符串，取值限定在 `options` 内）。
+    Enum {
+        /// 合法取值集合（非空、无重复）。
+        options: Vec<String>,
+    },
 }
 
 /// 参数 schema 条目：键 → 落点 + 类型/范围。目录是参数定义的唯一源；
@@ -144,6 +151,20 @@ impl ParameterSpec {
                     Ok(())
                 } else {
                     Err(illegal("must be a boolean".into()))
+                }
+            }
+            ParameterKind::Enum { options } => {
+                if options.is_empty() {
+                    return Err(illegal("enum spec has no options".into()));
+                }
+                let mut seen = std::collections::BTreeSet::new();
+                if !options.iter().all(|option| seen.insert(option)) {
+                    return Err(illegal("enum spec has duplicate options".into()));
+                }
+                match value.as_str() {
+                    Some(text) if !text.is_empty() && options.iter().any(|o| o == text) => Ok(()),
+                    Some(_) => Err(illegal(format!("must be one of {options:?}"))),
+                    None => Err(illegal("must be a string".into())),
                 }
             }
         }
@@ -252,189 +273,88 @@ pub fn require_declared_assets(
     Ok(())
 }
 
-/// 内置目录：`apps/showcase` 现有 18 个注册用例（顺序与注册表一致）。
+/// 内置目录：庭院展台单场景（docs/showcase/05 §10：18 个旧展示场景退役，
+/// 全部由 courtyard 的分区/参数面/捕获矩阵回收）。
 ///
-/// `builder` 记录当前所有者符号（`labs/scenes::builders::*`，视图 preset 在
-/// `labs/scenes::views::*`）；`reference`
-/// 绑定 `fixtures/synthetic/reference-scene` 资产依赖；`outline-advanced`
-/// 声明 `Standard` tier 需求；environment 三项共享一个构建器、以视图
-/// preset 符号区分昼雾/黄昏/夜。
+/// `builder` 记录当前所有者符号（`labs/scenes::builders::courtyard`）；
+/// reference-scene GLB 是必需依赖（S4：全 lane 打包，缺席 = BLOCKED）。
 #[must_use]
 pub fn catalog() -> Vec<CatalogEntry> {
-    let entry = |id: &str,
-                 summary: &str,
-                 symbol: &str,
-                 view: Option<&str>,
-                 tier: Option<StylizedExecutionTier>,
-                 assets: Vec<AssetDecl>| {
-        CatalogEntry {
-            id: SceneId::new(id).expect("catalog id is valid"),
-            summary: summary.to_string(),
-            builder: BuilderBinding {
-                owner: "labs/scenes".to_string(),
-                symbol: symbol.to_string(),
-                view: view.map(str::to_string),
-            },
-            tier,
-            assets,
-            parameters: Vec::new(),
-            presets: Vec::new(),
-        }
+    let view_target = |field: &str| ParameterTarget {
+        scope: crate::action::TargetScope::View,
+        id: "main".to_string(),
+        field: field.to_string(),
     };
-    let reference_scene = || AssetDecl {
-        id: "reference-scene".to_string(),
-        source: "fixtures/synthetic/reference-scene".to_string(),
-        sha256: None,
+    let entity_target = |id: &str, field: &str| ParameterTarget {
+        scope: crate::action::TargetScope::Entity,
+        id: id.to_string(),
+        field: field.to_string(),
     };
-    vec![
-        entry(
-            "overview",
-            "三材质球 + 轮廓概览",
-            "builders::overview",
-            None,
-            None,
-            vec![],
-        ),
-        entry(
-            "ramp",
-            "ramp 渐变采样",
-            "builders::ramp",
-            None,
-            None,
-            vec![],
-        ),
-        entry(
-            "lighting",
-            "灯光/阴影模型",
-            "builders::lighting",
-            None,
-            None,
-            vec![],
-        ),
-        {
-            let mut face = entry("face", "脸部材质语义", "builders::face", None, None, vec![]);
-            // face 的参数面：逐实例 face SDF 阈值（OptionalF32；null = 材质默认）
-            // 与 ramp/profile 行索引（U32, 0..=255）。落点 = 注册的逻辑实例。
-            face.parameters = (0..3)
-                .flat_map(|i| {
-                    [
-                        ParameterSpec {
-                            name: format!("instances.{i}.face_threshold"),
-                            target: ParameterTarget {
-                                scope: crate::action::TargetScope::Entity,
-                                id: format!("instances.{i}"),
-                                field: "face_threshold".to_string(),
-                            },
-                            kind: ParameterKind::OptionalF32,
-                            summary: "face SDF 阈值（null 回退材质默认）".to_string(),
-                        },
-                        ParameterSpec {
-                            name: format!("instances.{i}.profile_index"),
-                            target: ParameterTarget {
-                                scope: crate::action::TargetScope::Entity,
-                                id: format!("instances.{i}"),
-                                field: "profile_index".to_string(),
-                            },
-                            kind: ParameterKind::U32 { max: 255 },
-                            summary: "profile/ramp 行索引".to_string(),
-                        },
-                    ]
-                })
-                .collect();
-            face
+    // 庭院展台（docs/showcase/05）：参数面见 §8；reference-scene GLB 是
+    // 必需依赖（S4：全 lane 打包，缺席 = BLOCKED）。
+    let mut courtyard = CatalogEntry {
+        id: SceneId::new("courtyard").expect("catalog id is valid"),
+        summary: "庭院展台：全部渲染特性分区同屏（docs/showcase/05）".to_string(),
+        builder: BuilderBinding {
+            owner: "labs/scenes".to_string(),
+            symbol: "builders::courtyard".to_string(),
+            view: None,
         },
-        entry("hair", "头发材质语义", "builders::hair", None, None, vec![]),
-        entry(
-            "metal",
-            "金属/ramp 对照",
-            "builders::metal",
-            None,
-            None,
-            vec![],
-        ),
-        entry(
-            "outline",
-            "几何轮廓",
-            "builders::outline",
-            None,
-            None,
-            vec![],
-        ),
-        entry(
-            "animation",
-            "骨骼动画采样",
-            "builders::animation",
-            None,
-            None,
-            vec![],
-        ),
-        entry("post", "后处理链", "builders::post", None, None, vec![]),
-        entry(
-            "stress",
-            "实例压力负载",
-            "builders::stress",
-            None,
-            None,
-            vec![],
-        ),
-        entry(
-            "reference",
-            "合成参考场景（固定六视角输入域）",
-            "builders::reference",
-            None,
-            None,
-            vec![reference_scene()],
-        ),
-        entry(
-            "performance",
-            "性能测量负载",
-            "builders::performance",
-            None,
-            None,
-            vec![],
-        ),
-        entry(
-            "outline-advanced",
-            "screen-space 描边（Standard+ 特性）",
-            "builders::outline_advanced",
-            None,
-            Some(StylizedExecutionTier::Standard),
-            vec![],
-        ),
-        entry("lod", "LOD 阈值切换", "builders::lod", None, None, vec![]),
-        entry(
-            "environment-day",
-            "环境调色板：昼雾",
-            "builders::environment",
-            Some("views::environment_day"),
-            None,
-            vec![],
-        ),
-        entry(
-            "environment-dusk",
-            "环境调色板：黄昏",
-            "builders::environment",
-            Some("views::environment_dusk"),
-            None,
-            vec![],
-        ),
-        entry(
-            "environment-night",
-            "环境调色板：夜",
-            "builders::environment",
-            Some("views::environment_night"),
-            None,
-            vec![],
-        ),
-        entry(
-            "effects",
-            "效果网格光照基：per-material key light 覆盖对比",
-            "builders::effects",
-            None,
-            None,
-            vec![],
-        ),
-    ]
+        tier: None,
+        assets: vec![AssetDecl {
+            id: "reference-scene".to_string(),
+            source: "fixtures/synthetic/reference-scene".to_string(),
+            sha256: None,
+        }],
+        parameters: vec![
+            ParameterSpec {
+                name: "time_of_day".to_string(),
+                target: view_target("time_of_day"),
+                kind: ParameterKind::Enum {
+                    options: vec!["day".to_string(), "dusk".to_string(), "night".to_string()],
+                },
+                summary: "时刻（view preset 选择）".to_string(),
+            },
+            ParameterSpec {
+                name: "outline_mode".to_string(),
+                target: view_target("outline_mode"),
+                kind: ParameterKind::Enum {
+                    options: vec!["off".to_string(), "hull".to_string(), "hybrid".to_string()],
+                },
+                summary: "描边模式（P2/P3 内容 + 相机附件；hybrid 需 Standard）".to_string(),
+            },
+            ParameterSpec {
+                name: "crowd".to_string(),
+                target: entity_target("lamps", "crowd"),
+                kind: ParameterKind::U32 { max: 1000 },
+                summary: "灯阵密度（0/100/1000；内容重建语义）".to_string(),
+            },
+            ParameterSpec {
+                name: "post".to_string(),
+                target: view_target("post"),
+                kind: ParameterKind::Bool,
+                summary: "后处理开关（相机附件）".to_string(),
+            },
+            ParameterSpec {
+                name: "flags".to_string(),
+                target: entity_target("flags.*", "pose"),
+                kind: ParameterKind::Enum {
+                    options: vec!["rest".to_string(), "posed".to_string()],
+                },
+                summary: "旗帜姿态（rest/posed；落点展开为 flags.0/flags.1）".to_string(),
+            },
+        ],
+        presets: Vec::new(),
+    };
+    // face_threshold：中央前排 face 组三实例（OptionalF32；null =
+    // 三阈值梯度 0.2/默认/0.8）。
+    courtyard.parameters.extend((0..3).map(|i| ParameterSpec {
+        name: format!("trio.face.{i}.face_threshold"),
+        target: entity_target(&format!("trio.face.{i}"), "face_threshold"),
+        kind: ParameterKind::OptionalF32,
+        summary: "face SDF 阈值（null 回退三阈值梯度）".to_string(),
+    }));
+    vec![courtyard]
 }
 
 /// 按 ID 查目录条目。
@@ -452,56 +372,9 @@ mod tests {
         let entries = catalog();
         assert_eq!(entries.len(), CATALOG_LEN);
         let ids: Vec<&str> = entries.iter().map(|entry| entry.id.as_str()).collect();
-        assert_eq!(
-            ids,
-            [
-                "overview",
-                "ramp",
-                "lighting",
-                "face",
-                "hair",
-                "metal",
-                "outline",
-                "animation",
-                "post",
-                "stress",
-                "reference",
-                "performance",
-                "outline-advanced",
-                "lod",
-                "environment-day",
-                "environment-dusk",
-                "environment-night",
-                "effects",
-            ]
-        );
+        // §10：18 个旧展示场景退役，courtyard 是唯一注册场景。
+        assert_eq!(ids, ["courtyard"]);
         assert_eq!(validate_catalog(&entries), Ok(()));
-    }
-
-    #[test]
-    fn outline_advanced_requires_standard_tier() {
-        let entry = catalog_entry("outline-advanced").expect("entry");
-        assert_eq!(entry.tier, Some(StylizedExecutionTier::Standard));
-    }
-
-    #[test]
-    fn reference_declares_reference_scene_asset() {
-        let entry = catalog_entry("reference").expect("entry");
-        assert_eq!(entry.assets.len(), 1);
-        assert_eq!(entry.assets[0].source, "fixtures/synthetic/reference-scene");
-    }
-
-    #[test]
-    fn environment_trio_shares_builder_with_three_view_presets() {
-        for (id, view) in [
-            ("environment-day", "views::environment_day"),
-            ("environment-dusk", "views::environment_dusk"),
-            ("environment-night", "views::environment_night"),
-        ] {
-            let entry = catalog_entry(id).expect("entry");
-            assert_eq!(entry.builder.symbol, "builders::environment");
-            assert_eq!(entry.builder.view.as_deref(), Some(view));
-        }
     }
 
     #[test]
@@ -512,43 +385,45 @@ mod tests {
     }
 
     #[test]
-    fn face_declares_instance_threshold_and_profile_parameters() {
-        let entry = catalog_entry("face").expect("entry");
-        let names: Vec<&str> = entry
-            .parameters
-            .iter()
-            .map(|spec| spec.name.as_str())
-            .collect();
-        for i in 0..3 {
-            assert!(names.contains(&format!("instances.{i}.face_threshold").as_str()));
-            assert!(names.contains(&format!("instances.{i}.profile_index").as_str()));
-        }
-        // 元数据校验：声明键接受合法值，未声明/越界/类型错拒绝（无 build 依赖）。
-        let mut params = crate::canon::ParameterMap::new();
-        params.insert(
-            "instances.1.face_threshold".to_string(),
-            serde_json::json!(0.2),
+    fn enum_parameter_accepts_declared_options_and_rejects_others() {
+        let spec = ParameterSpec {
+            name: "view.palette".to_string(),
+            target: ParameterTarget {
+                scope: crate::action::TargetScope::View,
+                id: "main".to_string(),
+                field: "palette".to_string(),
+            },
+            kind: ParameterKind::Enum {
+                options: vec!["day".to_string(), "dusk".to_string(), "night".to_string()],
+            },
+            summary: "环境调色板".to_string(),
+        };
+        // 合法枚举值通过。
+        assert_eq!(
+            spec.validate_value("view.palette", &serde_json::json!("dusk")),
+            Ok(())
         );
-        params.insert(
-            "instances.1.profile_index".to_string(),
-            serde_json::json!(3),
-        );
-        assert_eq!(validate_parameters(&entry, &params), Ok(()));
-        let mut bad = crate::canon::ParameterMap::new();
-        bad.insert(
-            "instances.1.profile_index".to_string(),
-            serde_json::json!(300),
-        );
+        // 不在 options 内的字符串拒绝。
         assert!(matches!(
-            validate_parameters(&entry, &bad),
+            spec.validate_value("view.palette", &serde_json::json!("noon")),
             Err(ParameterError::IllegalValue { .. })
         ));
-        let mut unknown = crate::canon::ParameterMap::new();
-        unknown.insert("nope".to_string(), serde_json::json!(1));
-        assert_eq!(
-            validate_parameters(&entry, &unknown),
-            Err(ParameterError::UnknownKey("nope".to_string()))
-        );
+        // 非字符串拒绝。
+        for value in [
+            serde_json::json!(1),
+            serde_json::json!(true),
+            serde_json::json!(null),
+        ] {
+            assert!(matches!(
+                spec.validate_value("view.palette", &value),
+                Err(ParameterError::IllegalValue { .. })
+            ));
+        }
+        // 空串拒绝。
+        assert!(matches!(
+            spec.validate_value("view.palette", &serde_json::json!("")),
+            Err(ParameterError::IllegalValue { .. })
+        ));
     }
 
     #[test]
@@ -557,7 +432,56 @@ mod tests {
         entries.push(entries[0].clone());
         assert_eq!(
             validate_catalog(&entries),
-            Err(CatalogError::DuplicateId("overview".to_string()))
+            Err(CatalogError::DuplicateId("courtyard".to_string()))
         );
+    }
+
+    #[test]
+    fn courtyard_declares_reference_asset_and_six_parameter_keys() {
+        let entry = catalog_entry("courtyard").expect("entry");
+        assert_eq!(entry.builder.symbol, "builders::courtyard");
+        assert_eq!(entry.assets.len(), 1);
+        assert_eq!(entry.assets[0].id, "reference-scene");
+        let names: Vec<&str> = entry
+            .parameters
+            .iter()
+            .map(|spec| spec.name.as_str())
+            .collect();
+        for name in [
+            "time_of_day",
+            "outline_mode",
+            "crowd",
+            "post",
+            "flags",
+            "trio.face.0.face_threshold",
+            "trio.face.1.face_threshold",
+            "trio.face.2.face_threshold",
+        ] {
+            assert!(names.contains(&name), "missing parameter {name}");
+        }
+        // 枚举/数值参数的合法值接受与非法值拒绝（metadata 校验，无 build 依赖）。
+        let mut params = crate::canon::ParameterMap::new();
+        params.insert("time_of_day".to_string(), serde_json::json!("dusk"));
+        params.insert("outline_mode".to_string(), serde_json::json!("hybrid"));
+        params.insert("crowd".to_string(), serde_json::json!(1000));
+        params.insert("post".to_string(), serde_json::json!(true));
+        params.insert("flags".to_string(), serde_json::json!("posed"));
+        params.insert(
+            "trio.face.1.face_threshold".to_string(),
+            serde_json::json!(null),
+        );
+        assert_eq!(validate_parameters(&entry, &params), Ok(()));
+        let mut bad = crate::canon::ParameterMap::new();
+        bad.insert("time_of_day".to_string(), serde_json::json!("noon"));
+        assert!(matches!(
+            validate_parameters(&entry, &bad),
+            Err(ParameterError::IllegalValue { .. })
+        ));
+        let mut over = crate::canon::ParameterMap::new();
+        over.insert("crowd".to_string(), serde_json::json!(1001));
+        assert!(matches!(
+            validate_parameters(&entry, &over),
+            Err(ParameterError::IllegalValue { .. })
+        ));
     }
 }

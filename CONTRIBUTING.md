@@ -231,18 +231,24 @@ character`, then repackage/reinstall. Both modes use the same application ID.
 ### Android catalog lane
 
 `python3 tools/dev.py check --lane android-catalog --out target/stylized/NEW_ANDROID_CATALOG`
-builds the APK once, then runs every registered catalog scene in a fresh
-process on the emulator (`Tenacity_API35`, `-gpu host`): the runner writes the
-scene id to a one-shot control file in the app files dir, force-stops, clears
-stale per-scene outputs, starts the app, waits for the structured report and
-pulls report + capture. Judgment is the golden tolerance against the canonical
-`fixtures/golden/showcase/` baselines, with the `android-vulkan` overlay where
-accepted; `GOLDEN_REBASELINE=1` writes overlay candidates for review (review
-and commit separately; the lane never overwrites canonical baselines). The
-reference scene's first-party fixture rides the APK assets
-(`STYLIZED_ANDROID_CATALOG_DIR`, staged by the lane). Per-scene failures are
+builds the APK once, then runs every courtyard capture spec (10 条，
+docs/showcase/05 §9) in a fresh process on the emulator (`Tenacity_API35`,
+`-gpu host`): the runner writes the capture id to a one-shot control file in
+the app files dir, force-stops, clears stale per-capture outputs, starts the
+app, waits for the structured report and pulls report + capture. Judgment is
+the golden tolerance against the canonical `fixtures/golden/showcase/`
+baselines, with the `android-vulkan` overlay where accepted;
+`GOLDEN_REBASELINE=1` writes overlay candidates for review (review and commit
+separately; the lane never overwrites canonical baselines). The reference
+scene's first-party fixture rides the APK assets
+(`STYLIZED_ANDROID_CATALOG_DIR`, staged by the lane). Per-capture failures are
 isolated and all results land in `report.json`. Evidence is emulator evidence
-only; no physical-device claim.
+only; no physical-device claim. Canonical 庭院基线缺席时本 lane 显式 BLOCKED
+（不是 FAIL）；显式 `GOLDEN_REBASELINE=1` 时进入播种流程：设备捕获直接写
+overlay 候选（sidecar 的 regions 从既有 overlay 携带——分区 AABB×机位投影
+是平台无关规格数据），评审 + 提交后才被接受。捕获报告写盘后应用进入驻留
+（`ANDROID_RESIDENT alive`，交互 V3 的地基；触摸事件已接，手势/面板属
+后续阶段）。
 
 Prerequisites match the Android smoke flow (cargo-ndk, JDK 26, SDK/NDK pins),
 plus a booted emulator (`adb devices` must show the target; select the serial
@@ -262,20 +268,22 @@ it is not a portable browser support claim.
 ## Browser showcase lane
 
 `python3 tools/dev.py check --lane browser-showcase --out target/stylized/NEW_BROWSER_SHOWCASE`
-runs every registered catalog scene in the browser through the
-`apps/browser-showcase` host (CaseDriver per-frame pumping; the shared
-`showcase::capture_profile_graph` capture contract) and judges per scene:
-browser (Dawn/Tint) vs fresh same-machine native capture of the same host
-binary — exact preferred, the reference/08 §5 envelope is the only fallback —
-plus the native capture vs the platform's accepted showcase golden at the
-golden tolerance (Linux: canonical `fixtures/golden/showcase/`; macOS: the
-`macos-metal` overlay where accepted). Both judgments are reported per scene;
-a scene failing either is a FAIL with evidence. No browser baselines are
-created. Per-scene failures are isolated and all results are reported.
+runs every courtyard capture spec (10 条) in the browser through the
+`apps/browser-showcase` host (`?spec=<capture_id>`; CaseDriver per-frame
+pumping; the shared `showcase::capture_profile_graph` capture contract) and
+judges per capture: browser (Dawn/Tint) vs fresh same-machine native capture
+of the same host binary — exact preferred, the reference/08 §5 envelope is
+the only fallback — plus the native capture vs the platform's accepted
+showcase golden at the golden tolerance (Linux: canonical
+`fixtures/golden/showcase/`; macOS: the `macos-metal` overlay where
+accepted). Both judgments are reported per capture; a capture failing either
+is a FAIL with evidence. No browser baselines are created. Per-capture
+failures are isolated and all results are reported. Canonical 庭院基线缺席时
+本 lane 显式 BLOCKED（不是 FAIL）。
 
 Prerequisites match the webgpu lane (same executables/env), except no compiled
-character asset is required: the catalog scenes are procedural, and the
-`reference` scene's first-party fixture is served from `fixtures/`.
+character asset is required: the reference-scene first-party fixture is served
+from `fixtures/`.
 
 Prerequisites: pinned Rust `wasm32-unknown-unknown` target, cached standalone Cargo
 dependencies, Node 22+, Pillow, a local display, Chromium and wasm-bindgen-cli

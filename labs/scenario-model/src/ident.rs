@@ -174,8 +174,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn string_id_accepts_showcase_names() {
-        for name in ["outline-advanced", "environment-day", "reference", "lod"] {
+    fn string_id_accepts_registered_names() {
+        for name in ["courtyard", "courtyard-day", "outline-advanced"] {
             SceneId::new(name).expect(name);
         }
     }

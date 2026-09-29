@@ -51,6 +51,11 @@ pub struct GoldenProvenance {
     pub height: u32,
     /// FNV-1a-64 digest of the PNG file bytes, lowercase hex.
     pub png_fnv1a64: String,
+    /// ROI 分区判定区域（docs/showcase/05 §9；additive 扩展——缺省/空 =
+    /// 整图判定，与既有 sidecar 兼容）。屏幕矩形在捕获时由分区 AABB 经
+    /// 捕获相机投影自动计算（不手工标定）。
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub regions: Vec<crate::regions::GoldenRegion>,
 }
 
 impl GoldenProvenance {
@@ -96,6 +101,7 @@ impl GoldenProvenance {
             height: captured.height,
             // Filled by `write_baseline` once the PNG bytes exist.
             png_fnv1a64: String::new(),
+            regions: Vec::new(),
         }
     }
 }

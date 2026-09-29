@@ -3,14 +3,15 @@
 //! 流程（Update 系统每帧推进一个阶段；无忙等、无第二事件循环）：
 //!
 //! 1. **Compile**：用与 PC 完全相同的编译器在设备端编译共享 catalog 的
-//!    `outline` 配方 → 同一 recipe hash、同一 Execution 域计划摘要
-//!    （身份可追溯——"PC 保存的配方可直接在移动端重放"）；
+//!    `courtyard` 配方（panorama 机位）→ 同一 recipe hash、同一
+//!    Execution 域计划摘要（身份可追溯——"PC 保存的配方可直接在移动端
+//!    重放"）；
 //! 2. **Run**：`CaseDriver::from_plan` 执行 `fixed_step{22} → observe`，
 //!    经 Vulkan 读回取得带回执捕获（实验 tick、harness stamp、像素）；
 //!    合理性检查：非黑帧（distinct 颜色数）；
-//! 3. **Refuse**：编译 `reference` 配方（未声明 reference-scene 资产）
-//!    → 结构化拒绝原因（line 248：未声明的资产依赖在执行前失败；
-//!    "无法执行时返回具体原因"）；
+//! 3. **Refuse**：编译 `courtyard` 配方（未声明 reference-scene 资产）
+//!    → 结构化拒绝原因（未声明的资产依赖在执行前失败；"无法执行时返回
+//!    具体原因"）；
 //! 4. **Report**：候选写 `report.candidate.json` + 产物 PNG，原子改名
 //!    发布（部分输出不算 PASS）；报告绑定 run/scene/recipe hash/plan
 //!    digest/session/generation/tick/adapter/backend/resolved tier/stamp/
@@ -27,19 +28,20 @@ use scenario_model::recipe::{RecipeReference, RunMode, RunSpec, SceneRecipe};
 use scene_runtime::{CaseDriver, CompileError, ObservationReceipt, compile};
 
 /// 宿主绑定场景（fixture 内容经 Startup 系统装配；本模块只重放 catalog 配方）。
-fn outline_recipe() -> SceneRecipe {
+/// courtyard 配方（panorama 机位；声明 reference-scene 资产依赖）。
+fn courtyard_recipe() -> SceneRecipe {
     SceneRecipe::from_json_slice(
         br#"{
             "schema": {"major": 1, "minor": 0},
-            "scene": {"id": "outline", "preset": null},
+            "scene": {"id": "courtyard", "preset": null},
             "seed": "42",
             "rng": {"algorithm": "chacha", "version": "1"},
             "resolution": {"width": 512, "height": 512},
             "anti_aliasing": {"type": "msaa", "samples": 4},
             "tier": null,
             "required_effects": [],
-            "assets": [],
-            "camera": {"position": [0.0, 0.4, 6.0], "target": [0.0, 0.0, 0.0], "fov_degrees": 45.0},
+            "assets": [{"id": "reference-scene", "source": "fixtures/synthetic/reference-scene", "sha256": null}],
+            "camera": {"position": [0.0, 3.4, 16.0], "target": [0.0, 1.3, -2.0], "fov_degrees": 45.0},
             "parameters": {},
             "actions": {"nodes": [
                 {"id": "settle", "tick": "0", "depends_on": [], "writes": [],
@@ -49,14 +51,15 @@ fn outline_recipe() -> SceneRecipe {
             ]}
         }"#,
     )
-    .expect("embedded outline recipe must ingest")
+    .expect("embedded courtyard recipe must ingest")
 }
 
-fn reference_recipe() -> SceneRecipe {
+/// courtyard 配方（不声明资产依赖）→ 结构化拒绝用例。
+fn undeclared_courtyard_recipe() -> SceneRecipe {
     SceneRecipe::from_json_slice(
         br#"{
             "schema": {"major": 1, "minor": 0},
-            "scene": {"id": "reference", "preset": null},
+            "scene": {"id": "courtyard", "preset": null},
             "seed": "42",
             "rng": {"algorithm": "chacha", "version": "1"},
             "resolution": {"width": 512, "height": 512},
@@ -64,7 +67,7 @@ fn reference_recipe() -> SceneRecipe {
             "tier": null,
             "required_effects": [],
             "assets": [],
-            "camera": {"position": [0.0, 1.1, 4.2], "target": [0.0, 0.9, 0.0], "fov_degrees": 45.0},
+            "camera": {"position": [0.0, 3.4, 16.0], "target": [0.0, 1.3, -2.0], "fov_degrees": 45.0},
             "parameters": {},
             "actions": {"nodes": [
                 {"id": "shot", "tick": "0", "depends_on": [], "writes": [],
@@ -72,7 +75,7 @@ fn reference_recipe() -> SceneRecipe {
             ]}
         }"#,
     )
-    .expect("embedded reference recipe must ingest")
+    .expect("embedded undeclared courtyard recipe must ingest")
 }
 
 fn capture_run(recipe: &SceneRecipe) -> RunSpec {
@@ -141,7 +144,7 @@ pub fn pump_replay(world: &mut World) {
 }
 
 fn compile_stage(world: &mut World, host: &mut ReplayHost) -> Stage {
-    let recipe = outline_recipe();
+    let recipe = courtyard_recipe();
     let run = capture_run(&recipe);
     match compile(&recipe, &run, None) {
         Ok(plan) => {
@@ -197,21 +200,21 @@ fn run_stage(world: &mut World, mut driver: Box<CaseDriver>) -> Stage {
 }
 
 fn refuse_stage(receipt: Box<ObservationReceipt>) -> Stage {
-    let recipe = reference_recipe();
+    let recipe = undeclared_courtyard_recipe();
     let run = capture_run(&recipe);
     let reason = match compile(&recipe, &run, None) {
         Err(CompileError::Catalog(error)) => {
-            info!("ANDROID_REPLAY refused reference reason={error}");
+            info!("ANDROID_REPLAY refused undeclared-assets reason={error}");
             error.to_string()
         }
         Err(error) => {
             return Stage::Failed(format!(
-                "reference recipe must fail with a catalog refusal, got: {error}"
+                "undeclared courtyard recipe must fail with a catalog refusal, got: {error}"
             ));
         }
         Ok(_) => {
             return Stage::Failed(
-                "reference recipe compiled on device (asset contract broken)".into(),
+                "undeclared courtyard recipe compiled on device (asset contract broken)".into(),
             );
         }
     };
@@ -253,7 +256,7 @@ fn write_stage(
     let report = serde_json::json!({
         "schema": "bevy_stylized.android-replay/v1",
         "status": "PASS",
-        "scene": "outline",
+        "scene": "courtyard",
         "recipe_sha256": host.recipe_sha256,
         "plan_digest": host.plan_digest,
         "session_id": session_id().to_string(),
@@ -273,7 +276,7 @@ fn write_stage(
             "artifact": ARTIFACT_FINAL,
             "pixels": [receipt.image.width, receipt.image.height],
         },
-        "refusals": [{"scene": "reference", "reason": refusal_reason}],
+        "refusals": [{"scene": "courtyard", "reason": refusal_reason}],
         "scope": "on-device replay evidence; not a cross-device pixel comparison",
     });
     let candidate = dir.join(REPORT_CANDIDATE);

@@ -1,12 +1,29 @@
 #![allow(dead_code)]
 //! 编译证据测试共享的配方构造（JSON 实例数据；参数 schema 归目录，
 //! 这些只是测试输入，不是第二份参数定义）。
+//!
+//! 05 §10 退役后：全部配方指向 courtyard（唯一注册场景），相机取
+//! `scenes::metadata::COURTYARD_CAMERA_PRESETS` 的机位坐标。
 
 use scenario_model::recipe::SceneRecipe;
 
-pub const OUTLINE_CAMERA: &str = r#"{
-    "position": [0.0, 0.4, 6.0],
-    "target": [0.0, 0.0, 0.0],
+pub const PANORAMA_CAMERA: &str = r#"{
+    "position": [0.0, 3.4, 16.0],
+    "target": [0.0, 1.3, -2.0],
+    "fov_degrees": 45.0
+}"#;
+
+/// center-trio 机位（三对照组特写）。
+pub const TRIO_CAMERA: &str = r#"{
+    "position": [3.5, 4.0, 4.0],
+    "target": [0.0, 1.25, -0.2],
+    "fov_degrees": 45.0
+}"#;
+
+/// flags 机位（旗帜特写）。
+pub const FLAGS_CAMERA: &str = r#"{
+    "position": [0.0, 2.4, -0.4],
+    "target": [-2.75, 2.0, -4.76],
     "fov_degrees": 45.0
 }"#;
 
@@ -36,9 +53,17 @@ pub fn recipe_json(scene: &str, camera: &str, msaa: &str, actions: &str) -> Stri
     )
 }
 
-pub fn outline_recipe() -> SceneRecipe {
+/// courtyard 配方：声明 reference-scene 资产依赖（catalog 要求）。
+pub fn courtyard_recipe_json(camera: &str, msaa: &str, actions: &str) -> String {
+    recipe_json("courtyard", camera, msaa, actions).replace(
+        r#""assets": []"#,
+        r#""assets": [{"id": "reference-scene", "source": "fixtures/synthetic/reference-scene", "sha256": null}]"#,
+    )
+}
+
+pub fn courtyard_recipe() -> SceneRecipe {
     SceneRecipe::from_json_slice(
-        recipe_json("outline", OUTLINE_CAMERA, "4", SETTLE_OBSERVE).as_bytes(),
+        courtyard_recipe_json(PANORAMA_CAMERA, "4", SETTLE_OBSERVE).as_bytes(),
     )
     .expect("recipe")
 }
@@ -49,20 +74,15 @@ pub fn face_threshold_json(threshold: f64) -> String {
         {{"id": "settle", "tick": "0", "depends_on": [], "writes": [],
           "kind": {{"type": "fixed_step", "ticks": "1", "step": {{"numerator": "1", "denominator": "60"}}}}}},
         {{"id": "apply", "tick": "1", "depends_on": ["settle"],
-          "writes": [{{"scope": "entity", "id": "instances.1"}}],
+          "writes": [{{"scope": "entity", "id": "trio.face.1"}}],
           "kind": {{"type": "apply_params",
-                   "target": {{"scope": "entity", "id": "instances.1"}},
+                   "target": {{"scope": "entity", "id": "trio.face.1"}},
                    "params": {{"face_threshold": {threshold}}}}}}},
         {{"id": "shot", "tick": "1", "depends_on": ["apply"], "writes": [],
           "kind": {{"type": "observe", "observation": "capture", "view": null}}}}
     ]"#
     );
-    recipe_json(
-        "face",
-        r#"{"position": [0.0, 0.3, 6.5], "target": [0.0, 0.0, 0.0], "fov_degrees": 45.0}"#,
-        "4",
-        &actions,
-    )
+    courtyard_recipe_json(TRIO_CAMERA, "4", &actions)
 }
 
 pub fn face_threshold_recipe(threshold: f64) -> SceneRecipe {
@@ -75,9 +95,9 @@ pub fn strip_deform_recipe(rotation: f64) -> SceneRecipe {
         {{"id": "s1", "tick": "0", "depends_on": [], "writes": [],
           "kind": {{"type": "fixed_step", "ticks": "1", "step": {{"numerator": "1", "denominator": "60"}}}}}},
         {{"id": "bend", "tick": "1", "depends_on": ["s1"],
-          "writes": [{{"scope": "entity", "id": "root"}}],
+          "writes": [{{"scope": "entity", "id": "flags.0"}}],
           "kind": {{"type": "deform",
-                   "target": {{"scope": "entity", "id": "root"}},
+                   "target": {{"scope": "entity", "id": "flags.0"}},
                    "channel": "rotation_z", "value": {rotation}}}}},
         {{"id": "s2", "tick": "1", "depends_on": ["bend"], "writes": [],
           "kind": {{"type": "fixed_step", "ticks": "1", "step": {{"numerator": "1", "denominator": "60"}}}}}},
@@ -85,19 +105,11 @@ pub fn strip_deform_recipe(rotation: f64) -> SceneRecipe {
           "kind": {{"type": "observe", "observation": "capture", "view": null}}}}
     ]"#
     );
-    SceneRecipe::from_json_slice(
-        recipe_json(
-            "animation",
-            r#"{"position": [0.0, 0.0, 5.0], "target": [0.0, 0.0, 0.0], "fov_degrees": 45.0}"#,
-            "4",
-            &actions,
-        )
-        .as_bytes(),
-    )
-    .expect("recipe")
+    SceneRecipe::from_json_slice(courtyard_recipe_json(FLAGS_CAMERA, "4", &actions).as_bytes())
+        .expect("recipe")
 }
 
-/// 经配方 `parameters` 声明阈值（catalog schema 路径）的 face 配方。
+/// 经配方 `parameters` 声明阈值（catalog schema 路径）的 courtyard 配方。
 pub fn face_parameters_recipe(threshold: f64) -> SceneRecipe {
     let actions = r#"[
         {"id": "settle", "tick": "0", "depends_on": [], "writes": [],
@@ -106,17 +118,12 @@ pub fn face_parameters_recipe(threshold: f64) -> SceneRecipe {
          "kind": {"type": "observe", "observation": "capture", "view": null}}
     ]"#;
     SceneRecipe::from_json_slice(
-        recipe_json(
-            "face",
-            r#"{"position": [0.0, 0.3, 6.5], "target": [0.0, 0.0, 0.0], "fov_degrees": 45.0}"#,
-            "4",
-            actions,
-        )
-        .replace(
-            "\"parameters\": {}",
-            &format!("\"parameters\": {{\"instances.1.face_threshold\": {threshold}}}"),
-        )
-        .as_bytes(),
+        courtyard_recipe_json(TRIO_CAMERA, "4", actions)
+            .replace(
+                r#""parameters": {}"#,
+                &format!(r#""parameters": {{"trio.face.1.face_threshold": {threshold}}}"#),
+            )
+            .as_bytes(),
     )
     .expect("recipe")
 }
