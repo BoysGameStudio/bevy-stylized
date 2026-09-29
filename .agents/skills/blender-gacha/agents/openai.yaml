@@ -1,4 +1,0 @@
-interface:
-  display_name: "Blender Gacha"
-  short_description: "Import and verify Gacha characters in Blender"
-  default_prompt: "Use $blender-gacha to import a character and prepare a verified Blender handoff."

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Bevy Stylized"
-  short_description: "Export, integrate and validate stylized Bevy assets"
-  default_prompt: "Use $bevy-stylized to integrate a Blender character and validate its rendered result."
