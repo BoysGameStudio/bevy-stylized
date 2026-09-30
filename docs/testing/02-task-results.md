@@ -76,7 +76,10 @@ use `--required` to enforce the domain parity gate, and retain that domain repor
 ## Required tests
 
 `tests/suites.json` owns required case names. GPU binary keys also select the binaries;
-there is no second hard-coded GPU list. Empty registries or invalid/empty binary
+there is no second hard-coded GPU list. A key is either `<binary>` (defaults to the
+`stylized-integration-tests` crate) or `crate::binary` (e.g. `scene-runtime::journal_evidence` —
+evidence tests living in other crates; added 2026-09-30 when the scene-runtime GPU evidence
+suites were found structurally uncovered). Empty registries or invalid/empty binary
 case lists are rejected before any test process starts. The runner lists the filtered ignored tests
 of each binary and compares the exact set, including duplicates. It then runs each
 case using stable libtest `--exact`, `--ignored`, `--nocapture`, one thread, and checks

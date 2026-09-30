@@ -3,7 +3,7 @@
 //!
 //! 从统一 catalog / 捕获规格派生（注册定义是唯一源，不维护第二份手写
 //! 入录）：courtyard 退役迁移（docs/showcase/05 §10）后，覆盖行按**捕获**
-//! 组织（10 条捕获规格，`crate::capture_spec::courtyard_capture_specs`），
+//! 组织（v2 起 12 条捕获规格，`crate::capture_spec::courtyard_capture_specs`），
 //! 不再按场景平铺。每行标注 PC/Android/Browser 三列状态（已有验证/
 //! 仅展示/待实现）与判定/产物凭据。机器可校验的不变量由本模块测试执行；
 //! 报告 JSON 是运行期生成物（`target/stylized/coverage/coverage.json`），
@@ -100,11 +100,12 @@ const FAMILY_COURTYARD: &str = "courtyard";
 
 /// 从捕获规格派生覆盖报告（当前真实状态；未证明的一律待实现）。
 ///
-/// 判定凭据（docs/showcase/05 §12 阶段 3，2026-09-28 验收记录
-/// `fixtures/golden/showcase.courtyard.acceptance.md`）：10 条捕获的
-/// macos-metal overlay 基线 + 同机重捕判定闭环；canonical（Linux/Vulkan
-/// 参考宿主）基线未建 = canonical 验收 BLOCKED，不是 PASS。
-/// browser/android 两列：lane 迁移（§10 M5）后的执行证据未产生 → Pending。
+/// 判定凭据（docs/showcase/05 §12 V2-3，验收记录
+/// `fixtures/golden/showcase.courtyard.acceptance.md`）：v2 12 条捕获的
+/// canonical（Linux/Vulkan 参考宿主）基线 + 同机重捕判定闭环
+///（2026-09-29 v2 条目；v1 凭据为 dated 历史）。browser/android 两列：
+/// v1 的执行/判定证据对应已退役的全景帧，不随 v2 帧变更继承——v2 证据
+/// 产生前两列一律 Pending（不是倒退，是帧语义变更后的如实状态）。
 #[must_use]
 pub fn coverage_report() -> CoverageReport {
     let golden = |path: &str| Judgment::Golden {
@@ -116,7 +117,7 @@ pub fn coverage_report() -> CoverageReport {
             capture: spec.capture_id.clone(),
             family: FAMILY_COURTYARD.to_string(),
             pc: CoverageState::Verified,
-            android: CoverageState::Verified,
+            android: CoverageState::Pending,
             browser: CoverageState::Pending,
             judgment: golden("fixtures/golden/showcase"),
         })
@@ -143,11 +144,9 @@ pub fn coverage_report() -> CoverageReport {
             "overview 同时展示三个 surface class，归入 lighting / environment（默认光照/视图语义）".to_string(),
             "reference 的六视角参考验收合同归 labs/reference 独立合同，不作为本表判定凭据".to_string(),
             "Metal host 的既有 golden 超差（sphere_outline/face_sdf_instances/outline-advanced hull）是 host 限定问题，合格 Linux host 的 golden 判定不受影响".to_string(),
-            "browser 列证据 = browser-showcase lane（Chrome 153 headless，Dawn/Vulkan NVIDIA）：全 18 场景执行 + 逐场景判定（vs canonical showcase 基线，exact 18/18，envelope 未动用）；macOS 诊断运行 lod/outline-advanced 各有亚 LSB 非边缘分歧像素， envelope 判 FAIL 并如实记录，不构成缺陷证据".to_string(),
-            "android 列证据 = android-catalog lane（Tenacity_API35 模拟器 -gpu host，MoltenVK→M4 Pro Metal）：18/18 PASS，两轮逐字节一致；effects/face/stress/outline-advanced 走 android-vulkan overlay（其中三项与 macos-metal overlay 逐字节一致，同一物理 GPU）；模拟器证据，不构成真机声明".to_string(),
-            "courtyard 迁移（05 §10，2026-09-28）：覆盖行从场景改为 10 条捕获规格；pc 列 = macos-metal overlay 基线 + 同机重捕判定闭环（fixtures/golden/showcase.courtyard.acceptance.md）；canonical 基线未建 = BLOCKED（参考宿主缺席，不是 PASS）；browser/android 列 Pending 是 lane 迁移前的真实状态".to_string(),
-            "android catalog lane（2026-09-28，Tenacity_API35 模拟器 -gpu host，MoltenVK→M4 Pro Metal）：10/10 PASS 两轮（android-vulkan overlay 播种 + 非重基线判定闭环；9 条 strict 逐字节，outline-hybrid loose+rois）；S4 打包（GLB 进 APK assets）与 catalog 捕获规格端到端验证；驻留模式落地（report_and_stay + ANDROID_RESIDENT 标记；触摸事件已接，手势/面板属交互 V3）。模拟器证据，不构成真机声明".to_string(),
-            "browser lane（2026-09-28，macOS M4 Pro / Chrome 153 Dawn）：?spec= 合同与 S4 HTTP 资产通道端到端可用；角色台 NPR 化（StylizedMaterialSet + StylizedAssetIntegrationPlugin，决策 2026-09-28）后 9/10 PASS（browser vs native exact）；courtyard-outline-hybrid 的 screen-space 描边在 Dawn(Tint) vs wgpu/Metal(naga) 间系统性分歧（2488 edge 像素，超 envelope，同 Metal screen-outline 平台差异一类，SUPPORT_MATRIX 2026-09-28 条目；放宽判定属 owner 决策）。列维持 Pending 是如实状态".to_string(),
+            "v2 改版（05 §12，2026-09-29 owner 决策）：不同屏全显——覆盖行从 v1 的 10 条全景系捕获改为 12 条分区激活捕获（zone 钉值，camera↔zone 一一对应）；判定收敛为整图精确为主（一帧一主体），ROI 机制保留（夜景 lamps）；pc 列 = canonical（linux-vulkan 参考宿主）基线 + 同机重捕判定闭环（fixtures/golden/showcase.courtyard.acceptance.md v2 条目）".to_string(),
+            "v3 展亭模式（2026-09-30 owner 决策）：内容同位轮换——12 条规格的机位/摆位重排并整体重捕（验收记录 v3 条目）；v4 增 5 条 cel 特性档捕获（rim/shadow/palette/metal/cutout，同判定口径）".to_string(),
+            "browser/android 两列 Pending 是 v2 帧语义变更后的如实状态：v1 证据（browser 9/10 exact + outline-hybrid Dawn/naga 分歧；android 模拟器 10/10 两轮）对应已退役的全景帧，不继承；v2 证据待各自宿主重跑（overlay 重播种 + lane 复跑）".to_string(),
         ],
     }
 }
@@ -173,7 +172,7 @@ mod tests {
             .iter()
             .map(|coverage| coverage.capture.as_str())
             .collect();
-        assert_eq!(coverage_ids.len(), 10, "every capture spec exactly once");
+        assert_eq!(coverage_ids.len(), 17, "every capture spec exactly once");
         for id in &spec_ids {
             assert_eq!(
                 coverage_ids.iter().filter(|c| *c == id).count(),
@@ -201,17 +200,17 @@ mod tests {
     fn capture_states_are_truthful() {
         let report = coverage_report();
         for coverage in &report.captures {
-            // pc 列：macos-metal overlay 基线 + 同机重捕判定闭环（验收记录
-            // fixtures/golden/showcase.courtyard.acceptance.md）→ Verified。
+            // pc 列：canonical（linux-vulkan 参考宿主）v2 基线 + 同机重捕
+            // 判定闭环（验收记录 fixtures/golden/showcase.courtyard.acceptance.md
+            // v2 条目）→ Verified。
             assert_eq!(
                 coverage.pc,
                 CoverageState::Verified,
-                "{} must have pc judgment evidence (overlay acceptance)",
+                "{} must have pc judgment evidence (canonical acceptance)",
                 coverage.capture
             );
-            // browser：Dawn/naga screen-outline 分歧未决（放宽属 owner 决策）→
-            // Pending；android：android-catalog lane 模拟器证据（执行 + 判定
-            // 凭据，不构成真机声明）→ Verified。
+            // browser/android：v1 证据对应已退役的全景帧，不随 v2 帧语义
+            // 变更继承；v2 证据产生前两列一律 Pending（如实状态，不是倒退）。
             assert_eq!(
                 coverage.browser,
                 CoverageState::Pending,
@@ -220,8 +219,8 @@ mod tests {
             );
             assert_eq!(
                 coverage.android,
-                CoverageState::Verified,
-                "{} android must be verified (android-catalog lane emulator evidence)",
+                CoverageState::Pending,
+                "{} android must be pending until v2 lane evidence exists",
                 coverage.capture
             );
             assert!(
@@ -250,7 +249,7 @@ mod tests {
         let bytes = coverage_json().expect("serialize");
         let value: serde_json::Value = serde_json::from_slice(&bytes).expect("parse");
         assert_eq!(value["schema"], "bevy_stylized.coverage/v2");
-        assert_eq!(value["captures"].as_array().expect("captures").len(), 10);
+        assert_eq!(value["captures"].as_array().expect("captures").len(), 17);
         // 生成物写出（运行期生成，非受管快照）。
         let out_dir = root.join("target/stylized/coverage");
         std::fs::create_dir_all(&out_dir).expect("create coverage out dir");
@@ -273,7 +272,7 @@ mod tests {
         // 与捕获规格一一对应。
         let showcase_cases: std::collections::BTreeSet<&str> =
             report.captures.iter().map(|c| c.capture.as_str()).collect();
-        assert_eq!(showcase_cases.len(), 10);
+        assert_eq!(showcase_cases.len(), 17);
         let specs: std::collections::BTreeSet<String> =
             crate::capture_spec::courtyard_capture_specs()
                 .iter()

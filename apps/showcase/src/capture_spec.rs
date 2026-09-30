@@ -26,7 +26,7 @@ use scene_runtime::{CaseDriver, DriverLimits, run_to_completion};
 use scenes::metadata::{COURTYARD_CAMERA_PRESETS, COURTYARD_REGION_AABBS};
 use scenes::{
     CameraAttachment, CourtyardFlagsPose, CourtyardOutlineMode, CourtyardSettings,
-    CourtyardTimeOfDay,
+    CourtyardTimeOfDay, CourtyardZone,
 };
 use validation::diff::{RegionRect, RegionTolerance, diff_rgba8_region, evaluate_region};
 use validation::frame::{FrameEnvelope, frame_stats};
@@ -42,6 +42,10 @@ pub fn settings_from_spec(spec: &CaptureSpec) -> CourtyardSettings {
     let mut settings = CourtyardSettings::default();
     for (key, value) in &spec.parameters {
         match key.as_str() {
+            "zone" => {
+                settings.zone = CourtyardZone::from_id(value.as_str().expect("validated"))
+                    .expect("catalog validated zone id");
+            }
             "time_of_day" => {
                 settings.time_of_day = match value.as_str().expect("validated") {
                     "day" => CourtyardTimeOfDay::Day,
@@ -445,5 +449,44 @@ pub fn run_capture_specs(filter: &str) -> i32 {
         1
     } else {
         0
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    //! 捕获规格的 camera↔zone 一致性（v2 §9：一一对应，校验数据源是
+    //! metadata 的 `courtyard_zone_camera_preset`）。
+    use super::*;
+
+    #[test]
+    fn capture_specs_camera_matches_zone() {
+        for spec in courtyard_capture_specs() {
+            let zone = spec.parameters["zone"].as_str().expect("zone pin");
+            let expected = scenes::metadata::courtyard_zone_camera_preset(zone)
+                .expect("zone resolves to camera");
+            assert_eq!(
+                spec.camera, expected,
+                "{}: camera {} must match zone {} (expected {})",
+                spec.capture_id, spec.camera, zone, expected
+            );
+        }
+    }
+
+    #[test]
+    fn settings_from_spec_expands_zone_pin() {
+        let specs = courtyard_capture_specs();
+        let hybrid = specs
+            .iter()
+            .find(|spec| spec.capture_id == "courtyard-outline-hybrid")
+            .expect("hybrid");
+        let settings = settings_from_spec(hybrid);
+        assert_eq!(settings.zone, CourtyardZone::P3);
+        assert_eq!(settings.outline_mode, CourtyardOutlineMode::Hybrid);
+        let trio = specs
+            .iter()
+            .find(|spec| spec.capture_id == "courtyard-trio")
+            .expect("trio");
+        assert_eq!(settings_from_spec(trio).zone, CourtyardZone::Trio);
     }
 }

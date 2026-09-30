@@ -167,8 +167,15 @@ def execute(project, args):
         selected = select_gpu_suites(suites['gpu'], getattr(args, 'suite', None))
         partial = bool(getattr(args, 'suite', None))
         for binary, identities in selected.items():
+            # 套件键支持 `crate::binary`（如 scene-runtime::journal_evidence）——
+            # 证据测试不一定住在 stylized-integration-tests（2026-09-30 lane
+            # 覆盖缺口修正：scene-runtime 的 GPU 证据测试原结构性漏网）。
+            if '::' in binary:
+                crate, test_binary = binary.split('::', 1)
+            else:
+                crate, test_binary = 'stylized-integration-tests', binary
             states.append(run_tests(project, binary,
-                ['cargo','test','--locked','-p','stylized-integration-tests','--test',binary], identities, env))
+                ['cargo','test','--locked','-p',crate,'--test',test_binary], identities, env))
         from task_runner import aggregate
         totals = {key: sum(s[key] for s in states) for key in
                   ['expected','executed','passed','failed','blocked','not_executed']}

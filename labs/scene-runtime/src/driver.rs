@@ -128,7 +128,7 @@ pub struct CaseDriver {
     state: State,
     ids: DriverIds,
     ledger: SceneLedger,
-    baseline: HashSet<Entity>,
+    baseline: Option<HashSet<Entity>>,
     observation_target: Option<golden_harness::CaptureTarget>,
     observation_entity: Option<Entity>,
     camera_override: Option<CameraRecipe>,
@@ -146,9 +146,10 @@ pub struct CaseDriver {
 
 impl CaseDriver {
     /// 以场景绑定与动作图构造（构造即校验动作图；非法输入返回结构化
-    /// 错误而不是在执行中 panic）。`baseline` 之前的实体视为宿主所有。
+    /// 错误而不是在执行中 panic）。宿主实体基线不在构造时取——第一次
+    /// 构建前惰性快照（见字段注记），其前的实体视为宿主所有。
     pub fn new(
-        world: &World,
+        _world: &World,
         session: SessionId,
         scene: SceneBinding,
         actions: ActionGraph,
@@ -179,7 +180,13 @@ impl CaseDriver {
                 generation: Generation::new(0),
                 entities: HashSet::new(),
             },
-            baseline: SceneLedger::snapshot(world),
+            // 基线惰性快照：第一次构建时才取（世界已完全装配——交互宿主
+            // 的窗口/监视器实体、BRP 方法系统实体、egui 相机等都在
+            // CaseDriver::new 之后才出生）。在 new() 取基线会把这些宿主
+            // 基础设施误记进 gen0 账本，首次重建时整批退役（实测：交互
+            // 宿主切分区 → PrimaryMonitor 被退役 → OnMonitor 关系级联杀
+            // 主窗口；bevy_remote 系统实体被退役 → BRP 全灭）。
+            baseline: None,
             observation_target: None,
             observation_entity: None,
             camera_override: None,
@@ -293,10 +300,60 @@ impl CaseDriver {
         Ok(())
     }
 
+    /// Ad-hoc 观测入口（docs/showcase/06 §9，U3 的 `Capture` 命令语义）：
+    /// 交互会话内对当前观测相机内容发起一次读回——与动作图 `Observe` 同一
+    /// 读回通道（AwaitObservation 收集进 `observations()`，宿主逐帧 `update`
+    /// 泵送后取回执）。仅 `Done` 稳态可发起（观测相机已构建、无在途动作）；
+    /// 读回跨帧完成，本调用只发起。
+    pub fn observe_adhoc(&mut self, world: &mut World, observation: &str) -> Result<(), RuntimeError> {
+        if self.state != State::Done {
+            return Err(RuntimeError::Scene(
+                "ad-hoc observation is only legal from the Done state".into(),
+            ));
+        }
+        let pending = self.issue_observation(world, observation, &None);
+        self.pending = Some(pending);
+        self.state = State::AwaitObservation { waited: 0 };
+        Ok(())
+    }
+
+    /// 增量内容更新登记（docs/showcase/05 §11.2 W3：分区展品动态装卸）。
+    /// 调用方已完成世界内的装卸（scenes 增量函数），本入口：代次 +1、
+    /// 账本重登（在册 ∩ 存活 ∪ 新增——画框与观测相机常驻留在账本，
+    /// 退役展品出账）、替换构建/应用配方并把新配方落到观测相机（相机
+    /// 实体不重建，`apply_camera_recipe` 通道）。仅 `Done` 稳态可调用；
+    /// 状态机不回 Build（增量是同步操作，异步资产流入与既有语义相同）。
+    pub fn note_content_update(
+        &mut self,
+        world: &mut World,
+        recipe: CameraRecipe,
+    ) -> Result<(), RuntimeError> {
+        if self.state != State::Done {
+            return Err(RuntimeError::Scene(
+                "content update is only legal from the Done state".into(),
+            ));
+        }
+        self.ids.generation += 1;
+        let alive = SceneLedger::snapshot(world);
+        let baseline = self.baseline.clone().unwrap_or_default();
+        self.ledger = SceneLedger {
+            generation: Generation::new(self.ids.generation),
+            entities: self
+                .ledger
+                .entities
+                .intersection(&alive)
+                .copied()
+                .chain(alive.difference(&baseline).copied())
+                .collect(),
+        };
+        self.built_recipe = Some(recipe.clone());
+        self.apply_camera_recipe(world, &recipe)?;
+        Ok(())
+    }
+
     /// 从 `Done` 终态再执行一段动作序列（同一观测相机/同一代次内的
     /// 重复 settle→observe 周期）。动作图先校验，非法输入返回结构化错误。
-    pub fn run_actions(&mut self, actions: ActionGraph) -> Result<(), RuntimeError> {
-        if self.state != State::Done {
+    pub fn run_actions(&mut self, actions: ActionGraph) -> Result<(), RuntimeError> {        if self.state != State::Done {
             return Err(RuntimeError::Scene(
                 "run_actions is only legal from the Done state".into(),
             ));
@@ -458,13 +515,18 @@ impl CaseDriver {
         }
         // 构建器永远执行（内容装配）；相机配方覆盖只替换配方数据，
         // 不跳过内容构建（CaptureCycle 的 noop 绑定返回默认配方）。
+        // 基线在第一次构建前惰性快照（见 new() 的注记）——此刻世界已
+        // 完全装配，宿主基础设施全部在基线内。
+        let baseline = self
+            .baseline
+            .get_or_insert_with(|| SceneLedger::snapshot(world))
+            .clone();
         let built = (self.scene.build)(world);
         let recipe = self.camera_override.clone().unwrap_or(built);
         self.spawn_observation_camera(world, &recipe);
         self.built_recipe = Some(recipe.clone());
         self.applied_recipe = Some(recipe);
-        self.ledger =
-            SceneLedger::record(Generation::new(self.ids.generation), &self.baseline, world);
+        self.ledger = SceneLedger::record(Generation::new(self.ids.generation), &baseline, world);
         self.state = if self.limits.implicit_readiness {
             State::WaitReady { waited: 0 }
         } else {
@@ -703,6 +765,13 @@ impl CaseDriver {
             generation: Generation::new(self.ids.generation),
             entities: HashSet::new(),
         };
+        // 配方同属代次状态：不作废的话，switch 与下一次 update_build 之间
+        // 的相机状态同步会把**上一代**配方当新配方派生并标记为最新——
+        // 新代构建完成后也不再刷新（实测：交互宿主切分区后窗口相机永久
+        // 停在旧机位）。清空后同步窗口内 camera_view 返回 None（保持上一
+        // 机位数帧），新代构建完成即按新配方派生。
+        self.built_recipe = None;
+        self.applied_recipe = None;
         self.scene = scene;
         self.next_action = 0;
         self.state = State::Build;
@@ -716,7 +785,7 @@ impl CaseDriver {
 // ---------------------------------------------------------------------------
 
 /// 逻辑 ID → 运行时实体（scenes::SceneTarget 注册合同）。
-fn resolve_target(world: &mut World, target: &TargetRef) -> Result<Entity, RuntimeError> {
+pub(crate) fn resolve_target(world: &mut World, target: &TargetRef) -> Result<Entity, RuntimeError> {
     if target.scope == TargetScope::View {
         if target.id.as_str() != "main" {
             return Err(RuntimeError::Scene(format!(
@@ -752,7 +821,7 @@ fn finite_f32(value: &serde_json::Value, key: &str) -> Result<f32, RuntimeError>
     Ok(mapped)
 }
 
-fn apply_instance_params(
+pub(crate) fn apply_instance_params(
     world: &mut World,
     target: &TargetRef,
     params: &scenario_model::canon::ParameterMap,
@@ -847,7 +916,7 @@ fn apply_instance_params(
     Ok(())
 }
 
-fn apply_deform(
+pub(crate) fn apply_deform(
     world: &mut World,
     target: &TargetRef,
     channel: &str,

@@ -32,6 +32,12 @@ impl SceneLedger {
     /// despawn 会经 discard hook 报错——快照一律排除资源实体。场景构建器
     /// 不插入资源（内容资产经 `Assets<T>` 计数核对，见 [`SceneCounts`]）；
     /// driver 装配的探针资源（readiness Probe 等）属基础设施，跨场景保留。
+    ///
+    /// winit 窗口实体同样排除：交互宿主里窗口在 `app.run()` 启动时（driver
+    /// 基线快照之后）才创建，会被「after − baseline」误记进代次账本并在
+    /// 场景重建时退役（实测：参数驱动的重建把主窗口 Window 组件退役，
+    /// bevy_winit 判「无窗口」退出应用）。窗口是宿主基础设施，不是场景
+    /// 内容。
     #[must_use]
     pub fn snapshot(world: &World) -> HashSet<Entity> {
         let resource_entities: HashSet<Entity> = world
@@ -43,6 +49,13 @@ impl SceneLedger {
             .iter_entities()
             .map(|entity| entity.id())
             .filter(|entity| !resource_entities.contains(entity))
+            .filter(|entity| {
+                world
+                    .get_entity(*entity)
+                    .ok()
+                    .and_then(|entity_ref| entity_ref.get::<bevy::window::Window>())
+                    .is_none()
+            })
             .collect()
     }
 
@@ -125,5 +138,27 @@ impl SceneCounts {
             hero_materials: world.resource::<Assets<StylizedHeroMaterial>>().len(),
             outline_materials: world.resource::<Assets<StylizedOutlineMaterial>>().len(),
         }
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// winit 窗口实体不进入账本快照（宿主基础设施；交互宿主里窗口在
+    /// driver 基线之后创建，误记进代次会在场景重建时被退役——实测
+    /// 参数驱动重建退役主窗口 Window 组件，bevy_winit 判无窗口退出）。
+    #[test]
+    fn snapshot_excludes_window_entities() {
+        let mut world = World::new();
+        let window = world.spawn(bevy::window::Window::default()).id();
+        let plain = world.spawn_empty().id();
+        let snapshot = SceneLedger::snapshot(&world);
+        assert!(snapshot.contains(&plain));
+        assert!(
+            !snapshot.contains(&window),
+            "window entities are host infrastructure, never scene content"
+        );
     }
 }

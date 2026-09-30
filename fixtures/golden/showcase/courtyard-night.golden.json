@@ -1,0 +1,31 @@
+{
+  "reference_toolchain": "engine-golden-v1",
+  "blender": null,
+  "gacha_setup": "synthetic-fixtures",
+  "gacha_setup_commit": null,
+  "export_contract": "blender-gltf-npr-v1",
+  "profile_schema": "bevy_stylized.material/v1",
+  "fixture": "showcase/courtyard-night",
+  "renderer": "bevy-stylized-render-0.1.0",
+  "engine_git_commit": "4d3ce55398b789331f88e7c151dee6738174c538",
+  "engine_source_revision": null,
+  "gpu": "NVIDIA GeForce RTX 5090 (Vulkan)",
+  "driver": "NVIDIA 615.71.09",
+  "captured_unix_seconds": 1790751490,
+  "width": 512,
+  "height": 512,
+  "png_fnv1a64": "36c002df64a2e429",
+  "regions": [
+    {
+      "id": "lamps",
+      "rect": {
+        "x": 0,
+        "y": 253,
+        "width": 512,
+        "height": 138
+      },
+      "max_channel_delta": 2,
+      "max_fail_ratio": 0.005
+    }
+  ]
+}

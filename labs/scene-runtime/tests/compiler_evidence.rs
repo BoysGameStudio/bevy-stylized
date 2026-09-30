@@ -96,9 +96,9 @@ fn capture_run(recipe: &SceneRecipe) -> RunSpec {
     }
 }
 
-/// 编译的 courtyard 配方（panorama 相机/AA/暖场与 showcase 捕获 profile
-/// 等价）→ 与 courtyard-day golden 基线（canonical；本平台 overlay 优先）
-/// 逐字节一致。
+/// 编译的 courtyard 配方（center-trio 相机/AA/暖场与 showcase 捕获 profile
+/// 等价；默认参数 zone=trio）→ 与 courtyard-trio golden 基线（canonical；
+/// 本平台 overlay 优先）逐字节一致。
 #[test]
 #[ignore = "requires explicit GPU execution"]
 fn compiled_courtyard_recipe_matches_showcase_capture() {
@@ -125,7 +125,7 @@ fn compiled_courtyard_recipe_matches_showcase_capture() {
         std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures/golden/showcase")
             .as_path(),
-        "courtyard-day",
+        "courtyard-trio",
         &platform,
     );
     let baseline_bytes = std::fs::read(&paths.png).unwrap_or_else(|error| {
@@ -196,6 +196,11 @@ fn deform_strip_root_binds_logical_target() {
         let run = capture_run(recipe);
         let plan = compile(recipe, &run, None).expect("compile");
         let mut app = evidence_app(resources.clone());
+        // flags 展品只在 p5 档在场（分区激活，v2 起）。
+        app.world_mut().insert_resource(scenes::CourtyardSettings {
+            zone: scenes::CourtyardZone::P5,
+            ..scenes::CourtyardSettings::default()
+        });
         run_plan(&mut app, plan, 700)
     };
     let straight = capture_with(&resources, &recipe_for(0.0));

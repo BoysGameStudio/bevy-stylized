@@ -1,32 +1,37 @@
 # 庭院展台（Courtyard）单场景设计
 
-> **Status:** Implemented 2026-09-28（阶段 0–5 已落地，6–7 部分落地（详见 §12 状态列）；ADR-0031 决策记录，
-> Accepted 属 owner 决策。本文档为唯一设计依据；§12 阶段表逐项标注落地状态，
-> 与实现冲突处以代码与验收记录为准）
+> **Status:** 设计 v3 已落地（2026-09-30：owner 决策「在同一个位置根据
+> 不同的 preset 展示不同的内容」——展亭模式：全部内容以中央平台为唯一
+> 舞台，按 zone 档位轮换装卸；W1–W3 增量装卸机制承载。overview 浏览模式、
+> 展台环、minimap、场景内点击聚焦随 v3 退役）。v2（分区激活）与 v1
+> （同屏全景）的实现与基线是 dated 历史：各阶段落地记录保留在 §12
+> 状态列，验收保留在验收记录 dated 条目，均不改写。
+> ADR-0031 决策记录：**Accepted（2026-09-30 owner 拍板）**。
 >
-> 本文档替代 18 个平铺展示场景的组织方式：合成一个「庭院展台」场景，
-> 全部渲染特性作为分区同屏出现；golden 回归采用 ROI 分区双层判定
-> （方案 A），不承担整图精确判定。
->
-> **交接状态（2026-09-29）：** 阶段 0–5 全部落地、6–7 部分落地（§12 状态列），
-> cpu/gpu/docs/browser/android 五条 lane 全绿（明细见 §12 与验收记录），
-> 实现已提交等待 owner 验收。续作起点（按优先级）：
-> ① canonical 基线捕获——需 Linux/Vulkan 参考宿主，现任基线为 macos-metal 与
-> android-vulkan overlay（§12 阶段 3，BLOCKED 记录在案）；
-> ② browser 交互 V2（驻留会话 + HTML 参数面板，§11.5/§12 阶段 6）；
-> ③ Android 交互 V3（手势分解 + 参数面板 + 应用内桥接，§12 阶段 7）。
-> 待 owner 拍板项：ADR-0031 转 Accepted；browser outline-hybrid 的 Dawn/naga
-> 分歧是否放宽判定（§12 阶段 4）；夜景曝光偏亮是否修正（§5 夜景段末）。
+> **交接状态（2026-09-30，v3 已落地）：** 展亭模式全链完成——内容全部
+> 上中央平台（lod 轴向视线递退、lamps 灯环不变）、机位表 9 台（panorama
+> 退役）、catalog zone 枚举去 overview、keymap 去 Tab（`previous_zone`
+> 记忆机制同退）、导览脚本 9 站收尾回 trio、minimap/pick 模块删除、
+> canonical 基线 12/12 重捕验收（逐张亲验，见验收记录 v3 条目）、
+> cpu/gpu/docs 三 lane 绿。增量装卸（W1–W3）与 UI（U1–U3）在 v3 下
+> 语义不变。v2/v1 为 dated 历史。
+> 续作起点（按优先级）：① browser/android v3 overlay 重播种 + lane 复跑
+> （macOS 侧，coverage 两列 Pending 待此）；② browser 交互 V2 / Android
+> 交互 V3（v1 §12 阶段 6/7，未批准不动工）。
+> 待 owner 确认项：交互输入链路的物理确认（窗口已开，←/→ 内容循环、
+> ↑/↓ 时刻、G 导览、C 捕获、H 演示、鼠标手势）。夜景曝光已修正
+> （2026-09-30，§5 夜景段末）；ADR-0031 已 Accepted（2026-09-30）。
 
 ## 0. 决策记录（已拍板）
 
 | 决策点 | 结论 |
 |---|---|
 | 场景数量 | 1 个合成场景 `courtyard`，退役现有 18 个展示场景 |
-| 回归结构 | 方案 A：全景宽松整图判定 + 分区 ROI 精确判定（Unreal local/global 模式） |
+| 显示模式（**v2，2026-09-29 owner 拍板**；**v3 修正 2026-09-30**） | **内容档轮换**：每次只展示当前内容档的展品（画框常驻）；v2 的分区激活演进为 v3 展亭模式（同一平台轮换装卸）；overview 同屏浏览随 v3 退役（同位必穿模），浏览全部内容归导览模式（G） |
+| 回归结构（**v2 修正**） | 分区激活后每帧单一主体：整图精确判定为主力（行业规范形态），ROI 双层判定机制保留在 harness（夜景灯阵等暗部场景继续使用）；v1 的「全景宽松 + 分区 ROI」随 v1 矩阵退役 |
 | 中央展示体 | 判定特写用球（基线纯净）；角色台放 reference GLB 做真实效果展示（混合方案） |
-| S4 资产门控 | GLB 打包进所有 lane，成为庭院必需依赖；缺席 = BLOCKED，不做空台降级 |
-| 默认状态 | day + hull 描边 + crowd=100 + post off + flags rest |
+| S4 资产门控 | GLB 打包进所有 lane；v2 起依赖面收窄——只有 stage 分区捕获在资产缺席时 BLOCKED，其余分区捕获不依赖 GLB（v1 的「缺席=整场景 BLOCKED」随全景退役解除） |
+| 默认状态 | **v2：zone=trio** + day + hull 描边 + crowd=100 + post off + flags rest |
 
 ## 1. 调研依据（2026-09-28 调研，关键来源）
 
@@ -38,7 +43,14 @@
 
 ## 2. 概念与构图手法
 
-环形展示庭院：中央角色材质三对照组（主角），周围展台环各演示一个特性（细节），中轴线引向远景 LOD 轴与实例灯阵（氛围与规模）。防杂乱手法：
+环形展示庭院（v3 展亭化）：中央平台是唯一舞台——角色材质三对照组
+（主角）与各特性内容档（细节）在同一位置轮换展示；远景 LOD 轴与实例
+灯阵保持空间特性（氛围与规模）。v1/v2 的「周围展台环各演示一个特性」
+随 v3 退役（展台环移除，内容全部上平台）。
+
+**内容档轮换（v3，2026-09-30 owner 拍板；v2 分区激活的演进）**：庭院的组织是一个场景，呈现是一个展台——每个视图只展示当前内容档的展品（中央平台同一位置轮换装卸）；画框（大地面、广场铺装、环形矮墙、中央平台、基座）常驻。overview 同屏浏览随 v3 退役（同位必穿模；浏览归导览模式 G）。v2 记录的红利：v1 记录在案的三类跨区污染——hybrid 屏幕空间描边的背景灯球/墙沿噪声、panorama 下 lamps ROI 全域交叠、灯阵雾效对远景判定的穿透（v1 隔离承诺边界，修正史见 §9 v1 注记）——随背景简化结构性消除。
+
+防杂乱手法（v1 为全景构图所立；v2 下第 3 条退为布局理由而非同屏构图约束）：
 
 1. **同几何、变材质**——材质对照统一用球，差异只来自材质（shaderball 方法论）；
 2. **统一展台形制**——展台同一尺寸同一中性灰，是画框不是展品；
@@ -47,37 +59,45 @@
 
 ## 3. 布局
 
-坐标系：Y 向上，默认相机在南（+Z）望北（−Z）。单位：米。
+坐标系：Y 向上；展亭机位族在南（+Z）望北（−Z）。单位：米。
+
+**v3（2026-09-30 owner 决策，展亭模式）**：全部展品内容以中央平台为唯一
+舞台，按 zone 档位轮换装卸（同一位置，不同 preset 不同内容）；v2 的
+展台环与分区摆位退役。布局图只余画框与环境：
 
 ```
                  北 (−Z)
        · · · 实例灯阵（北半环 r8.5–11，纵深 ≤38m）· · ·
-                 [LOD₄ r6.21  d=60]
-               [LOD₃ r3.51  d=34]
-   [P5 旗帜]      [角色台 (0,0,−8)]       [P1 ramp]
-  [P4 光照对照]    [LOD₂ r1.71 d=16.5]   [P2 描边hull]
-        [P3 描边hybrid]  [中央平台·三对照组]  [LOD₁ r0.67 d=6.5]
+          [LOD₄ r6.4 d≈62]   [LOD₃ r3.8 d≈36]
+              [LOD₂ r1.7 d≈16.6]
+                [中央平台·唯一舞台（内容轮换）]
+              [LOD₁ r0.75 d≈7.3]（平台西南前景）
                矮墙 r13（南留门）
-              默认相机 (0, 3.4, 16.0)
+            hero 机位族（南望北；lamps/lod 各有取景机位）
                  南 (+Z)
 ```
 
-| 元素 | 位置 | 尺寸 |
-|---|---|---|
-| 大地面 | 原点中心 | 半径 60 圆盘，深灰，接收阴影 |
-| 广场铺装 | 原点中心 | 半径 12 圆盘，抬高 0.02，浅灰（描边可读底） |
-| 环形矮墙 | 半径 13 | 高 1.2、厚 0.4，四段弧墙，南留门 |
-| 中央平台 | 原点 | 半径 2.2、高 0.3 圆台 |
-| 展台环 | 半径 5.5，60° 均布 6 座 | 0.8×0.8×1.0 方柱，顶面 y=1.0 |
-| 角色台 | (0, 0, −8) | 半径 1.5、高 0.5 圆台（资产门控区） |
-| LOD 轴 | 见 §6 验证坐标表 | 四球递退 |
-| 实例灯阵 | 北半环 r8.5–11 网格 | 灯柱 + 灯球，密度参数控制 |
+| 元素 | 位置 | 尺寸 | v3 语义 |
+|---|---|---|---|
+| 大地面 | 原点中心 | 半径 60 圆盘，深灰，接收阴影 | 常驻（环境壳） |
+| 广场铺装 | 原点中心 | 半径 12 圆盘，抬高 0.02，浅灰（描边可读底） | 常驻 |
+| 环形矮墙 | 半径 13 | 高 1.2、厚 0.4，四段弧墙，南留门 | 常驻 |
+| 中央平台 | 原点 | 半径 2.2、高 0.3 圆台 | 常驻（**唯一舞台**） |
+| LOD 轴 | 平台西南起向北递退（微偏西，避开灯柱列） | 四球递退 | **lod 档展品** |
+| 实例灯阵 | 北半环 r8.5–11 网格 | 灯柱 + 灯球，密度参数控制 | **lamps 档展品** |
 
-**已验证的相机约束**（2026-09-28 本地计算）：golden 捕获 512×512 为 1:1 画幅，垂直 fov 45° 时水平视角同为 45°。eye=(0, 3.4, 16.0)、look=(0, 1.3, −2) 时展台环全部入镜（侧台边缘 21.95°，半角 22.5°，裕量约 0.5°；实施时若需更稳取 z=17–18）。更早的 eye z=11.5 方案在 1:1 下侧台出画、P2 被裁，已废弃。
+**已验证的相机约束**（v1 panorama 取景证据，随 panorama 退役仅作 dated
+历史保留）：golden 捕获 512×512 为 1:1 画幅，垂直 fov 45° 时水平视角同
+为 45°；v1 eye=(0, 3.4, 16.0) 全景方案的侧台边缘裕量约 0.5°。v3 起
+全景机位退役，本段数值不再构成合同。
 
 ## 4. 分区详设
 
-每区标注：内容 → 演示特性 → 回收的旧场景。
+每区标注：内容 → 演示特性 → 回收的旧场景。**v3 语义（2026-09-30）**：
+「分区」= 展台内容档位——所有内容的展品部分都生成在**中央平台**上
+（lod 轴向视线递退、lamps 灯环除外，二者是空间特性展品）；各小节标题
+中的方位坐标是 v1/v2 的 dated 摆位记录（不改写），当前坐标单一源是
+`labs/scenes/src/metadata.rs`（AABB 表）与 builder 代码。
 
 ### 中央平台：三对照组（球，判定用）
 
@@ -117,6 +137,32 @@
 
 两根旗杆（高 2.6）挂双骨骼蒙皮条带旗面；姿态参数 rest / posed（root 旋转 0.5 rad，确定性定姿态）。→ 回收 animation。
 
+### rim · 边缘光对照（V4，2026-09-30 调研收编）
+
+3 球横排（Cel，底色压暗）：rim off / 白 rim 强 / 暖色 rim 弱。→ 收编
+`StylizedCelParams::with_rim`（此前只有 golden_cel 测试覆盖，展台无）。
+
+### shadow · 阴影形状对照（V4）
+
+3 球横排（Cel）：默认（0.5/0.1/0.3）/ 硬高阈（0.7/0.02/0.15）/ 软低下限
+（0.35/0.3/0.45）。→ 收编 `with_shadow`（展台此前只用默认阴影形状）。
+
+### palette · 四色调色板对照（V4）
+
+3 球横排（Character）：默认灰阴影 / 暖阴影（夕照）/ 冷阴影（蓝紫）。→
+收编 `with_palette`（soft/sharp × lit/shadow 串联相乘，此前零展示）。
+
+### metal · 金属三色 + spec ramp（V4）
+
+3 球横排（Hero）：无 matcap 平色 / matcap 银灰 / matcap + 金属三色调
+（dark/light/shadow）+ spec ramp 强。→ 收编 `StylizedMetalParams` +
+`with_spec_ramp_intensity`（trio 此前只演示 matcap off/on）。
+
+### cutout · alpha 镂空（V4）
+
+双竖卡（Cel + 程序化棋盘格 alpha 纹理 + cutoff 0.5 + double_sided）。→
+收编 `with_alpha_cutoff`（此前只有 masked_outline 测试覆盖）。
+
 ### P6 · LOD 轴（见 §6）
 
 → 回收 lod。展台环第 6 座（东北，(2.75, 0, −4.76)）按统一形制建成、暂无展品——「展台是画框不是展品」；LOD 轴的 mid 球从该座与 P1 之间的空档穿出。
@@ -127,7 +173,9 @@
 
 **NPR 化（2026-09-28 决策落地）**：角色经 NPR adoption 渲染而非 vanilla `StandardMaterial`——`WorldAssetRoot` 挂 `StylizedMaterialSet`（四个 FixtureMat* 按 glTF 材质名映射到 Character class 描述符，`base_color_factor` 取 GLB 内联 baseColorFactor，double_sided 按 GLB 声明，纹理表为空）；材质集数据归 builder（`labs/scenes/src/builders.rs::courtyard_reference_stage`），adoption 系统（`StylizedAssetIntegrationPlugin`）归各宿主插件装配（showcase headless/interactive、browser-showcase、android-smoke、scene-runtime 证据 App）。动因：vanilla PBR 在 Dawn/Metal 下渲染纯黑（host 限定上游差异，docs/platforms/SUPPORT_MATRIX.md 2026-09-28 条目），且 vanilla 路径本就不满足「真实 NPR 效果展示」意图。labs/reference 的六视角验收合同与 labs/reference 的编译角色管线不受影响（两者是独立合同）。
 
-**S4 决策（2026-09-28 拍板）：GLB 打包进所有 lane。** reference-scene 资产成为庭院的必需依赖，browser lane 走 HTTP asset source、android lane 打包进 APK assets（实施前置项，见 §12 阶段 0）。资产缺席时整个场景构建失败（BLOCKED），不做空台降级（遵循「必需资产缺席是 BLOCKED 不是 PASS」）；该 lane 的庭院捕获整体标记 BLOCKED 而非跳过通过。已知代价：资产管线未就绪的 lane 在窗口期内无庭院覆盖——这是打包完成前的显式状态，不是静默缺口。
+**S4 决策（2026-09-28 拍板）：GLB 打包进所有 lane。** reference-scene 资产经 HTTP asset source（browser）/ APK assets（android）随包分发（实施前置项，见 §12 阶段 0）。**v2 依赖面收窄（2026-09-29）**：分区激活后只有 stage 分区加载角色——`courtyard-stage` 捕获在资产缺席时 BLOCKED（不做空台降级，遵循「必需资产缺席是 BLOCKED 不是 PASS」）；其余分区捕获不依赖 GLB，v1 的「资产缺席 = 整场景捕获 BLOCKED」窗口期代价随之解除。
+
+**角色台展品参数化（2026-09-29 owner 决策落地）**：新增 `stage_character` 参数（§8）。`fixture`（默认）= 上述合成 reference-scene 角色——golden 判定与证据测试内容**不变**（基线零变动、lane 资产面不变）；`odette` = 真 Genshin 角色（genshin-odette compiled static-v3，`assets/local/genshin-odette/compiled/static-v3`），经宿主注册的 `odette://` 资产源 + `.npr.json` sidecar 资产（`StylizedSidecarAsset`/`StylizedSidecarSource`，integration 插件统一注册，浏览器/APK 同源可加载）走同一 adoption 链路——**交互展示档，不进 golden**（第三方美术基线不可提交：ADR-0017 政策；golden-local 拆分已退役，不复活）。odette 资产缺席 = 加载失败并在 stderr 可见，不做空台降级；browser/android 宿主不注册 odette 源（维持 fixture）。
 
 ### 实例灯阵（北半环背景，密度参数）
 
@@ -172,11 +220,11 @@ view 参数（vignette 0.5 + chromatic 0.004 + display transform），整帧开�
 
 （雾范围数值为 PC-5 实机捕获迭代锁定：初版直接沿用旧场景的 day 14–80 导致展台环以远全部洗白，2026-09-28 第二轮捕获验收修正。）
 
-已验证的夜景修正项：雾是逐片元效果、不染天空，天空色由 zenith_tint 单独写清屏色（`crates/bevy-stylized-render/src/view.rs:258-260`）；现有 night preset 雾色与 zenith 不同色，远景消隐方向与天幕有可见色差——**实施时统一为同一色系后锁定基线**。夜景 non-black 契约安全（zenith 保底 + 灯阵 emission，全图均值远超阈值 1.0）。夜景下 LOD 远球没入雾中（fog end=48 < d=60.6）属预期，LOD ROI 判定只挂 day 机位。PC-5 验证另确认：夜景地面/展台整体曝光偏亮（共享夜景色板的既有行为），与色系统一一并留阶段 3 基线锁定时处理。
+已验证的夜景修正项：雾是逐片元效果、不染天空，天空色由 zenith_tint 单独写清屏色（`crates/bevy-stylized-render/src/view.rs:258-260`）；现有 night preset 雾色与 zenith 不同色，远景消隐方向与天幕有可见色差——**实施时统一为同一色系后锁定基线**。夜景 non-black 契约安全（zenith 保底 + 灯阵 emission，全图均值远超阈值 1.0）。夜景下 LOD 远球没入雾中（fog end=48 < d=60.6）属预期，lod 捕获钉 day 不受影响。~~夜景地面/展台曝光偏亮~~ **已修正（2026-09-30 owner 拍板）**：根因 = 夜景只降 ambient、key light 仍全白（view.rs：illuminance 固定 1.0、光强由颜色携带），地面读到 ~83% 日间亮度；修正 = `courtyard_night` 的 key_light_color 调暗偏冷（0.22/0.26/0.42），地面落 ~46% 日间亮度（前景 luma 196.6→109.0），灯阵成画面主光源；courtyard-night/stress 两条基线随修正重捕（隔离上下文）。
 
 ## 6. LOD 轴验证坐标
 
-阈值实测 mid=10 / far=25 / very_far=50（`crates/bevy-stylized-core/src/lod.rs:32-40`），距离 = 球心到相机眼点的欧氏长度。相对默认相机 eye=(0, 3.4, 16.0) 的合法坐标（四带各中、离带边界 ≥20% 余量、球随距离放大保持角直径 ≈11.8°）。**下表坐标由 PC-2 实施时重解并锁定**（原表反推自已废弃的 eye z=11.5 方案，near 球实距 10.6m 会落入 mid 带；且原 mid 坐标 (2.2,−4.76) 与东北展台冲突）：
+阈值实测 mid=10 / far=25 / very_far=50（`crates/bevy-stylized-core/src/lod.rs:32-40`），距离 = 球心到相机眼点的欧氏长度。相对 panorama 机位 eye=(0, 3.4, 16.0) 解出的合法坐标（四带各中、离带边界 ≥20% 余量、球随距离放大保持角直径 ≈11.8°）。**下表坐标由 PC-2 实施时重解并锁定**（原表反推自已废弃的 eye z=11.5 方案，near 球实距 10.6m 会落入 mid 带；且原 mid 坐标 (2.2,−4.76) 与东北展台冲突）：
 
 | 带 | 球心 (x, y, z) | 半径 | 实际距离 | 余量 |
 |---|---|---|---|---|
@@ -189,26 +237,43 @@ view 参数（vignette 0.5 + chromatic 0.004 + display transform），整帧开�
 
 ## 7. 相机机位
 
+**v3：机位与内容一一对应**——内容同在中央平台（展亭模式），机位是每
+内容的取景机位（摄影师换位、展品不动）：平台内容共用南望北的 hero
+机位族，lamps 用灯环广角机位，lod 用侧斜视沿轴机位。panorama 随
+overview 退役。机位经捕获检视锁定（v3 实捕验证，见验收记录 v3 条目）。
+
 | 机位 | eye | look | 用途 |
 |---|---|---|---|
-| panorama（默认） | (0, 3.4, 16.0) | (0, 1.3, −2) | 全景：对照组 + 展台环 + LOD 轴 + 灯阵一框读完 |
-| center-trio | **(3.5, 4.0, 4.0)** | **(0, 1.25, −0.2)** | 三对照组特写：face/hair/metal 精确判定（P3 实捕验证锁定：3/4 高位斜视角使 7 球三排分离可读） |
-| outline | (4.2, 1.8, 6.8) | (2.75, 1.4, 4.76) | P2 描边判定（只覆盖 P2——P3 不在画框内是初版设计疏漏，P3 由 outline-west 覆盖） |
-| outline-west | (−4.2, 1.8, 6.8) | (−2.75, 1.4, 4.76) | P3 hybrid 判定（outline 的镜像，P3 方块堆为主体；PC-5 捕获检视修正） |
-| lod-side | **(70, 7, −8)** | **(−4.6, 2.5, −17.3)** | 侧视 LOD 轴（P3 实捕验证锁定：东侧远观，四球档位带 ≥16px 边距并排可读；初版 eye (7,3,−10) 只拍到最近一颗球） |
-| flags | **(0, 2.4, −0.4)** | **(−2.75, 2.0, −4.76)** | 蒙皮旗面姿态判定（P3 实捕验证锁定；原 eye (−4.6,2.0,−1.6) 与西移后的 mid LOD 球冲突——eye 位于球体内，整帧被球面占据） |
+| center-trio（默认） | (3.2, 3.4, 5.2) | (0, 1.2, 0) | 三对照组判定（斜上角读三排纵深） |
+| ramp | (0, 1.7, 5.2) | (0, 1.28, 0) | p1 ramp 判定（正对横排 4 球） |
+| outline | (0, 1.7, 5.4) | (0, 1.35, 0) | p2 描边判定（正对读 0/2/8 宽度梯度） |
+| outline-west | (0, 1.3, 3.4) | (0, 0.65, 0) | p3 hybrid 判定（方块堆矮小，取景收紧） |
+| lighting | (0, 1.8, 5.6) | (0, 1.35, 0) | p4 光照对照判定 |
+| flags | (0, 2.8, 7.0) | (0, 1.9, 0) | 蒙皮旗面姿态判定（条带高，取景偏高） |
+| stage | (0, 2.0, 6.2) | (0, 1.45, 0) | 角色台 NPR 角色判定（全身入镜） |
+| lod-side | (1.8, 2.4, 7.5) | (−2.2, 2.2, −20) | 侧斜视 LOD 轴（正对轴向会球体相叠） |
+| lamps | (0, 2.6, 10) | (0, 1.8, −10) | 灯阵夜景判定（北望灯环） |
+| rim | (0, 1.8, 5.4) | (0, 1.35, 0) | rim 边缘光对照（V4） |
+| shadow | (0, 1.8, 5.4) | (0, 1.35, 0) | 阴影形状对照（V4） |
+| palette | (0, 1.8, 5.4) | (0, 1.35, 0) | 四色 palette 对照（V4） |
+| metal | (0, 1.8, 5.4) | (0, 1.35, 0) | 金属三色 + spec ramp（V4） |
+| cutout | (0, 1.8, 4.6) | (0, 1.3, 0) | alpha 镂空卡片（V4，稍近读剪影） |
 
-机位数据单一源是 `labs/scenes/src/metadata.rs` 的 `COURTYARD_CAMERA_PRESETS`（6 个 preset，panorama 居首；←/→ 交互循环与捕获规格引用同表）。
+机位数据单一源是 `labs/scenes/src/metadata.rs` 的 `COURTYARD_CAMERA_PRESETS`
+（v3 为 9 个 preset、v4 增 5 台共 14，center-trio 居首为默认；←/→ 交互
+循环与捕获规格引用同表）。
 
 ## 8. 参数面
 
 | 参数 | 取值 | 作用域 |
 |---|---|---|
+| **zone** | trio / p1 / p2 / p3 / p4 / p5 / lod / stage / lamps / rim / shadow / palette / metal / cutout | **展台内容档**（v3：内容在中央平台轮换装卸 + 机位联动；overview 随 v3 退役；v4 增 5 个 cel 特性档） |
 | time_of_day | day / dusk / night | view preset |
 | outline_mode | off / hull / hybrid | P2/P3 内容 + 相机附件（hybrid 需 Standard） |
-| crowd | 0 / 100 / 1000 | 灯阵密度 |
+| crowd | 0 / 100 / 1000 | 灯阵密度（只影响 lamps 分区展品） |
 | post | off / on | 相机附件 |
 | flags | rest / posed | 蒙皮姿态 |
+| **stage_character（2026-09-29 新增）** | fixture / odette | 角色台展品（内容重建语义；fixture=golden 判定内容，odette=真 Genshin 角色交互展示档，见 §4 角色台段） |
 | face_threshold | 0.0–1.0 / null | 中央前排 face 组 SDF 阈值（沿用现有参数 schema 机制） |
 
 > 实施前置项（M1，**已落地**）：`ParameterKind::Enum(Vec<String>)` 变体已随
@@ -219,102 +284,112 @@ view 参数（vignette 0.5 + chromatic 0.004 + display transform），整帧开�
 > schema：face 组实例 `trio.face.0..2`、灯阵 `lamps`、旗帜 `flags.*`、
 > 视图作用域 `main`；命名在代次内唯一（合同同 SceneTarget 既有约定）。
 
-## 9. 回归结构（方案 A：ROI 分区双层判定）
+## 9. 回归结构（v3：一帧一主体，整图精确为主；ROI 机制保留）
 
-**原则**：一次渲染，多层判定。整图只抓整体崩坏；精确判定按分区 ROI 独立断言，故障隔离粒度 = 特性级。同一捕获的 tier/参数差异走多基线分桶（Gold「multiple approved images」/ Unreal「Add As Alternative」模式），不放宽容差。
+**原则（v3）**：展亭模式下每条捕获的画面只含当前内容档展品 + 画框
+（地面/铺装/矮墙/平台）——**一帧一主体**，整图精确判定成为主力，即
+Unity「一场景一用例一基线」在单场景内的等效形态。宽松整图 + ROI 双层
+判定机制**保留在 harness**（夜景灯阵等暗部场景继续使用）；tier/参数
+差异仍走多基线分桶。v1 的「全景宽松 + 分区 ROI」与 v2 的「分区隔离」
+随展亭模式演进为「档位轮换」（dated 历史不改写）。
 
-### 捕获矩阵（10 个捕获）
+### 捕获矩阵（v4，17 个捕获）
 
-| 捕获 | 机位 × 参数 | 判定 |
+| 捕获 | zone／机位 × 参数 | 判定 |
 |---|---|---|
-| courtyard-day | panorama, day, hull, crowd=100, post=off, flags=rest | 整图宽松 + ROI：对照组 / P1 / P4（见下注） |
-| courtyard-dusk | panorama, dusk | 整图宽松（时刻覆盖） |
-| courtyard-night | panorama, night, crowd=100 | 整图宽松 + ROI：灯阵 emission |
-| courtyard-trio | center-trio, day | 整图精确（等效旧 face/hair/metal 基线，含全部 off/on 与阈值状态） |
-| courtyard-outline-hull | outline, hull | 整图精确 |
-| courtyard-outline-hybrid | outline-west, hybrid（Standard 桶） | 整图宽松 + ROI：p3 精确（见下注；tier 门控捕获） |
-| courtyard-lod | lod-side, day | 整图精确（LOD 分带） |
-| courtyard-post | panorama, day, post=on | 整图精确（对抗性检视 S1：post 必须有独立基线） |
-| courtyard-flags | flags, day, flags=posed | 整图精确（对抗性检视 S2：posed 姿态覆盖） |
-| courtyard-stress | panorama, night, crowd=1000 | 整图宽松 + non-black；性能证据走 performance lane |
+| courtyard-trio | trio／center-trio，day | 整图精确（等效旧 face/hair/metal 基线，含全部 off/on 与阈值状态） |
+| courtyard-ramp | p1／ramp，day | 整图精确（**v2 新增**：v1 由 day 全景 ROI 覆盖） |
+| courtyard-outline-hull | p2／outline，day，hull | 整图精确 |
+| courtyard-outline-hybrid | p3／outline-west，day，hybrid（**Standard 桶**） | 整图精确（v2 目标：噪声源结构性消除，实施时按本节噪声口径验证；若 host 噪声复现则回退整图宽松 + p3 ROI，机制保留） |
+| courtyard-lighting | p4／lighting，day | 整图精确（**v2 新增**：v1 由 day 全景 ROI 覆盖；key light ±Z 显式对照回到像素级，v1 的显式→隐式降级恢复） |
+| courtyard-flags | p5／flags，day，flags=posed | 整图精确 |
+| courtyard-stage | stage／stage，day | 整图精确（**v2 新增**：v1 角色仅全景隐式覆盖；资产门控捕获——GLB 缺席 = 本捕获 BLOCKED） |
+| courtyard-lod | lod／lod-side，day | 整图精确（LOD 分带；far 带起特性降级——matcap 等 hero extras 随 `StylizedLodPolicy` 削落，近球亮面/远球哑光的对比即可读证据） |
+| courtyard-dusk | p4／lighting，dusk | 整图宽松（时刻覆盖；光照对照区同时是色板探针） |
+| courtyard-night | lamps／lamps，night，crowd=100 | 整图宽松 + ROI：lamps（emission 判定；夜景暗部沿用 L2 区域阈值口径） |
+| courtyard-post | trio／center-trio，day，post=on | 整图精确（对抗性检视 S1 结论沿用：post 必须有独立基线） |
+| courtyard-stress | lamps／lamps，night，crowd=1000 | 整图宽松 + non-black；性能证据走 performance lane |
+| courtyard-rim | rim／rim，day | 整图精确（V4 新增：rim off/白强/暖弱对照） |
+| courtyard-shadow | shadow／shadow，day | 整图精确（V4 新增：阴影形状三档） |
+| courtyard-palette | palette／palette，day | 整图精确（V4 新增：四色 palette 三档） |
+| courtyard-metal | metal／metal，day | 整图精确（V4 新增：平色/matcap/金属+spec ramp 递进） |
+| courtyard-cutout | cutout／cutout，day | 整图精确（V4 新增：alpha 镂空剪影） |
 
-outline_mode=off 无独立捕获（L1）：hull 宽度 0 的球在 P2 内部分覆盖该状态，如实记录为部分覆盖。
+outline_mode=off 无独立捕获（L1 沿用）：hull 宽度 0 的球在 P2 内部分覆盖该状态，如实记录为部分覆盖。crowd=0 无独立捕获（lamps 区空阵不是演示状态）。v1 的 courtyard-day（全景默认态）随全景退役——day 默认态的像素覆盖由 trio/ramp/lighting 等 day 钉值捕获分担，无覆盖丢失。
 
-单附件槽约束（实现备注）：`CameraRecipe` 只有一个附件槽，post 与 hybrid 不同时组合（本矩阵本就无此组合）；运行时同时请求时 hybrid 优先（ScreenOutline 先于 PostProcess），已在 builder 注释记录。
+单附件槽约束（实现备注，沿用）：`CameraRecipe` 只有一个附件槽，post 与 hybrid 不同时组合（v2 矩阵仍无此组合）；运行时同时请求时 hybrid 优先（ScreenOutline 先于 PostProcess），已在 builder 注释记录。
 
-### 捕获规格（capture spec）schema
+### 捕获规格（capture spec）schema（v2 增 zone 钉值）
 
 每条捕获是一份数据记录——suites.json、lane 控制文件（`catalog-scene.txt` 的后继）、golden 目录三方都靠它寻址。**捕获 ID 只允许 `-`**（`_`↔`-` 派生约定：browser/android lane 从 `showcase_golden_<id 下划线形>` 测试名反解捕获 ID，见 §10 迁移清单）：
 
 ```
-capture_id    捕获身份（如 courtyard-day；对应测试名 showcase_golden_courtyard_day）
-camera        §7 机位 id（panorama / center-trio / outline / outline-west / lod-side / flags）
-parameters    §8 参数集的完整钉值（未钉参数取默认状态 §0；摄入时展开，无运行时隐式默认）
+capture_id    捕获身份（如 courtyard-trio；对应测试名 showcase_golden_courtyard_trio）
+camera        §7 机位 id（14 个 preset；v2 起 camera 与 zone 一一对应，校验一致性）
+parameters    §8 参数集的完整钉值（v2 起含 zone 键；未钉参数取默认状态 §0；摄入时展开，无运行时隐式默认）
 tier          tier 桶（缺省 Portable；Standard 桶只用于 courtyard-outline-hybrid）
 judgment      whole_frame_loose | whole_frame_strict | { rois: [区域 id, ...] }
 ```
 
-10 条捕获规格是 §9 矩阵的机读形式；规格是纯数据，新增捕获不改 harness 代码。
+17 条捕获规格是 §9 矩阵的机读形式（v3 12 条 + v4 新增 5 条 cel 特性档）；规格是纯数据，新增捕获不改 harness 代码。
 
-### golden.json 的 regions 扩展（schema 形状）
+### golden.json 的 regions 扩展（schema 形状，沿用）
 
 ```jsonc
 {
-  "fixture": "showcase/courtyard-day",   // 现有字段不变
+  "fixture": "showcase/courtyard-night", // 现有字段不变
   "png_fnv1a64": "…", "width": 512, "height": 512,
-  "regions": [                            // 新增（additive）
-    { "id": "trio", "rect": {"x": 0, "y": 0, "width": 0, "height": 0},
+  "regions": [                            // additive 扩展；v2 起主要由夜景 lamps 使用
+    { "id": "lamps", "rect": {"x": 0, "y": 0, "width": 0, "height": 0},
       "max_channel_delta": 0, "max_fail_ratio": 0.0 }
   ]
 }
 ```
 
-`rect` 由分区 AABB 投影自动计算（非手工标定）；`max_channel_delta` / `max_fail_ratio` 在首次基线验收时锁定并写入 acceptance 记录。缺省（无 regions 字段）= 整图判定，与现状兼容。
+`rect` 由分区 AABB 投影自动计算（非手工标定）；`max_channel_delta` / `max_fail_ratio` 在基线验收时锁定并写入 acceptance 记录。缺省（无 regions 字段）= 整图判定，与现状兼容。
 
-### ROI 判定规格
+### ROI 判定规格（机制保留；v2 矩阵以整图精确为主）
 
-- ROI **不手工标定**（M2 修正）：从分区 3D AABB 经捕获相机投影自动计算屏幕矩形，捕获时写入 golden.json 的 `regions` 扩展字段（additive 扩展；现有 golden.json 只有 fixture/hash/尺寸）；harness 断言同一捕获内 ROI 两两不重叠，防止跨区污染判定归属；
-- ROI 内精确判定：per-pixel 每通道阈值 + 失败像素比双层门限（Babylon.js/Unity 模式），**阈值按区域分别锁定**（L2：夜景暗部相对噪声更高，不能全局一把尺），具体数值在首次基线验收时写入 acceptance 记录；
+- ROI **不手工标定**（M2）：从分区 3D AABB 经捕获相机投影自动计算屏幕矩形，捕获时写入 golden.json 的 `regions` 扩展字段；harness 断言同一捕获内 ROI 两两不重叠，防止跨区污染判定归属；
+- ROI 内精确判定：per-pixel 每通道阈值 + 失败像素比双层门限（Babylon.js/Unity 模式），**阈值按区域分别锁定**（L2：夜景暗部相对噪声更高，不能全局一把尺），具体数值在基线验收时写入 acceptance 记录；
 - 整图宽松判定：non-black + 全图 luma/chroma 统计包络（抓全黑、整体色差、大面积缺失）；
 - 噪声源固定：AA 档位、曝光锁定（Unreal「Disable Noisy Rendering Features」对应做法）；个别持续 noisy 的区域才评估引入 FLIP（`pip install flip-evaluator`），不全局放宽；
-- **布局即合同（修正版）**：ROI 定义跟随分区几何自动更新，无需手工重标定；布局变更使基线像素失效，走显式 GOLDEN_REBASELINE。布局冻结前先以临时基线跑通 ROI 机制，正式验收在布局冻结后进行（L3）。
-
-**day 全景 ROI 集修正（P2 实施，2026-09-28，投影证据）**：§9 原列的 6 区在 panorama 机位下不可能两两不重叠——lamps 整环 AABB 投影覆盖全宽并与所有区交叠；p5↔trio 有 1.7px 细缝交叠；p2↔p1 有 30×9px 交叠。故 day 集收敛为 [trio, p1, p4]（投影矩形 (158,238,196×96)/(410,253,102×65)/(0,248,103×70)，两两零交叠，已固化为 harness 锚点测试）；被移出的三区由专属精确捕获覆盖（courtyard-night 的 lamps、courtyard-flags 的 p5、courtyard-outline-hull 的 p2），判定覆盖无丢失。
+- **布局即合同**：ROI 定义跟随分区几何自动更新；布局变更使基线像素失效，走显式 GOLDEN_REBASELINE。
 
 ### 分区 AABB 表（ROI 投影的数据源）
 
-单一源是 `labs/scenes/src/metadata.rs` 的 `COURTYARD_REGION_AABBS`：trio / p1 / p2 / p3 / p4 / p5 / lamps / stage 共 8 区（p3 含 hull 外扩；stage 的 y 上界 2.5m 是角色高度的保守估计）。新增分区 = 加 AABB 数据 + 捕获规格引用，不改 harness 代码。
+单一源是 `labs/scenes/src/metadata.rs` 的 `COURTYARD_REGION_AABBS`：trio / p1 / p2 / p3 / p4 / p5 / lamps / stage 共 8 区（v3 重写为平台摆位；stage 的 y 上界是角色高度的保守估计）。v3 的 zone 集合 = 这 8 区 + lod（lod 判定走整图，无 ROI 需求）。新增内容档 = 加 AABB 数据 + 捕获规格引用，不改 harness 代码。
 
-**hybrid 判定模式修正（P3 验收，2026-09-28）**：hybrid 在 Standard 桶下整图 strict 判定暴露真实噪声——背景灯球/墙沿剪影处逐运行 2–4px 边缘翻转（crowd=0 对照捕获逐字节稳定，确认噪声源是屏幕空间边缘检测对背景深度次序的敏感性，非 P3 主体）。按「个别持续 noisy 区域不全局放宽」原则，hybrid 判定改为整图宽松 + p3 ROI 精确（p3 ROI 逐字节一致）。
+### 噪声与播种口径（v2 修正）
 
-**实施陷阱（捕获管线教训）**：蒙皮网格离原点部署时必须覆盖剔除 Aabb 并挂 `NoAutoAabb`——旗面条带的剔除 Aabb 按 bind 姿态（原点）计算，关节移到展台后非原点机位下被视锥剔除；且 `calculate_bounds` 的 `AssetChanged<Mesh3d>` 路径会在网格资产事件后重算覆盖手工 Aabb。回归测试：`flag_strips_carry_overridden_culling_aabb`（scenes）。
+- **screen-outline 剪影噪声（v1 记录在案的两类）来源消除**：v1 实测 hybrid 背景灯球/墙沿剪影处逐运行 2–4px 边缘翻转（host 深度次序竞争）、Dawn(Tint) vs wgpu/Metal(naga) 2488px 系统性边缘分歧——两者的共同前提是**背景里存在无关分区的内容**。v2 分区激活后 hybrid 视图背景只剩环境壳，噪声前提结构性消除。**实施口径**：courtyard-outline-hybrid 以整图精确捕获，逐运行逐字节稳定即锁定 strict；若 host 噪声在纯净背景下仍复现，回退整图宽松 + p3 ROI（判定模式数据随捕获规格，lane 工具按 sidecar regions 自动选择模式的既有链路不变），证据写入验收记录。v1 的「hybrid 一律宽松+ROI」口径随之作废（它是全景背景的应对，不是描边本体的性质）。同族噪声的重配置证据（`labs/scene-runtime` reconfiguration_evidence）以 ≤16 差异像素包络断言，不受影响。
+- **overlay 播种的 regions 携带**（沿用）：平台 overlay 播种（GOLDEN_REBASELINE）写出 sidecar 时，regions 从既有 overlay sidecar 携带——分区 AABB × 捕获机位投影是平台无关的规格数据，不因平台重算；阈值继承首锁值，跨平台容差分歧走既有 overlay 评审流程，不放宽容差。
 
-### 噪声与播种口径（2026-09-28 验收后锁定）
+### 隔离承诺（v2 修正版）
 
-- **screen-outline 剪影噪声的判定口径**：screen-space 描边在背景灯球/墙沿剪影处存在逐运行 2–4 像素边缘翻转（host 噪声，深度次序竞争经屏幕空间边缘检测放大；Dawn(Tint) 与 wgpu/Metal(naga) 之间另有系统性边缘分歧——2026-09-28 browser lane 实测 2488 edge 像素，与 2026-09-23 记录的 Metal screen-outline 平台差异同类）。**hybrid 相关像素判定一律走「整图宽松 + ROI 精确」与噪声包络，不走整图 strict**——判定模式数据随捕获规格（`courtyard-outline-hybrid` = whole_frame_loose + rois[p3]），lane 工具（`tools/checks/browser.py`、`android_catalog.py`）按 sidecar regions 自动选择判定模式。同族噪声的重配置证据（`labs/scene-runtime` reconfiguration_evidence）以 ≤16 差异像素包络断言。
-- **overlay 播种的 regions 携带**：平台 overlay 播种（GOLDEN_REBASELINE）写出 sidecar 时，regions 从既有 overlay sidecar 携带——分区 AABB × 捕获机位投影是**平台无关的规格数据**（矩形在 PC 播种时已由 harness 锚点测试锁定），不因平台重算；阈值继承首锁值（max_channel_delta=2、max_fail_ratio=0.005），跨平台容差分歧走既有 overlay 评审流程，不放宽容差。
+分区激活后跨区穿透大幅消解：每帧只有聚焦分区展品 + 环境壳，影子/雾/光向的跨区污染面只剩环境壳（展台影子落在地面属帧内内容）。残余的全局因素是**视图层**（时刻色板、雾、曝光）——它同时影响所有捕获。故障定位语义简化为：单捕获红 = 该分区特性疑似；多捕获同红 = 优先怀疑视图层/光照/共享材质。v1 M3 记录的 lighting 显式→隐式降级由 courtyard-lighting 恢复为像素级显式对照。
 
-### 隔离承诺的边界（如实声明，M3）
+### 成本表述（诚实版，v2 修正）
 
-ROI 隔离只对**材质/内容局部变化**成立。阴影、雾、全局光向等**跨区效果**穿透 ROI 边界（旗杆影子可落入展台 ROI，光向变化使所有 ROI 同时变化）。旧 `lighting` 场景的侧向 key light 显式对照在庭院里降级为**隐式覆盖**（全场球面都是 NdotL 探针 + 整图宽松判定）——这是相对旧体系的一个真实覆盖性质变化，记录在案。因此故障定位语义是：ROI 红 = 该区域特性疑似；多 ROI 同红 + 整图红 = 优先怀疑跨区因素（光照/雾/视图层）。
+v2 矩阵 12 捕获（v1 为 10）：新增 ramp/lighting/stage 三条专属精确捕获；courtyard-day（全景默认态）一条退役；dusk/night/stress 三条由 panorama 改挂分区机位（lighting/lamps/lamps）。单帧负载下降（无全景大构图；stress 仍含 crowd=1000 灯阵）。「一帧多判」回到「一帧一判」——失去的是编排节省，换回的是与行业规范同形态的判定隔离（ADR Context 的行业证据在 v2 下不再是张力而是依据）；组织/浏览收益由导览模式（G）承接（v3 起 overview opt-in 退役）。
 
-### 成本表述（诚实版，M4）
+### v1 注记（历史，不改写）
 
-本方案的收益在**组织、浏览与概念层级**，不在渲染成本：18 个微场景（每场 3–4 球）单次渲染成本极低，庭院 10 条捕获含 crowd=1000 夜景等重负载，总 GPU 时间未必低于旧体系。「一次渲染多处判定」省的是**场景切换与进程编排**，不是像素吞吐。
+v1 矩阵与判定模式的完整修正史——day 全景 ROI 集投影收敛 [trio,p1,p4]、outline-west 机位增设、hybrid 判定模式 strict→宽松+p3 ROI、蒙皮旗面剔除 Aabb + `NoAutoAabb` 陷阱（回归测试 `flag_strips_carry_overridden_culling_aabb`，v2 flags 分区同一机制继续适用）——记录在验收记录 dated 条目（`fixtures/golden/showcase.courtyard.acceptance.md`）。
 
 ## 10. 旧场景退役映射
 
 | 旧场景 | 去向 | 旧场景 | 去向 |
 |---|---|---|---|
-| overview | 中央三对照组 | performance | crowd=100 + 中央对照组 |
+| overview | 中央三对照组 | performance | crowd 参数 + lamps 分区（v1 曾记为 crowd=100 + 中央对照组） |
 | ramp | P1 | outline-advanced | P3（Standard 桶） |
-| lighting | 时刻参数 + P4 + 全场隐式 NdotL 覆盖（显式→隐式降级，见 §9 隔离承诺边界） | lod | LOD 轴 |
+| lighting | 时刻参数 + P4 专属精确捕获（v1 曾降级为全场隐式 NdotL 覆盖；v2 恢复像素级显式对照，§9 v2 矩阵 courtyard-lighting） | lod | LOD 轴 |
 | face / hair / metal | 中央三对照组（保留全部 off/on 与阈值状态） | environment ×3 | time_of_day |
 | outline | P2 | effects | P4 |
-| animation | P5 旗帜 + courtyard-flags 捕获（posed） | reference | 角色台（GLB 展示，全 lane 打包；S4 决策 2026-09-28） |
+| animation | P5 旗帜 + courtyard-flags 捕获（posed） | reference | 角色台（GLB 展示，全 lane 打包；S4 决策 2026-09-28；v2 起专属 courtyard-stage 捕获） |
 | post | courtyard-post 捕获（post=on 独立基线） | stress | courtyard-stress 捕获 |
 
-18 条旧基线（`fixtures/golden/showcase/*.png`）随旧场景退役删除，由 10 个捕获的基线集替代；重捕走 GOLDEN_REBASELINE（需 GPU，缺席记 BLOCKED）；dated 验收记录（`*.acceptance.md`、SUPPORT_MATRIX）按惯例保留不改写，新验收记录追加。
+18 条旧基线（`fixtures/golden/showcase/*.png`）随旧场景退役删除，由 10 个捕获的基线集替代（v1；**v2 起再由 12 捕获矩阵替代**，§12 v2 阶段）；重捕走 GOLDEN_REBASELINE（需 GPU，缺席记 BLOCKED）；dated 验收记录（`*.acceptance.md`、SUPPORT_MATRIX）按惯例保留不改写，新验收记录追加。
 
 退役时的线协议迁移清单（M5，易被低估，单列）：`tests/suites.json` 的 18 条 `showcase_golden_*` 身份 → 10 条捕获身份；`tools/checks/browser.py` 与 `tools/checks/android_catalog.py` 的 `showcase_golden_*` 派生逻辑同步；android `catalog-scene.txt` 控制文件的语义从「场景名」改为「捕获规格」（§9 schema）；`coverage.rs` 场景行改按捕获/分区组织；`tests/integration/tests/showcase_golden.rs` 的 18 个 `scene_case!` 重写；`README.md:20` 的 `-- overview` 示例更新；`CONTRIBUTING.md` 的 lane 描述同步；`docs/showcase/01` §380-409 的 12 族收敛表标注「由本文档（05）取代」。
 
@@ -336,7 +411,7 @@ ROI 隔离只对**材质/内容局部变化**成立。阴影、雾、全局光�
 | `SetCameraAttachment(...)` | 插入/移除/替换相机附件（post、ScreenOutline） | 由 outline_mode / post 参数驱动，与机位正交；与上一条共用 driver 的相机重建入口 |
 | `CameraOrbit { yaw, pitch }` / `CameraPan { dx, dy }` / `CameraZoom { factor }` / `ResetView` | 自由相机 | 在当前机位上偏移；产生新 revision（01:429）；reset 回到当前 preset 的配方机位 |
 | `SetParameter(key, value)` | 改 §8 参数 | 逐参数语义见 §11.2 |
-| `Capture` | 捕获当前画面 | 走现有捕获路径（严格捕获仍用固定像素 target，与交互画面解耦）；交互模式下落盘到会话 run 输出目录（与 lane 捕获同一合同），文件名带捕获规格与时刻戳 |
+| `Capture` | 捕获当前画面 | 走现有捕获路径（严格捕获仍用固定像素 target，与交互画面解耦）；交互模式下落盘到会话 run 输出目录（与 lane 捕获同一合同），文件名带捕获规格与时刻戳。**交互观察通道设计锁定（06 §9，2026-09-30 owner 接受）**：`Capture` 为 SessionCommand 变体 + driver 新增 observe 入口；交互捕获不参与 golden 判定，toast 文案明示「浏览快照，非判定证据」；实现归 U3 分期 |
 
 ### 11.2 参数的运行时语义分层
 
@@ -349,17 +424,37 @@ ROI 隔离只对**材质/内容局部变化**成立。阴影、雾、全局光�
 | outline_mode | **内容 + 附件换**：P2/P3 状态 + ScreenOutline 附件 | hybrid 需 Standard tier；不足时按既有 RefusalReason 结构化拒绝（UI 置灰 + 原因），可触发 ADR-0030 会话内升档 |
 | crowd | **内容重建**：retire 当前代次 + 重建灯阵 | 走 driver 既有 switch 路径（同场景内重建，generation+1） |
 
+> **W1–W3 已落地（2026-09-30，owner 需求「场景内容动态加载」，方案 A：
+> 增量装卸 + 本表 live 路径）**：post/outline_mode = 相机附件 live 换
+> （不重建、不换代次）；flags = live Deform（rotation_z 绝对设定；展品
+> 不在场时只写设置、下次激活生效）；face_threshold = live ApplyParams
+> （三落点同写——与重建语义同义，null 回 0.2/默认/0.8 梯度）；
+> zone/stage_character/crowd = 分区展品**增量装卸**（`CourtyardBuckets`
+> 分桶登记 + `courtyard_update` 按 settings diff 装卸 + driver
+> `note_content_update` 换代次重登账本）——画框（地面/墙/展台/平台）与
+> 观测相机实体跨代常驻，zone 切换先装后卸（补间落定才退役旧区展品，
+> 06 §8 美术检视），代次 +1 与 `Switched` 语义不变。等价性证据：
+> 增量巡场（zone 循环 + lamps 桶重装 + live 参数混合）后捕获与全新构建
+> **逐字节一致**（`incremental_zone_walk_preserves_capture_identity`，
+> GPU）——该证据揪出并修复一处 ulp 级相机姿态缺陷（W1 附件切换一度用
+> orbit 姿态往返重建的呈现姿态，偏离配方机位末位字节致 2px 差；改取
+> driver 应用配方的精确值）。
+
 ### 11.3 相机统一与分区聚焦
 
 - **修正历史遗留**：窗口相机改为使用场景返回的 CameraRecipe（01:416-417「窗口和离屏不能另补不同机位」），交互画面与捕获画面同源；
-- orbit/pan/zoom 共享实现：把 Inspector 的 `OrbitCamera`（yaw/pitch/distance，米制，distance>0.001、pitch±1.5 rad 校验）模式上移为共享层能力，Inspector 与庭院共用；
-- **分区聚焦**：点击/触摸展台 → 射线命中分区 → 跳对应特写机位（§7）；中央对照组 → center-trio，P2/P3 → outline，LOD 球 → lod-side，旗帜 → flags，其他 → panorama。前置缺口（A4）：共享层无 mesh 射线检测能力，需引入 bevy_picking 或手写 ray-primitive 命中（分区都是球/盒，手写成本可控）；V1 键位表不依赖本条；
+- orbit/pan/zoom 共享实现：把 Inspector 的 `OrbitCamera`（yaw/pitch/distance，米制，distance>0.001、pitch±1.5 rad 校验）模式上移为共享层能力，Inspector 与庭院共用（**设计锁定**：06 §5——手势翻译层与键位翻译层同构、合成输入事件单测；2026-09-30 owner 接受 06；**已在 U1 落地**：庭院侧经 `mousemap` 翻译层发相机命令，控制器 CameraState 即共享 orbit 模型，Inspector 数据结构不动，见 §12 U1 行）；
+- **分区聚焦（v2 语义扩展；v3 起点击聚焦退役）**：切内容档 =
+  `SetParameter(zone, …)` 装卸该档展品（§4）+ 跳对应机位（§7 一一对应）。
+  v2 的「点击/触摸展台 → 射线命中分区」（06 §5/§16 D2 手写 ray-primitive）
+  曾在 U2 落地，**v3 退役**——同一位置下点展品 = 已是当前内容，无导航
+  意义（pick/minimap 模块随之删除，不留死代码）；
 
 ### 11.4 UI 从目录派生
 
 参数 schema（§8，含 M1 的枚举扩展）即控件元数据：`Enum` → 分段按钮/下拉、`F32/OptionalF32` → 滑杆、`Bool` → 开关。控件声明只有这一份；tier 门控参数在能力不足时置灰并显示结构化原因。01:443 的「相同控件元数据用于所有布局」由此落实——三平台布局不同，语义与校验同源。
 
-**最小切片已落地（阶段 7，2026-09-28）**：PC 交互窗口的 egui 叠加层——左下常驻状态条（机位/时刻/outline 分段/post/crowd/flags）、分区图例（9 区，默认展开）、键位帮助（默认折叠）——以静态声明数据实现（tier 门控呈现已生效：hybrid 不足 Standard 时置灰并带原因）。**未落地**：schema 驱动的控件生成（参数面板从 catalog 参数 schema 自动装配分段按钮/滑杆/开关）、跨平台共享控件元数据——维持后续阶段。
+**最小切片已落地（阶段 7，2026-09-28）**：PC 交互窗口的 egui 叠加层——左下常驻状态条（机位/时刻/outline 分段/post/crowd/flags）、分区图例（9 区，默认展开）、键位帮助（默认折叠）——以静态声明数据实现（tier 门控呈现已生效：hybrid 不足 Standard 时置灰并带原因）。**未落地**：schema 驱动的控件生成（参数面板从 catalog 参数 schema 自动装配分段按钮/滑杆/开关）、跨平台共享控件元数据——**设计锁定（06 §6，2026-09-30 owner 接受）**：右侧抽屉 + 控件从 catalog ParameterKind 自动生成（含 U32 步进滑杆 + presets 芯片、OptionalF32 「自动」勾选；分组 Scene/Rendering/Content 进 catalog 元数据），实现归 U2 分期。
 
 ### 11.5 平台适配矩阵
 
@@ -377,13 +472,18 @@ ROI 隔离只对**材质/内容局部变化**成立。阴影、雾、全局光�
 
 | 键 | 命令 |
 |---|---|
-| ← / → | 机位 preset 循环（panorama → center-trio → outline → lod-side → flags） |
+| ← / → | **内容档循环**：trio → p1 → p2 → p3 → p4 → p5 → lod → stage → lamps（机位随内容联动，§7；v1 的「机位循环」语义由内容循环吸收） |
 | ↑ / ↓ | time_of_day 循环（day → dusk → night） |
 | O / P | outline_mode / post 切换（tier 不足时 stderr 打结构化拒绝） |
 | 1 / 2 / 3 | crowd = 0 / 100 / 1000（按数量序助记） |
 | Space | flags rest/posed |
+| N | stage_character fixture/odette 翻转（2026-09-29 新增；odette 档需宿主 odette:// 资产源，不影响判定内容） |
 | R | ResetView |
-| C | Capture（捕获当前画面） |
+| C | Capture（浏览快照，非判定证据；U3 落地） |
+| G | 导览模式（脚本化巡场，任意导航输入退出；U3 落地） |
+| H | 演示模式（隐藏全部 UI，Esc/H 退出；U1 落地） |
+
+（v2 的 Tab overview 开关随 v3 退役——同屏全显与展亭模式互斥。）
 
 浏览器与 Android 在 V1 不接交互（浏览器保持一次性捕获、Android 保持 catalog 模式），交互分期见 §12。
 
@@ -398,7 +498,7 @@ ROI 隔离只对**材质/内容局部变化**成立。阴影、雾、全局光�
 | 0 | 前置项：catalog `ParameterKind` 枚举扩展（M1）；GLB 打包进 browser/android 资产管线（S4）；`SessionCommand` 扩展 + driver 相机配方/附件构建后替换 API（§11.1）；共享 orbit 相机（§11.3） | cpu lane 全绿 + 新单测 | **已落地**（M1 Enum 变体在 PC-1 前置落地；S4 打包 browser 阶段 5 / android 阶段 6 验证；命令层 PC-3、相机统一 PC-4） |
 | 1 | 场景构建：courtyard builder（分区 × 参数） | cpu lane + 布局/LOD 落带断言（沿用 metadata.rs 余量测试套路） | **已落地**（PC-2；§0 默认状态 = CourtyardSettings::Default） |
 | 2 | ROI 判定扩展：golden.json regions + AABB 投影 + 不重叠断言 + labs/validation 区域 diff | cpu lane + harness 单测 | **已落地**（捕获规格 10 条 + golden.json regions + 区域 diff/整图包络；day ROI 集按投影证据收敛 [trio,p1,p4]） |
-| 3 | 基线捕获与验收：10 捕获（GPU，GOLDEN_REBASELINE；布局冻结前先跑临时基线，L3） | gpu lane + acceptance 记录；GPU 缺席 = BLOCKED | **已落地**（macos-metal overlay 10/10 验收 + 两轮捕获修正/美术迭代 + outline-west/hybrid 判定修正；canonical 基线未建 = BLOCKED 记录在案） |
+| 3 | 基线捕获与验收：10 捕获（GPU，GOLDEN_REBASELINE；布局冻结前先跑临时基线，L3） | gpu lane + acceptance 记录；GPU 缺席 = BLOCKED | **已落地**（macos-metal overlay 10/10 验收 + 两轮捕获修正/美术迭代 + outline-west/hybrid 判定修正；**canonical 基线已建**——2026-09-29 linux-vulkan 参考宿主 10/10 捕获验收，overlays 降为平台层，验收记录同日条目） |
 | 4 | 旧场景退役：§10 迁移清单全量同步 | cpu + gpu + browser + android 四条 lane 全绿 | **已落地**（catalog=1、绑定=1、suites.json 18→10、cpu/gpu lane 全绿；browser 9/10 exact + outline-hybrid 平台分歧记录在案；android 10/10 PASS 模拟器） |
 | 5 | 交互 V1：PC 键位表 + 窗口相机统一（§11.6、§11.3 第一条） | cpu lane + 交互冒烟 | **已落地**（PC-4 键位翻译层 + 窗口相机统一；P7 egui 叠加层最小切片——状态条/图例/键位帮助 + tier 置灰；C=Capture 维持暂缓；窗口冒烟待用户验证） |
 | 6 | 交互 V2：browser 驻留会话 + HTML 参数面板（URL 捕获规格扩展在阶段 4 已落地） | browser-showcase lane + 手动验证 | **部分落地**（`?spec=` 捕获规格合同 + browser lane 判定链已落地并实跑；驻留会话 + HTML 参数面板未做） |
@@ -407,12 +507,37 @@ ROI 隔离只对**材质/内容局部变化**成立。阴影、雾、全局光�
 
 阶段 1–4 交付「可捕获、可判定、可退役」的庭院；阶段 5–7 交付交互。**捕获与 lane 迁移不依赖交互层**——交互只是同一命令集的另一个驱动源。
 
+### v2 阶段（2026-09-29 owner 决策改版：分区激活，不同屏全显）
+
+上表 v1 各阶段的落地记录保留为历史（dated 验收记录不改写）；v1 的基线集
+（canonical + macos-metal/android-vulkan overlay）与全景判定模式随 v1 矩阵
+在 V2-3 退役重捕。窗口冒烟另修复交互路径三缺陷（窗口相机 Tonemapping、
+egui 叠加相机清屏配置、PrimaryEguiContext 挂载，2026-09-29），
+阶段 5 的「窗口冒烟待用户验证」在 V2-1 一并复验。
+
+| 阶段 | 内容 | 验收门槛 | 状态（2026-09-29） |
+|---|---|---|---|
+| V2-0 | 设计改版：本文档 v2 + ADR-0031 修正（Context/Decision/Consequences）+ TRACEABILITY R-031 同步 | docs lane | **已落地** |
+| V2-1 | 分区激活实现：`zone` 参数进 catalog schema（枚举含 overview）；builder 按激活分区生成展品（环境壳/画框常驻；lamps/stage/lod 展品条件生成）；机位表 6→10（ramp/lighting/stage/lamps 新增，panorama 归 overview，新机位实捕验证锁定）；键位 ←/→ 分区循环 + Tab overview；阶段 5 窗口冒烟复验 | cpu lane + 激活/机位断言（沿用 metadata 断言套路）+ 窗口冒烟 | **已落地**（CourtyardZone + zone 钉值全链（catalog/controller/capture-spec/keymap）；builder 条件生成 + overview 全量；机位 10 preset + zone↔机位映射断言；窗口冒烟经 BRP（bevy-copilot，127.0.0.1:15702 + 自定义方法 `showcase/session_command`，与键位同一 SessionCommand 通道）端到端驱动验证：trio→p2→overview→trio 切换中应用/窗口/egui/BRP 全程存活、窗口相机随分区联动、分区内容计数与画面截图逐项正确。**冒烟揪出并修复两个运行时缺陷**：① 场景账本基线钉在 `CaseDriver::new`，其后出生的宿主实体（PrimaryMonitor——OnMonitor 关系级联杀主窗口、bevy_remote 系统实体、egui 相机）被误退役——改首次构建前惰性快照（`labs/scene-runtime/src/driver.rs`）；② `built_recipe`/`applied_recipe` 不随代次作废，同步窗口内把上一代配方当新配方派生，窗口相机永久锁死——改 switch_scene 清空。两缺陷各有回归测试。物理按键链路待用户确认——Wayland 合成输入不可注入，翻译层有单测） |
+| V2-2 | 捕获矩阵 v2：capture_spec.rs 改 12 条（zone 钉值 + camera↔zone 一致性校验）；suites.json / 集成测试 / lane 派生逻辑同步（§10 迁移清单同一机制）；hybrid 纯净背景 strict 验证（噪声复现则回退 loose+p3 ROI 并记录） | cpu lane + harness 单测 | **已落地**（12 规格 + camera↔zone 一致性测试；suites.json 12 身份；showcase_golden.rs 12 用例；lane 工具经 suites.json 派生无需硬编码同步；coverage.rs v2 真实状态——browser/android 证据不随帧变更继承回落 Pending；**hybrid strict 验证通过**：纯净背景逐字节稳定，未动用回退预案，Dawn/naga 放宽议题作废——browser v2 复跑时按纯净背景重估） |
+| V2-3 | v2 基线捕获与验收：12 捕获 GOLDEN_REBASELINE（本机 canonical）；v1 基线集退役删除；验收记录追加 dated 条目 | gpu lane + acceptance 记录；GPU 缺席 = BLOCKED | **已落地**（12/12 PASS：strict 9 条（含 hybrid）逐字节 + night loose+lamps ROI + dusk/stress loose；v1 基线集已删；亲眼看图 12/12（分区隔离成立、新机位取景锁定）；验收记录 v2 条目） |
+| V2-4 | lanes 全绿：cpu / gpu / docs；browser/android 的 v2 overlay 重播种与 lane 复跑归各自主 host（macOS 侧后续工作，模拟器证据不构成真机声明的口径沿用） | cpu + gpu + docs lane 绿 | **本机三 lane 全绿**（gpu 全量含 showcase_golden 12/12、cpu、docs，退出码 0）；browser/android v2 重播种待 macOS 侧 |
+| V2-5 | 角色台展品参数（2026-09-29 owner 需求：庭院里看到真角色）：`stage_character`（fixture 默认 / odette）全链（catalog schema/controller/keymap N 键/builder 分支）；`.npr.json` sidecar 资产化（`StylizedSidecarAsset` + 加载器 + `StylizedSidecarSource` apply 系统 + `param_overrides` 宿主订正通道，归 `StylizedAssetIntegrationPlugin` 统一注册，三宿主零装配变更）；纹理前缀支持 `source://` 限定；交互宿主注册 odette:// 资产源（目录缺席不注册 + stderr 明示）；**golden/证据内容不动**（fixture 档，基线零变动，ADR-0017 第三方美术不提交基线） | cpu lane + 单测（catalog 校验/controller 重建/keymap 翻译/sidecar apply+override/纹理路径）+ gpu lane 零基线变动复跑 + 窗口冒烟（BRP 切 odette + 截图亲验） | **已落地**（单测全绿；cpu/gpu/docs 三 lane 退出码 0——**gpu 12/12 未重捕**，实证 golden 内容零变动；窗口冒烟 BRP 驱动 fixture↔odette 往返 + stage 截图亲验：odette 全身 NPR 渲染正确。**冒烟揪出并修复面部黑脸**：static-v3 静态烘焙导出 Face 网格节点恒等（顶点已最终朝向），sidecar 的 face 基向量是 Blender 原作者空间 (0,−1,0)，直接代入整面背光——经 param_overrides 覆盖 face_forward/up 为世界朝向 + effect_light_dir 正面来光（只动 Face 材质，全局 view 光照口径不变）。物理 N 键链路同 V2-1 物理按键待确认项） |
+| U1 | 交互层一期（06 §13，owner 2026-09-30 接受 06 并批准动工）：toast 堆叠（右下，确认 2s 消退/拒绝琥珀色驻留，键位/鼠标/BRP 三驱动源共用）；Tab 上一分区记忆（keymap `overview_return` 参数 + 宿主会话记忆）；鼠标手势（新 `mousemap` 翻译层与 keymap 同构——左拖 orbit/右拖 pan/滚轮 zoom/双击 reset，Inspector 同手感常量，点击/拖拽位移阈值判定，EguiWantsInput 指针门控）；机位补间（控制器相机状态内 0.4s ease-in-out 球面插值，默认关——捕获/冒烟零行为变化，交互窗口默认开，`--no-camera-transition` 钉关；补间不进 journal/不产生 revision）；H 演示模式（隐藏全部 egui UI，Esc/H 退出，宿主本地状态）；状态条 building 指示（DriverStatus::Running 驱动） | cpu lane + 手势/翻译/补间单测（合成输入 + 显式 dt 推进）+ 窗口冒烟（BRP 驱动 + 亲眼看图）+ owner 物理鼠标确认 | **已落地**（单测全绿：keymap 5 + mousemap 7 + controller 补间 4（起跳无瞬跳/半途同源/终点落定/默认关闭/抢占/重建起跳）；cpu lane 退出码 0；窗口冒烟 BRP 驱动 + 截图亲验：切分区补间中间态与落定态逐帧正确、toast 确认/拒绝/驻留语义逐项可见。冒烟揪出并修复：BRP 路径绕过 desktop_tick 命令循环不落 toast——命令结果收敛到共用 helper，三驱动源同源。building 指示在本机重建过快（亚秒级）未捕到可见帧，代码路径有 controller 测试覆盖，如实记录。物理鼠标/H 键链路同 V2-1 物理按键待确认项——翻译层合成事件单测覆盖，winit 物理链路待 owner 确认） |
+| U2 | 空间导航与参数面板（06 §13）：分区 dock（底部 9 分区芯片 + overview 开关，06 §3 Legend 退役、说明文案下移为芯片 tooltip；点击 = `SetParameter(zone)`，与 ←/→ 完全同命令）；minimap（右上，egui Painter 自绘俯视：点状分区取 `COURTYARD_REGION_AABBS` 中心投影、lamps 画北半环弧（不取 AABB 中心）、LOD 轴四球折线（出界径向截断 + 箭头）、当前机位视锥楔形（与状态条同源缓存）；激活高亮/overview 全亮；图形命中 = 点半径/弧带/线段距离阈值，不做像素级精确）；场景内点击聚焦（builder 随展品注册命中图元 `CourtyardHitMap`——球/圆柱/盒展品本体，不是分区 AABB（lamps AABB 覆盖北半场会误触发）；lamps 逐灯柱实例、stage 命中台基座/角色、画框展台常驻注册供跨分区导航；宿主用窗口相机 `viewport_to_world` 射线，未命中/同分区不动作）；schema 驱动参数抽屉（catalog `ParameterKind` → 控件选型单一源（`param_panel::widget_kind`：Enum ≤4 分段/>4 下拉、U32 步进滑杆（拖拽结束才提交——crowd 是内容重建语义）、Bool 开关、OptionalF32 滑杆+自动勾选）；catalog schema 增可选 `ui` 元数据（ParameterUiMeta：分组 Scene/Rendering/Content + crowd presets 芯片 [0/100/1000]，全域 0..=1000 仍合法）；tier 置灰经控制器 `evaluate` 同一判定 + 结构化原因 tooltip；Legend 退役） | cpu lane + schema 控件单测 + 射线命中断言 + 窗口冒烟 | **已落地**（2026-09-30：catalog 分组/presets 断言；pick 求交 4 单测（球/盒/圆柱/最近序）+ builder 注册命中断言（默认 13 条 = 画框 6 + trio 7、overview 236 条、lamps 逐灯命中、未命中不动作）；minimap 投影往返/点/弧/轴命中 4 单测；控件选型 + 取值映射 2 单测；cpu + gpu lane 退出码 0（**golden 12/12 未重捕**，命中表是纯资源注册、像素零变动）；窗口冒烟 BRP 驱动 + 截图亲验：dock/minimap/参数抽屉渲染正确，BRP 切 stage+odette 后 dock 芯片/minimap 激活点/机位楔形/抽屉下拉与分段/状态条五处联动一致，tier Portable 下 hybrid 置灰生效。场景内点击的 winit 物理指针链路同 V2-1 物理按键待确认项——射线拾取与命中注册有单测/断言覆盖，待 owner 物理确认） |
+| U3 | 演示与捕获（06 §13）：导览模式（G 开关，宿主本地状态；脚本 = 数据 `tour::COURTYARD_TOUR`（9 分区循环序 ×4s + overview 收尾 6s 后结束），driver 落定时才推进驻留计时（构建耗时不吃驻留预算），任意导航输入退出，每条驻留命令照常走 SessionCommand 通道）；宿主 journal 接线（desktop_tick 命令循环与 BRP 入口同换 `command_recorded`——键位/鼠标/UI 队列/BRP 四驱动源同通道，会话级 `CommandJournal` 驻留内存）；`SessionCommand::Capture`（06 §9 落地：evaluate 仅在 driver Done 稳态受理（构建在途/失败 = DriverBusy 结构化拒绝），执行 = driver 新 `observe_adhoc` 入口（与动作图 Observe 同一读回通道，读回跨帧完成、发起即 Applied）；回执由宿主落盘 `target/stylized/showcase/interactive/`（gitignored，文件名带观测名/代次/实验 tick/时刻戳）+ toast 显示路径并明示「browsing snapshot, not golden evidence」；**不参与 golden 判定**；C 键 + 抽屉按钮 + BRP 同变体） | cpu lane + observe 通道测试 + 冒烟 | **已落地**（2026-09-30：controller Capture 门控单测（非 Done 拒绝）+ journal Capture 持久化往返 + tour 脚本推进/收尾单测；cpu + gpu lane 退出码 0（golden 12/12 未重捕）；窗口冒烟 BRP 发 capture → Applied + PNG 落盘 + 亲眼看图（512² 内容与窗口一致）+ 双 toast（applied + snapshot saved 路径）可见。重建在途拒绝的实况窗口本机过短（亚秒级重建）未捕到——门控路径有 controller 单测覆盖，如实记录。物理 G/C 键链路同既有物理按键待确认项） |
+| W1–W3 | 场景内容动态加载（2026-09-30 owner 需求「动态加载，不要全部放在场景中」，方案 A：增量装卸 + §11.2 live 参数路径全量落地）：W1 post/outline_mode = 相机附件 live 换（不重建、不换代次）；W2 flags/face_threshold = 实体级 live（在场应用/缺席只写设置）；W3 分区展品动态装卸（`CourtyardBuckets` 分桶登记——差值登记法零耦合，`courtyard_update` 按 settings diff 装卸，driver `note_content_update` 换代次重登账本；画框 29 实体与观测相机实体跨代常驻；zone 切换先装后卸，补间落定才退役旧区） | 等价性证据（增量 == 全新构建逐字节）+ 单测 + 三 lane + 窗口冒烟 | **已落地**（`incremental_zone_walk_preserves_capture_identity`（GPU）：zone 巡场 + lamps 桶重装 + live 参数混合后捕获与单次运行**逐字节一致**、计数回基线、观测相机实体不变；controller 延迟退役/在场 live 路由单测、builders 装卸桶单测全绿；cpu/gpu/docs 三 lane 退出码 0，**golden 12/12 未重捕**（捕获路径不动）；窗口冒烟 BRP + 截图亲验：post live 即时生效（Applied 不换代次）、p5 切换画框连续无闪烁、stage 换 odette 只动角色台（gen 2→3）。**证据揪出并修复一处 ulp 级缺陷**：W1 附件切换一度用 orbit 姿态往返重建的呈现姿态写观测相机，偏离配方机位末位字节（逐字节证据差 2px）——改取 driver 应用配方的精确值。物理键鼠链路同既有待确认项） |
+
+| V4 | cel shading 特性补全（2026-09-30 调研缺口收编，owner 批准）：5 个新内容档（rim 边缘光对照 / shadow 阴影形状三档 / palette 四色对照 / metal 金属三色+spec ramp 递进 / cutout alpha 镂空）——纯增量：5 builder 函数 + zone id/机位/区域表 +5 + catalog 枚举 +5 + 捕获规格 17 条 + dock/keymap/tour 同步；既有 12 条基线零变动（lod 档经查证特性降级已在演示——Hero+matcap 球经 StylizedLodPolicy 在 far 带削 matcap，不动）；新基线按 v3 合同隔离上下文捕获 | cpu lane + 布局断言 + gpu lane 17/17 + 逐张亲验 | **已落地**（cpu lane 退出码 0；5 条新基线隔离捕获 + 亲眼看图（rim 边缘光可读、shadow 硬软对照分明、palette 暖冷阴影分明、metal 平色→matcap→spec 递进、cutout 棋盘镂空清晰）；gpu lane 17/17；文档收尾同步） |
+| V3-0..4 | 展亭模式改版（2026-09-30 owner 决策「在同一个位置根据不同的 preset 展示不同的内容」；方案与对抗性评估见 plans/patriot-big-barda-valkyrie.md）：全部内容上中央平台（p1/p2/p4 横排 + 基座、p3 台面堆、p5 杆带、stage 台基座、lod 轴西南起北伸微偏西、lamps 不变）；展台环/overview/panorama/minimap/点击聚焦退役（不留死代码：pick.rs、minimap.rs 删除，Tab 键释放，导览脚本 9 站收尾回 trio）；机位表 9 台重排（hero 机位族 + 内容取景机位）；区域 AABB 表重写；canonical 基线 12/12 重捕 | cpu/gpu/docs lane + 布局断言 + 逐张亲验 + 冒烟 | **已落地**（布局/落带/区域断言更新全绿；三 lane 退出码 0；基线 12/12 重捕并双复跑逐字节稳定——首轮重捕曾因重捕与验证之间夹了注释级源码编辑（重编译改变 inlining 致 ulp 级着色漂移）在 lane 复跑暴露 trio 漂移，整体重捕 + 双复跑后冻结，运维口径记入验收记录 v3 条目；窗口冒烟逐内容亲验取景） |
+
 ## 13. 明确不做
 
+- **全景同屏不承担 golden 判定**（owner 决策 2026-09-29；v3 起 overview 浏览模式整体退役——同位必穿模，无基线、无 ROI、无判定职责的表述随之归档）；
 - Inspector 不动（独立角色检视器，自带 provenance hash 机制；阶段 2-7 全程零改动）；
 - benchmarks / labs/regression 不动（它们直接复用 builders 的共享 helper，不经 catalog 场景；退役后持续绿——共享 helper（build_strip/build_hero_1/build_portable_instances/ramp_image/matcap_image/ilm_image 等）全部保留并经回归验证）；
 - labs/reference 的六视角验收合同不动（独立于展示场景；角色台 NPR 化不影响其编译角色管线）；
 - dated 验收/测量记录不改写（新旧条目以追加为准）；
-- 不为旧 18 场景 ID 留兼容层或别名（AGENTS.md：只支持当前版本；§10 退役为硬切）。
+- 不为旧 18 场景 ID 留兼容层或别名（AGENTS.md：只支持当前版本；§10 退役为硬切）；同理不为 v1 退役的捕获 ID（courtyard-day）留兼容层——V2-2 硬切，旧 ID 在版本/catalog 门被显式拒绝。
 
 交互分期的排序依据（V1 PC → V2 browser → V3 Android）：PC 交互宿主已存在、键鼠输入翻译最薄，命令层正确性在这里验证成本最低；browser 的页面桥/CDP 驱动模式现成，缺口集中在驻留状态机与页面控件，工作量可控；Android 未知数最多（手势分解、egui spike、驻留会话、应用内桥接、APK 资产管线），放最后让前两期先把命令集与参数面打磨稳定，避免三平台同时返工。

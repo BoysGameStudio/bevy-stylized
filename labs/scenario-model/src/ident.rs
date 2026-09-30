@@ -175,7 +175,7 @@ mod tests {
 
     #[test]
     fn string_id_accepts_registered_names() {
-        for name in ["courtyard", "courtyard-day", "outline-advanced"] {
+        for name in ["courtyard", "courtyard-trio", "courtyard-outline-hybrid"] {
             SceneId::new(name).expect(name);
         }
     }

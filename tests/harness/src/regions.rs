@@ -265,34 +265,4 @@ mod capture_spec_projection_tests {
             );
         }
     }
-
-    #[test]
-    fn panorama_day_rects_match_the_verified_layout() {
-        // 数值锚点（panorama, 512²）：三区的投影矩形是布局冻结前的
-        // 观测基线——布局微调会推动矩形，断言迫使显式审视。
-        let view_proj = view_proj("panorama");
-        let expected = [
-            ("trio", (158, 238, 196, 96)),
-            ("p1", (410, 253, 102, 65)),
-            ("p4", (0, 248, 103, 70)),
-        ];
-        for (id, (x, y, w, h)) in expected {
-            let aabb = scenes::metadata::COURTYARD_REGION_AABBS
-                .iter()
-                .find(|region| region.id == id)
-                .expect("region aabb");
-            let rect =
-                project_aabb_to_screen(aabb.min, aabb.max, view_proj, 512, 512).expect("visible");
-            assert_eq!(
-                rect,
-                ScreenRect {
-                    x,
-                    y,
-                    width: w,
-                    height: h
-                },
-                "region {id}"
-            );
-        }
-    }
 }

@@ -58,7 +58,9 @@ def validate_gpu_suites(suites):
     if not isinstance(suites, dict) or not suites:
         raise CheckFailed('required GPU registry must contain test binaries')
     for binary, names in suites.items():
-        if not isinstance(binary, str) or not re.fullmatch(r'[A-Za-z0-9_-]+', binary):
+        # 套件键：`<binary>` 或 `crate::binary`（crate 限定形态服务
+        # 非 stylized-integration-tests 的证据测试，2026-09-30）。
+        if not isinstance(binary, str) or not re.fullmatch(r'[A-Za-z0-9_-]+(::[A-Za-z0-9_-]+)?', binary):
             raise CheckFailed('invalid GPU binary identity')
         if (not isinstance(names, list) or not names
                 or any(not isinstance(n, str) or not re.fullmatch(r'[\w:]+', n) for n in names)

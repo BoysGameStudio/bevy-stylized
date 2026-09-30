@@ -106,16 +106,14 @@ pub fn validate_capture_specs(specs: &[CaptureSpec]) -> Result<(), CaptureSpecEr
     Ok(())
 }
 
-/// courtyard 的十条捕获（§9 捕获矩阵的机读形式；顺序固定）。
+/// courtyard 的十七条捕获（§9 矩阵的机读形式；顺序固定；v4 增 5 条 cel 特性档）。
 ///
-/// ROI 集合的修正记录（相对 §9 表）：courtyard-day 的 ROI 收敛为
-/// [trio, p1, p4]——panorama 机位下 lamps（整环 AABB 投影覆盖全宽）、
-/// p5（与 trio 投影有 1.7px 细缝）、p2（与 p1 投影有 30×9px 交叠）无法
-/// 满足「同一捕获内 ROI 两两不重叠」断言；这三区各有专属精确捕获
-/// （night 灯阵 / flags 姿态 / outline-hull×P2），判定覆盖不丢失。
-/// 数值证据：panorama 投影 trio(158,238,354,334) p1(410,253,512,318)
-/// p4(0,248,95,318) 两两无交叠；p2(370,268,446,387) 与 p1 交叠、
-/// p5(125,176,215,287) 与 trio 交叠、lamps(0,219,512,314) 与全域交叠。
+/// v2（2026-09-29 owner 决策改版）：分区激活——每条捕获钉 `zone`，
+/// camera 与 zone 一一对应（一致性由 metadata 层的
+/// `courtyard_zone_camera_preset` 校验，见 scenes metadata 测试）。
+/// v1 的全景系捕获（courtyard-day 等 panorama 机位 + ROI 集）随
+/// 「不同屏全显」决策退役；判定收敛为整图精确为主（一帧一主体），
+/// ROI 机制保留（courtyard-night 的 lamps 区域双层门限）。
 #[must_use]
 pub fn courtyard_capture_specs() -> Vec<CaptureSpec> {
     let spec = |id: &str,
@@ -134,8 +132,9 @@ pub fn courtyard_capture_specs() -> Vec<CaptureSpec> {
             rois: rois.iter().map(|roi| roi.to_string()).collect(),
         }
     };
-    let pins = |time: &str, outline: &str, crowd: u64, post: bool, flags: &str| {
+    let pins = |zone: &str, time: &str, outline: &str, crowd: u64, post: bool, flags: &str| {
         ParameterMap::from([
+            ("zone".to_string(), serde_json::json!(zone)),
             ("time_of_day".to_string(), serde_json::json!(time)),
             ("outline_mode".to_string(), serde_json::json!(outline)),
             ("crowd".to_string(), serde_json::json!(crowd)),
@@ -143,36 +142,20 @@ pub fn courtyard_capture_specs() -> Vec<CaptureSpec> {
             ("flags".to_string(), serde_json::json!(flags)),
         ])
     };
-    let day = || pins("day", "hull", 100, false, "rest");
+    let day = |zone: &str| pins(zone, "day", "hull", 100, false, "rest");
     vec![
-        spec(
-            "courtyard-day",
-            "panorama",
-            day(),
-            None,
-            WholeFrameJudgment::Loose,
-            &["trio", "p1", "p4"],
-        ),
-        spec(
-            "courtyard-dusk",
-            "panorama",
-            pins("dusk", "hull", 100, false, "rest"),
-            None,
-            WholeFrameJudgment::Loose,
-            &[],
-        ),
-        spec(
-            "courtyard-night",
-            "panorama",
-            pins("night", "hull", 100, false, "rest"),
-            None,
-            WholeFrameJudgment::Loose,
-            &["lamps"],
-        ),
         spec(
             "courtyard-trio",
             "center-trio",
-            day(),
+            day("trio"),
+            None,
+            WholeFrameJudgment::Strict,
+            &[],
+        ),
+        spec(
+            "courtyard-ramp",
+            "ramp",
+            day("p1"),
             None,
             WholeFrameJudgment::Strict,
             &[],
@@ -180,36 +163,27 @@ pub fn courtyard_capture_specs() -> Vec<CaptureSpec> {
         spec(
             "courtyard-outline-hull",
             "outline",
-            day(),
+            day("p2"),
             None,
             WholeFrameJudgment::Strict,
             &[],
         ),
-        // hybrid 的判定模式修正（2026-09-28 验收期）：screen-space 描边在
-        // 背景灯球/墙沿剪影处有逐运行 2–4 像素的边缘翻转（深度次序竞争经
-        // 屏幕空间边缘检测放大；与 P3 主体无关），整图精确在此类噪声下不可
-        // 验收——改为整图宽松 + P3 区域精确（双层门限），与设计「个别持续
-        // noisy 区域不全局放宽」一致。
+        // hybrid（v2 目标 = 整图精确）：v1 的噪声源（背景灯球/墙沿剪影的
+        // 屏幕空间边缘翻转）随分区激活结构性消除——P3 视图背景只剩环境壳。
+        // 若 host 噪声在纯净背景下复现，按 §9 噪声口径回退 loose+p3 ROI
+        // 并记录证据，不预先放宽。
         spec(
             "courtyard-outline-hybrid",
             "outline-west",
-            pins("day", "hybrid", 100, false, "rest"),
+            pins("p3", "day", "hybrid", 100, false, "rest"),
             Some(StylizedExecutionTier::Standard),
-            WholeFrameJudgment::Loose,
-            &["p3"],
-        ),
-        spec(
-            "courtyard-lod",
-            "lod-side",
-            day(),
-            None,
             WholeFrameJudgment::Strict,
             &[],
         ),
         spec(
-            "courtyard-post",
-            "panorama",
-            pins("day", "hull", 100, true, "rest"),
+            "courtyard-lighting",
+            "lighting",
+            day("p4"),
             None,
             WholeFrameJudgment::Strict,
             &[],
@@ -217,17 +191,99 @@ pub fn courtyard_capture_specs() -> Vec<CaptureSpec> {
         spec(
             "courtyard-flags",
             "flags",
-            pins("day", "hull", 100, false, "posed"),
+            pins("p5", "day", "hull", 100, false, "posed"),
+            None,
+            WholeFrameJudgment::Strict,
+            &[],
+        ),
+        spec(
+            "courtyard-stage",
+            "stage",
+            day("stage"),
+            None,
+            WholeFrameJudgment::Strict,
+            &[],
+        ),
+        spec(
+            "courtyard-lod",
+            "lod-side",
+            day("lod"),
+            None,
+            WholeFrameJudgment::Strict,
+            &[],
+        ),
+        spec(
+            "courtyard-dusk",
+            "lighting",
+            pins("p4", "dusk", "hull", 100, false, "rest"),
+            None,
+            WholeFrameJudgment::Loose,
+            &[],
+        ),
+        spec(
+            "courtyard-night",
+            "lamps",
+            pins("lamps", "night", "hull", 100, false, "rest"),
+            None,
+            WholeFrameJudgment::Loose,
+            &["lamps"],
+        ),
+        spec(
+            "courtyard-post",
+            "center-trio",
+            pins("trio", "day", "hull", 100, true, "rest"),
             None,
             WholeFrameJudgment::Strict,
             &[],
         ),
         spec(
             "courtyard-stress",
-            "panorama",
-            pins("night", "hull", 1000, false, "rest"),
+            "lamps",
+            pins("lamps", "night", "hull", 1000, false, "rest"),
             None,
             WholeFrameJudgment::Loose,
+            &[],
+        ),
+        // V4 cel 特性补全（2026-09-30，调研缺口收编；纯增量——既有 12 条
+        // 规格与基线不动）。
+        spec(
+            "courtyard-rim",
+            "rim",
+            day("rim"),
+            None,
+            WholeFrameJudgment::Strict,
+            &[],
+        ),
+        spec(
+            "courtyard-shadow",
+            "shadow",
+            day("shadow"),
+            None,
+            WholeFrameJudgment::Strict,
+            &[],
+        ),
+        spec(
+            "courtyard-palette",
+            "palette",
+            day("palette"),
+            None,
+            WholeFrameJudgment::Strict,
+            &[],
+        ),
+        spec(
+            "courtyard-metal",
+            "metal",
+            day("metal"),
+            None,
+            WholeFrameJudgment::Strict,
+            &[],
+        ),
+        spec(
+            "courtyard-cutout",
+            "cutout",
+            day("cutout"),
+            None,
+            WholeFrameJudgment::Strict,
             &[],
         ),
     ]
@@ -240,29 +296,30 @@ mod tests {
     #[test]
     fn courtyard_capture_specs_are_valid_and_match_the_matrix() {
         let specs = courtyard_capture_specs();
-        assert_eq!(specs.len(), 10, "§9 捕获矩阵 10 条");
+        assert_eq!(specs.len(), 17, "§9 捕获矩阵 17 条（v3 12 + v4 5）");
         assert_eq!(validate_capture_specs(&specs), Ok(()));
-        // 全 pin 键集合一致（五个枚举/数值键）。
+        // 全 pin 键集合一致（zone + 五个枚举/数值键）。
         for spec in &specs {
             let keys: std::collections::BTreeSet<&str> =
                 spec.parameters.keys().map(String::as_str).collect();
             assert_eq!(
                 keys,
-                ["time_of_day", "outline_mode", "crowd", "post", "flags"]
+                ["zone", "time_of_day", "outline_mode", "crowd", "post", "flags"]
                     .into_iter()
                     .collect(),
-                "{} must pin all five scalar keys",
+                "{} must pin all six scalar keys",
                 spec.capture_id
             );
         }
-        // 抽查矩阵行：hybrid 走 Standard 桶；stress 是 night+crowd=1000 宽松。
+        // 抽查矩阵行：hybrid 走 Standard 桶 + 整图精确（v2 目标）；
+        // stress 是 night+crowd=1000 宽松。
         let hybrid = specs
             .iter()
             .find(|spec| spec.capture_id == "courtyard-outline-hybrid")
             .expect("hybrid capture");
         assert_eq!(hybrid.tier, Some(StylizedExecutionTier::Standard));
-        assert_eq!(hybrid.whole_frame, WholeFrameJudgment::Loose);
-        assert_eq!(hybrid.rois, ["p3"]);
+        assert_eq!(hybrid.whole_frame, WholeFrameJudgment::Strict);
+        assert_eq!(hybrid.parameters["zone"], serde_json::json!("p3"));
         let stress = specs
             .iter()
             .find(|spec| spec.capture_id == "courtyard-stress")
@@ -270,11 +327,19 @@ mod tests {
         assert_eq!(stress.whole_frame, WholeFrameJudgment::Loose);
         assert_eq!(stress.parameters["crowd"], serde_json::json!(1000));
         assert_eq!(stress.parameters["time_of_day"], serde_json::json!("night"));
-        let day = specs
+        assert_eq!(stress.parameters["zone"], serde_json::json!("lamps"));
+        let night = specs
             .iter()
-            .find(|spec| spec.capture_id == "courtyard-day")
-            .expect("day capture");
-        assert_eq!(day.rois, ["trio", "p1", "p4"]);
+            .find(|spec| spec.capture_id == "courtyard-night")
+            .expect("night capture");
+        assert_eq!(night.rois, ["lamps"]);
+        // v1 全景系 ID 不再出现。
+        assert!(
+            specs
+                .iter()
+                .all(|spec| spec.capture_id != "courtyard-day" && spec.camera != "panorama"),
+            "panorama 机位与 courtyard-day 随 v1 退役"
+        );
     }
 
     #[test]

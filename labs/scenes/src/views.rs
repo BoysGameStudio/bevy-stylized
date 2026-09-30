@@ -53,6 +53,10 @@ pub fn courtyard_dusk(view: &mut StylizedViewDescriptor) {
 /// 夜间 ambient。
 pub fn courtyard_night(view: &mut StylizedViewDescriptor) {
     view.day_night_factor = 0.0;
+    // 夜景 key light 调暗偏冷（2026-09-30 owner 拍板修正夜景曝光）：夜间
+    // ambient 有夜间档而 key 此前仍全白——地面读到 ~83% 日间亮度（偏亮）。
+    // 调暗后地面落 ~46% 日间亮度，灯阵成为画面主光源。
+    view.key_light_color = LinearRgba::new(0.22, 0.26, 0.42, 1.0);
     view.environment = StylizedEnvironment {
         fog: StylizedFog {
             enabled: true,

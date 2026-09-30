@@ -3,7 +3,7 @@
 //! 流程（Update 系统每帧推进一个阶段；无忙等、无第二事件循环）：
 //!
 //! 1. **Compile**：用与 PC 完全相同的编译器在设备端编译共享 catalog 的
-//!    `courtyard` 配方（panorama 机位）→ 同一 recipe hash、同一
+//!    `courtyard` 配方（固定相机坐标，见 courtyard_recipe）→ 同一 recipe hash、同一
 //!    Execution 域计划摘要（身份可追溯——"PC 保存的配方可直接在移动端
 //!    重放"）；
 //! 2. **Run**：`CaseDriver::from_plan` 执行 `fixed_step{22} → observe`，
@@ -28,7 +28,7 @@ use scenario_model::recipe::{RecipeReference, RunMode, RunSpec, SceneRecipe};
 use scene_runtime::{CaseDriver, CompileError, ObservationReceipt, compile};
 
 /// 宿主绑定场景（fixture 内容经 Startup 系统装配；本模块只重放 catalog 配方）。
-/// courtyard 配方（panorama 机位；声明 reference-scene 资产依赖）。
+/// courtyard 配方（固定相机坐标——v1 全景机位坐标的历史沿用，仅是 JSON 数值输入；声明 reference-scene 资产依赖）。
 fn courtyard_recipe() -> SceneRecipe {
     SceneRecipe::from_json_slice(
         br#"{

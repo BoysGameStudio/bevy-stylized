@@ -60,8 +60,10 @@ fn main() {
     };
 
     if !capture_mode {
+        // 机位补间（06 §8）：交互窗口默认开；冒烟路径钉关。
+        let camera_transition = !args.iter().any(|a| a == "--no-camera-transition");
         for case in selected {
-            showcase::run_interactive(case);
+            showcase::run_interactive(case, camera_transition);
         }
         return;
     }

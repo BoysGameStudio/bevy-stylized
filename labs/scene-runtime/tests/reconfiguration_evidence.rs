@@ -181,7 +181,8 @@ fn portable_session_upgrades_to_standard_in_session() {
     );
 
     // 会话内升档：outline_mode=hybrid 需 Standard → 控制器先尝试重配置，
-    // 设备已具备能力 → 接受并同场景重建（内容重建语义，§11.2）。
+    // 设备已具备能力 → 接受。W1（05 §11.2）起 outline_mode 是相机附件
+    // live 换——不换代次、不重建内容。
     let outcome = controller.command(
         app.world_mut(),
         &SessionCommand::SetParameter {
@@ -189,9 +190,10 @@ fn portable_session_upgrades_to_standard_in_session() {
             value: serde_json::json!("hybrid"),
         },
     );
-    assert!(
-        matches!(outcome, CommandOutcome::Switched { .. }),
-        "in-session upgrade must accept the hybrid parameter: {outcome:?}"
+    assert_eq!(
+        outcome,
+        CommandOutcome::Applied,
+        "in-session upgrade must accept the hybrid parameter"
     );
     assert_eq!(
         resolved_tier(&app),
@@ -263,6 +265,15 @@ fn unenabled_device_feature_is_refused_without_state_change() {
     )
     .expect("plan");
     run_to_completion(&mut app, &mut driver, 700).expect("initial build");
+    // 快照缺特性 → 结构化拒绝。宿主无关的确定性构造（2026-09-30 lane 登记
+    // 后发现旧前提失效：本机 Stage B 快照默认启用 Bindless/Float16——
+    // 「Stage A 未请求」在本机不成立；改为显式从快照摘除特性，测拒绝
+    // 合同本身而非宿主的默认启用集）。摘除在基线读取之前。
+    app.world_mut()
+        .resource_mut::<StylizedResolvedCapabilities>()
+        .actual
+        .features
+        .remove(&StylizedGpuFeature::Bindless);
     let before_capture = capture_once(&mut app, &mut driver);
     let before_caps = app
         .world()
@@ -270,7 +281,6 @@ fn unenabled_device_feature_is_refused_without_state_change() {
         .clone();
     let before_generation = app.world().resource::<StylizedReconfigGeneration>().0;
 
-    // Stage A 未请求 Bindless → 设备快照不含 binding-array 特性 → 结构化拒绝。
     let error = app
         .world_mut()
         .apply_stylized_reconfiguration(StylizedCapabilityConfig {
@@ -278,7 +288,7 @@ fn unenabled_device_feature_is_refused_without_state_change() {
             requested_features: std::collections::BTreeSet::from([StylizedGpuFeature::Bindless]),
             ..StylizedCapabilityConfig::default()
         })
-        .expect_err("bindless was never enabled on this device");
+        .expect_err("snapshot without bindless must refuse");
     assert_eq!(
         error,
         StylizedReconfigError::FeaturesNotEnabled {

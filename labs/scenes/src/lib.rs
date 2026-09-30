@@ -29,7 +29,9 @@ pub mod registry;
 
 #[cfg(feature = "build")]
 pub use builders::{
-    CourtyardFlagsPose, CourtyardOutlineMode, CourtyardSettings, CourtyardTimeOfDay, SceneTarget,
+    CourtyardBuckets, CourtyardFlagsPose, CourtyardOutlineMode, CourtyardSettings,
+    CourtyardStageCharacter, CourtyardTimeOfDay, CourtyardUpdate, CourtyardZone, SceneTarget,
+    courtyard_attachment, courtyard_update, retire_entities,
 };
 #[cfg(feature = "build")]
 pub use recipe::{CameraAttachment, CameraRecipe};

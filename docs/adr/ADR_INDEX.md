@@ -34,4 +34,4 @@
 | ADR-0028 | glTF Plugin Initialization Ordering | Accepted | [`0028-gltf-plugin-initialization.md`](0028-gltf-plugin-initialization.md) |
 | ADR-0029 | Performance Evidence Policy | Accepted | [`0029-performance-evidence-policy.md`](0029-performance-evidence-policy.md) |
 | ADR-0030 | Runtime Capability Reconfiguration | Proposed | [`0030-runtime-reconfiguration.md`](0030-runtime-reconfiguration.md) |
-| ADR-0031 | Single Courtyard Scene with ROI-Layered Golden Judgment | Proposed | [`0031-single-courtyard-scene.md`](0031-single-courtyard-scene.md) |
+| ADR-0031 | Single Courtyard Scene with Zone-Activated Golden Judgment | Accepted（2026-09-30） | [`0031-single-courtyard-scene.md`](0031-single-courtyard-scene.md) |

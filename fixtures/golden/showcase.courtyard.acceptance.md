@@ -1,4 +1,10 @@
-# Courtyard 捕获基线验收记录（macos-metal overlay）
+# Courtyard 捕获基线验收记录
+
+> 本文件为 dated 验收记录的追加式日志：2026-09-28 条目记录 macos-metal
+> overlay 验收（当时 canonical 缺席 = BLOCKED）；2026-09-29 条目记录
+> canonical（linux-vulkan 参考宿主）基线捕获与验收。旧条目不改写。
+
+## 2026-09-28 条目：macos-metal overlay 验收
 
 > **日期**：2026-09-28 ｜ **阶段**：docs/showcase/05 §12 阶段 3（基线捕获与验收）
 > **宿主**：macOS + Apple M4 Pro（Metal），单进程串行
@@ -225,3 +231,252 @@ screen-outline 判定放宽与否是 owner 决策点；(3) hybrid 的 screen-out
 
 角色（NPR 化后）在设备端渲染正确（day 捕获逐字节等于基线）。模拟器证据，
 不构成真机声明。
+
+---
+
+## 2026-09-29 条目：canonical 基线捕获与验收（linux-vulkan 参考宿主）
+
+> **日期**：2026-09-29 ｜ **阶段**：docs/showcase/05 §12 阶段 3（canonical 基线）
+> **宿主**：Linux + NVIDIA GeForce RTX 5090（Vulkan），驱动 NVIDIA 615.71.09，
+> 单进程串行（本机即 docs/reference/08 §1 的 canonical 参考宿主，
+> `CANONICAL_GOLDEN_PLATFORM = "linux-vulkan"`）
+> **机制**：`GOLDEN_REBASELINE=1 showcase -- courtyard --capture-spec all`；
+> `resolve_capture_paths` 在 canonical 宿主上写 `fixtures/golden/showcase/`
+> 顶层（canonical），不写 overlay。捕获后同机重捕判定（新 App 实例）。
+
+**canonical 基线自此建立**：庭院 10 条捕获的 canonical 集合
+（`fixtures/golden/showcase/*.png` + `*.golden.json`）落成，
+2026-09-28 条目的「Canonical 缺席声明（BLOCKED）」由本条目解除——
+该声明作为 dated 历史保留不改写。既有 macos-metal / android-vulkan
+两套基线留在各自平台子目录，按 `resolve_baseline_paths` 合同降为
+overlay（只在各自平台查询时优先；canonical 宿主不查询 overlay）。
+
+### 判定闭环证据（写基线 → 同机重捕 → 判定，10/10 PASS）
+
+| 捕获 | 判定 | 结果 |
+|---|---|---|
+| courtyard-day | loose + rois[trio,p1,p4] | PASS（luma 211.6 / stddev 29.5 / chroma 27.4；3 ROI max_delta=0 fail_ratio=0） |
+| courtyard-dusk | loose | PASS（luma 188.1 / stddev 35.9 / chroma 40.8） |
+| courtyard-night | loose + rois[lamps] | PASS（luma 135.1 / stddev 65.2 / chroma 24.7；lamps ROI max_delta=0 fail_ratio=0） |
+| courtyard-trio | strict | PASS（逐字节，max_delta=0，psnr=inf） |
+| courtyard-outline-hull | strict | PASS（逐字节） |
+| courtyard-outline-hybrid | loose + rois[p3] | PASS（luma 197.5 / stddev 54.0 / chroma 23.5；p3 ROI max_delta=0 fail_ratio=0） |
+| courtyard-lod | strict | PASS（逐字节） |
+| courtyard-post | strict | PASS（逐字节） |
+| courtyard-flags | strict | PASS（逐字节） |
+| courtyard-stress | loose + non-black | PASS（luma 135.1 / stddev 65.2 / chroma 25.1） |
+
+regions 屏幕矩形由分区 AABB × 捕获机位投影在捕获时自动计算（平台无关
+规格数据），与 2026-09-28 锁定值逐项一致：day 的 trio (158,238,196,96) /
+p1 (410,253,102,65) / p4 (0,248,103,70)，night 的 lamps (0,219,512,95)，
+hybrid 的 p3 (106,185,313,327)；阈值继承首锁值
+`max_channel_delta=2 / max_fail_ratio=0.005`，未放宽。
+
+### 亲眼看图验收（逐张复核 canonical PNG）
+
+- day/dusk/night/stress 全景：三对照组、展台环、角色台（NPR cel 着色角色，
+  深发色/肤色底可读，非 PBR 棕块/黑块）、灯阵、西侧 LOD 轴全部在场；
+  dusk 暖橙雾 + 紫红天顶、night 深蓝雾 + 灯阵 emission 符合 §5 色板；
+  stress 灯阵 crowd=1000 密集成带；
+- trio：7 球三排分离可读，face 阈值梯度与 hair/metal off/on 对照可辨；
+- outline-hull：P2 纵列 hull 宽度 0/2/8 梯度可读；
+- outline-hybrid：P3 方块堆 hull + 屏幕空间内棱线清晰（outline-west 机位，
+  P3 为画面主体）；
+- lod：东侧远观四球并排、档位雾中递退可读；
+- post：后处理色差/暗角效果明确可见（独立于 day 的 post=on 基线）；
+- flags：双旗 posed 姿态（旋转定姿态）入镜完整，无蒙皮剔除缺失。
+
+### 与 macos-metal overlay 的关系（如实记录）
+
+10 条捕获的 canonical 与 macos-metal overlay 像素均非逐字节一致
+（fnv1a64 全部不同）——跨后端/跨设备像素分歧是 overlay 机制的存在理由，
+**跨设备像素一致性不在获准比较域**；loose 统计包络两宿主高度接近
+（day luma 211.6 vs 211.7、stddev 29.5 vs 29.1 等），内容构图逐项等价
+（亲眼看图比对）。canonical 集合是唯一判定基准；overlay 只服务各自平台。
+
+### 已知限制（沿用，未在本条目处理）
+
+- 夜景地面/展台整体曝光偏亮（共享夜景色板既有行为，§5 夜景段末修正项）
+  维持现状进入 canonical 基线——是否修正是 owner 决策点；若修正需
+  GOLDEN_REBASELINE 重锁全部含夜景的基线（night/stress 及像素含夜景
+  调色板的捕获）；
+- 夜雾色与 zenith 天幕色系未统一（§5 同一修正项）；
+- 本条目全部判定为同机自比对；跨后端分歧的判定链归 browser/android
+  lane（各自 overlay 与已记录的平台分歧条目）。
+
+---
+
+## 2026-09-29 条目（晚）：v1 基线集随设计 v2 退役预告（owner 决策）
+
+owner 窗口冒烟后否决「同屏全显」核心概念，庭院设计改版为 **v2 分区激活**
+（docs/showcase/05 v2、ADR-0031 修正案）：默认与判定路径每次只显示一个
+分区的展品，全景同屏降级为 opt-in 浏览模式，不承担 golden 判定。
+
+本文件上述全部 dated 条目（2026-09-28 macos-metal overlay、2026-09-29
+canonical）作为 v1 实现的历史记录**保留不改写**；其证明的基线集
+（`fixtures/golden/showcase/` 顶层 canonical + `macos-metal/` +
+`android-vulkan/` 两套 overlay）对应的是已退役的 v1 全景捕获矩阵，
+**不构成 v2 设计的验收**。v2 的 12 捕获矩阵基线走 V2-3
+GOLDEN_REBASELINE 重捕，v1 基线集届时删除，验收另起 dated 条目。
+v1 判定模式修正史（day ROI 收敛、outline-west 机位、hybrid 宽松+p3 ROI）
+的技术教训由 v2 继承的部分已写入设计文档 §9 v1 注记。
+
+---
+
+## 2026-09-29 条目（v2）：分区激活矩阵 12 捕获 canonical 基线验收
+
+> **日期**：2026-09-29 ｜ **阶段**：docs/showcase/05 §12 V2-3（v2 基线捕获与验收）
+> **宿主**：Linux + NVIDIA GeForce RTX 5090（Vulkan），驱动 NVIDIA 615.71.09，
+> 单进程串行（canonical 参考宿主）
+> **机制**：V2-1/V2-2 实现（zone 参数 + 分区激活 builder + 机位 6→10 +
+> 12 捕获规格）后，`GOLDEN_REBASELINE=1 showcase -- courtyard
+> --capture-spec all`；v1 基线集（canonical + macos-metal/android-vulkan
+> overlay）已按 §12 V2-3 先行删除，本条目的 12 条基线是唯一现行集合。
+
+### 判定闭环证据（写基线 → 同机重捕 → 判定，12/12 PASS）
+
+| 捕获 | zone／机位 | 判定 | 结果 |
+|---|---|---|---|
+| courtyard-trio | trio／center-trio | strict | PASS（逐字节） |
+| courtyard-ramp | p1／ramp | strict | PASS（逐字节） |
+| courtyard-outline-hull | p2／outline | strict | PASS（逐字节） |
+| courtyard-outline-hybrid | p3／outline-west，**Standard** | **strict** | PASS（逐字节） |
+| courtyard-lighting | p4／lighting | strict | PASS（逐字节） |
+| courtyard-flags | p5／flags（posed） | strict | PASS（逐字节） |
+| courtyard-stage | stage／stage | strict | PASS（逐字节） |
+| courtyard-lod | lod／lod-side | strict | PASS（逐字节） |
+| courtyard-dusk | p4／lighting，dusk | loose | PASS（luma 188.7 / stddev 34.1 / chroma 42.8） |
+| courtyard-night | lamps／lamps，night | loose + rois[lamps] | PASS（luma 125.1 / stddev 65.5 / chroma 28.3；lamps ROI max_delta=0 fail_ratio=0，矩形 (0,253,512,138) 投影自动计算） |
+| courtyard-post | trio／center-trio，post=on | strict | PASS（逐字节） |
+| courtyard-stress | lamps／lamps，night，crowd=1000 | loose + non-black | PASS（luma 124.4 / stddev 65.1 / chroma 29.2） |
+
+### hybrid 噪声验证（v2 核心验收点）
+
+courtyard-outline-hybrid 在分区激活后的纯净背景（P3 方块堆 + 环境壳，
+无灯阵/无关分区）下 **strict 整图逐字节稳定**（捕获-重捕 max_delta=0）——
+v1 记录在案的背景灯球/墙沿剪影噪声（逐运行 2–4px 翻转、Dawn/naga
+2488px 系统分歧的前提）结构性消除，§9 v2 噪声口径的 strict 目标达成，
+**未动用 loose+p3 ROI 回退预案**。v1 的「hybrid 一律宽松+ROI」口径与
+「Dawn/naga 判定放宽」议题随之作废（后者在 browser lane v2 复跑时按
+纯净背景重新评估，不预设立场）。
+
+### 亲眼看图验收（逐张复核 canonical PNG）
+
+- 分区隔离成立：每条捕获只含聚焦分区展品 + 环境壳（空展台画框在场）；
+  v1 全景里的灯阵/角色/LOD 球不再串场（flags 机位曾被 mid LOD 球冲突
+  的取景问题随分区隔离结构性消失）；
+- 新机位（ramp/lighting/stage/lamps，§7「实施时验证」）经本轮捕获锁定：
+  ramp 4 球横排 ramp 行色带可读；lighting 3 球 key light ±Z 对照明暗
+  分明（显式光照对照恢复像素级）；stage 角色 NPR cel 分带特写可读；
+  lamps 机位夜望灯阵 emission 带清晰；
+- dusk（P4 视角暖紫调色板）、post（色差/暗角明确）、stress（千灯成带）
+  复核通过；
+- 夜景地面/展台偏亮维持现状入基线（owner 决策点，§5 夜景段末；
+  night luma 125.1，灯阵视角下比 v1 全景夜景略暗）。
+
+### 已知限制（沿用）
+
+- 本条目全部判定为同机自比对；browser/android 的 v2 证据（overlay
+  重播种 + lane 复跑）归各自主 host，产生前 coverage 两列维持 Pending
+  （v1 证据对应已退役全景帧，不继承）；
+- 夜景曝光修正（owner 决策点）若执行需重锁 night/stress 两条基线。
+
+## 2026-09-30 条目（v3）：展亭模式 12 捕获 canonical 重捕与验收
+
+**背景**：owner 2026-09-30 决策——「在同一个位置根据不同的 preset 展示
+不同的内容」，v2 的庭院九分区空间布局改为展亭模式（全部内容以中央
+平台为唯一舞台，按 zone 档位轮换装卸；W1–W3 增量装卸机制承载）。
+overview 浏览模式、podium 展台环、minimap、场景内点击聚焦随 v3 退役
+（同位必穿模/无空间导航意义）。12 条捕获规格 id 与判定口径不变，机位
+（每内容一台取景机位）与摆位全部重排，故 canonical 基线整体重捕。
+
+**流程**：布局断言先冻结（scenes metadata 落带/区域包含/机位映射测试
+全绿）→ 删旧基线 → `GOLDEN_REBASELINE=1 STYLIZED_REQUIRE_GPU=1` 重捕
+12 条 → 不带 rebase 复跑 **12/12 PASS**（strict 9 条逐字节 + night/stress
+loose + dusk loose，同 v2 口径）→ 逐张亲眼看图验收。
+
+| 捕获 | 内容/机位 | 判定 | 复核 |
+|---|---|---|---|
+| courtyard-trio | trio／center-trio | strict | PASS（逐字节）；斜上 hero 机位读三排对照 |
+| courtyard-ramp | p1／ramp | strict | PASS（逐字节）；4 球横排 ramp 行色带清晰 |
+| courtyard-outline-hull | p2／outline | strict | PASS（逐字节）；宽度 0/2/8 梯度正面可读 |
+| courtyard-outline-hybrid | p3／outline-west，**Standard** | strict | PASS（逐字节）；收紧取景后方块堆 hull+内边缘清晰 |
+| courtyard-lighting | p4／lighting | strict | PASS（逐字节） |
+| courtyard-flags | p5／flags（posed） | strict | PASS（逐字节）；双杆条带上平台 |
+| courtyard-stage | stage／stage | strict | PASS（逐字节）；角色立台面基座、全身入镜 |
+| courtyard-lod | lod／lod-side | strict | PASS（逐字节）；侧斜视读带——近球平滑/远球低模面化可见 |
+| courtyard-dusk | p4／lighting，dusk | loose | PASS |
+| courtyard-night | lamps／lamps，night | loose + rois[lamps] | PASS（lamps ROI 投影随新机位自动重算） |
+| courtyard-post | trio／center-trio，post=on | strict | PASS（逐字节） |
+| courtyard-stress | lamps／lamps，night，crowd=1000 | loose + non-black | PASS |
+
+**亲眼看图复核要点**：展亭隔离成立（每帧只有当前内容 + 画框：地面/
+铺装/环墙/平台，空展台已移除）；平台承载全部对照组无溢出（p1 横排
+±1.33m < r2.2）；lod 轴微偏西不穿灯柱列（lamps/lod 不同档不共存）。
+
+**已知限制（沿用）**：同机自比对口径不变；browser/android 的 v3 overlay
+重播种归各自主 host（本机 BLOCKED 口径不变）；夜景曝光维持现状入
+基线（owner 决策点仍未拍板——v3 夜景为灯阵视角，曝光观感随布局变化，
+该议题需在 v3 基线上重新评估）。
+
+**v3 重捕漂移记录（如实）**：首轮重捕（12:15）后、gpu lane 复跑时
+courtyard-trio 出现确定性 ±1 绿通道带状差异（max_delta=9 / mean 0.0094 /
+psnr 68dB，墙面与天空带），位置无几何位移（相机/内容未变）。根因定位：
+重捕与复跑之间 scene-runtime 有注释/测试级源码编辑，重编译改变了
+inlining 使着色路径产生 ulp 级浮点差——strict 逐字节判定对构建产物敏感
+（v2 时代码冻结故未暴露）。处置：12 条从最终树整体重捕，两个独立进程
+复跑均 12/12 逐字节 PASS 后冻结。**运维口径**：strict 基线重捕后，
+判定验证必须与重捕共用同一构建（中间不要夹任何源码编辑，包括注释）。
+
+**进程上下文敏感性（v3 验收发现，如实记录）**：courtyard-trio 的像素受
+「同进程内先跑过哪些捕获」影响（墙面/天空带 ±1 绿通道，max_delta=9/
+mean 0.0094/psnr 68dB；几何无位移）。批量（单进程 12 连跑）与隔离
+（每规格一进程）两种上下文产生不同结果；其余 11 条两种上下文一致。
+二分定位：单个前置规格不触发、前后半区各自不触发、全集触发——累积性
+效应，根因未继续深挖（疑似驱动/进程级着色状态累积）。**判定合同以此
+钉死：golden 基线的捕获与判定都以 lane 的隔离上下文（每规格独立进程）
+为准**；`--capture-spec all` 的批量路径只是开发便利路径，不作判定依据。
+trio 基线已按隔离上下文重捕。
+
+## 2026-09-30 条目（v4）：cel 特性补全——5 条新捕获基线验收
+
+**背景**：cel shading 特性面调研（引擎参数族 vs 展台覆盖）后收编五个
+高价值缺口为展亭新内容档（05 §4 各节；既有 12 条规格与基线零变动，
+lod 档特性降级经查证已在演示，不动）。
+
+| 捕获 | 内容 | 判定 | 复核 |
+|---|---|---|---|
+| courtyard-rim | rim：off / 白强 / 暖弱 | strict | PASS（逐字节）；边缘光对照可读 |
+| courtyard-shadow | shadow：默认 / 硬高阈 / 软低下限 | strict | PASS（逐字节）；硬软阴影边界分明 |
+| courtyard-palette | palette：默认灰 / 暖 / 冷阴影 | strict | PASS（逐字节）；三档阴影染色分明 |
+| courtyard-metal | metal：平色 / matcap / +三色+spec ramp | strict | PASS（逐字节）；递进可读（首版 matcap 基底对照太弱，改递进后重捕） |
+| courtyard-cutout | cutout：棋盘格镂空双卡 | strict | PASS（逐字节）；镂空剪影清晰 |
+
+**流程**：5 条全部按 v3 合同以隔离上下文（每规格独立进程）捕获
+（`GOLDEN_REBASELINE=1` + `--exact` 逐条）；gpu lane 复跑 **17/17 PASS**
+（strict 15 + night/stress 宽松，同前口径）；逐张亲眼看图验收。
+browser/android 的 v4 捕获归各自主 host（本机 BLOCKED 口径不变）。
+
+## 2026-09-30 条目（夜景曝光修正 + lane 覆盖缺口修正）
+
+**夜景曝光修正（owner 拍板，2026-09-30）**：根因 = 夜景只降 ambient、
+key light 仍全白（view.rs 合同：illuminance 固定 1.0，光强由颜色携带）。
+修正 = `courtyard_night` 的 key_light_color 调暗偏冷（0.22/0.26/0.42），
+前景地面 luma 196.6→109.0（46% 日间），灯阵成为画面主光源。courtyard-
+night / courtyard-stress 两条基线按隔离上下文重捕并亲验（夜景氛围成立、
+千灯带可读）。
+
+**lane 覆盖缺口修正**：scene-runtime 的 14 条 GPU 证据测试
+（compiler/driver/journal/reconfiguration_evidence）原不在任何 lane
+（gpu lane 机制此前只跑 stylized-integration-tests crate）。suites.json
+的 gpu 键扩展支持 `crate::binary` 形态并全部登记；task_runner 身份校验
+同步放行。此后这些测试随 gpu lane 强制。
+
+**登记即揪出腐烂**：登记进 lane 后首轮复跑暴露 4 条随 v2/v3/W1 腐烂的证据
+测试（此前无 lane 强制无人运行）——compiled_courtyard_recipe 的配方机位
+停在 v2 坐标（更新到 v3 center-trio）、deform_strip 的 flags.0 目标在分区
+激活下不在场（测试改钉 p5 档，经 CourtyardSettings 注入——zone 是视图
+作用域参数，配方 parameters 不支持）、portable_session_upgrades 的 hybrid
+预期停在内容重建语义（W1 起为附件 live 换，改 Applied）、unenabled_device
+的「Stage A 未请求 Bindless」前提在本机失效（快照默认启用；改为从快照显式
+摘除特性，测拒绝合同本身，宿主无关）。四条修复后各自实测绿。

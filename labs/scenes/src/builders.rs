@@ -9,6 +9,7 @@
 use bevy::{
     asset::{Assets, RenderAssetUsages},
     color::LinearRgba,
+    ecs::reflect::ReflectResource,
     image::Image,
     math::{Mat4, Quat, Vec3, primitives::Cylinder, primitives::Sphere},
     mesh::{Mesh, Meshable, skinning::SkinnedMesh},
@@ -19,7 +20,7 @@ use bevy::{
 use bevy_stylized::prelude::*;
 use bevy_stylized::stylized_render::post::{StylizedDisplayTransform, StylizedPostProcess};
 
-use crate::metadata::{COURTYARD_LOD_BALLS, COURTYARD_PODIUM_RING, COURTYARD_TRIO_BALLS};
+use crate::metadata::{COURTYARD_LOD_BALLS, COURTYARD_TRIO_BALLS};
 use crate::recipe::{CameraAttachment, CameraRecipe};
 
 /// 可寻址场景节点：稳定逻辑 ID 的注册组件（docs/showcase/01 line 92/224
@@ -315,13 +316,14 @@ pub fn build_portable_instances_world(world: &mut World, n: u32) {
 }
 
 // ---------------------------------------------------------------------------
-// courtyard（docs/showcase/05）：庭院展台合成场景——全部渲染特性作为分区
-// 同屏出现；参数面（§8）经 CourtyardSettings 资源进入构建（缺席 = §0 默认
-// 状态 day/hull/100/false/rest/None）。
+// courtyard（docs/showcase/05）：庭院展台合成场景——渲染特性按分区组织，
+// v2 分区激活（聚焦分区展品生成，画框常驻；overview = 同屏全显浏览模式）；
+// 参数面（§8）经 CourtyardSettings 资源进入构建（缺席 = §0 默认状态
+// trio/day/hull/100/false/rest/None）。
 // ---------------------------------------------------------------------------
 
 /// courtyard 时刻参数（§8：view preset 选择）。
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, bevy::prelude::Reflect)]
 pub enum CourtyardTimeOfDay {
     /// 昼（§0 默认）。
     #[default]
@@ -333,7 +335,7 @@ pub enum CourtyardTimeOfDay {
 }
 
 /// courtyard 描边模式（§8：P2/P3 内容 + 相机附件；hybrid 需 Standard）。
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, bevy::prelude::Reflect)]
 pub enum CourtyardOutlineMode {
     /// 无描边。
     Off,
@@ -345,7 +347,7 @@ pub enum CourtyardOutlineMode {
 }
 
 /// courtyard 旗帜姿态（§8：posed = root 旋转 0.5 rad 的确定性定姿态）。
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, bevy::prelude::Reflect)]
 pub enum CourtyardFlagsPose {
     /// 静止（§0 默认）。
     #[default]
@@ -354,12 +356,132 @@ pub enum CourtyardFlagsPose {
     Posed,
 }
 
+/// courtyard 展台内容（v3 展亭模式，2026-09-30 owner 决策）：每个档位在
+/// 中央平台生成对应展品；画框（场地壳/平台）常驻。v2 的 `Overview`
+/// 同屏浏览模式随 v3 退役（同位必穿模；浏览全部内容归导览模式 G）。
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, bevy::prelude::Reflect)]
+pub enum CourtyardZone {
+    /// 中央三对照组（§0 默认内容）。
+    #[default]
+    Trio,
+    /// P1 ramp。
+    P1,
+    /// P2 描边 hull。
+    P2,
+    /// P3 描边 hybrid。
+    P3,
+    /// P4 光照对照。
+    P4,
+    /// P5 旗帜。
+    P5,
+    /// LOD 轴。
+    Lod,
+    /// 角色台（GLB，资产门控）。
+    Stage,
+    /// 实例灯阵。
+    Lamps,
+    /// rim 边缘光对照（V4）。
+    Rim,
+    /// 阴影形状对照（V4）。
+    Shadow,
+    /// Character 四色 palette 对照（V4）。
+    Palette,
+    /// Hero 金属三色 + spec ramp（V4）。
+    Metal,
+    /// alpha 镂空卡片（V4）。
+    Cutout,
+}
+
+impl CourtyardZone {
+    /// zone 参数值（§8；catalog 枚举选项与捕获规格钉值共用）。
+    #[must_use]
+    pub fn id(self) -> &'static str {
+        match self {
+            CourtyardZone::Trio => "trio",
+            CourtyardZone::P1 => "p1",
+            CourtyardZone::P2 => "p2",
+            CourtyardZone::P3 => "p3",
+            CourtyardZone::P4 => "p4",
+            CourtyardZone::P5 => "p5",
+            CourtyardZone::Lod => "lod",
+            CourtyardZone::Stage => "stage",
+            CourtyardZone::Lamps => "lamps",
+            CourtyardZone::Rim => "rim",
+            CourtyardZone::Shadow => "shadow",
+            CourtyardZone::Palette => "palette",
+            CourtyardZone::Metal => "metal",
+            CourtyardZone::Cutout => "cutout",
+        }
+    }
+
+    /// 从参数值解析（捕获规格/控制器入口；catalog 已校验取值）。
+    #[must_use]
+    pub fn from_id(id: &str) -> Option<Self> {
+        Some(match id {
+            "trio" => CourtyardZone::Trio,
+            "p1" => CourtyardZone::P1,
+            "p2" => CourtyardZone::P2,
+            "p3" => CourtyardZone::P3,
+            "p4" => CourtyardZone::P4,
+            "p5" => CourtyardZone::P5,
+            "lod" => CourtyardZone::Lod,
+            "stage" => CourtyardZone::Stage,
+            "lamps" => CourtyardZone::Lamps,
+            "rim" => CourtyardZone::Rim,
+            "shadow" => CourtyardZone::Shadow,
+            "palette" => CourtyardZone::Palette,
+            "metal" => CourtyardZone::Metal,
+            "cutout" => CourtyardZone::Cutout,
+            _ => return None,
+        })
+    }
+}
+
+/// courtyard 角色台展品（v2 增补，2026-09-29 owner 决策）：`Fixture` =
+/// 合成 reference-scene GLB（golden 判定/证据测试内容，可提交基线）；
+/// `Odette` = 真 Genshin 角色（compiled static-v3，经 `odette://` 资产源 +
+/// `.npr.json` sidecar adoption；第三方美术只进交互展示，不进 golden——
+/// ADR-0017 来源政策，golden-local 已退役）。
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, bevy::prelude::Reflect)]
+pub enum CourtyardStageCharacter {
+    /// 合成 fixture（默认；全部捕获规格/证据测试使用）。
+    #[default]
+    Fixture,
+    /// 真 Genshin 角色（genshin-odette compiled static-v3；交互展示档）。
+    Odette,
+}
+
+impl CourtyardStageCharacter {
+    /// stage_character 参数值（catalog 枚举选项共用）。
+    #[must_use]
+    pub fn id(self) -> &'static str {
+        match self {
+            CourtyardStageCharacter::Fixture => "fixture",
+            CourtyardStageCharacter::Odette => "odette",
+        }
+    }
+
+    /// 从参数值解析（控制器入口；catalog 已校验取值）。
+    #[must_use]
+    pub fn from_id(id: &str) -> Option<Self> {
+        Some(match id {
+            "fixture" => CourtyardStageCharacter::Fixture,
+            "odette" => CourtyardStageCharacter::Odette,
+            _ => return None,
+        })
+    }
+}
+
 /// courtyard 场景参数（§8 参数面的构建期通道；§0 默认状态 = `Default`：
-/// day / hull / crowd=100 / post off / flags rest / face_threshold None）。
+/// zone=trio / day / hull / crowd=100 / post off / flags rest /
+/// face_threshold None / stage_character=fixture）。
 ///
 /// builder 经 `world.get_resource::<CourtyardSettings>()` 读取，缺席用默认。
-#[derive(bevy::prelude::Resource, Clone, Copy, Debug, PartialEq)]
+#[derive(bevy::prelude::Resource, bevy::prelude::Reflect, Clone, Copy, Debug, PartialEq)]
+#[reflect(Resource)]
 pub struct CourtyardSettings {
+    /// 分区激活（v2：聚焦分区展品生成 + 机位联动；overview = 全展品）。
+    pub zone: CourtyardZone,
     /// 时刻（day/dusk/night）。
     pub time_of_day: CourtyardTimeOfDay,
     /// 描边模式（off/hull/hybrid）。
@@ -372,27 +494,35 @@ pub struct CourtyardSettings {
     pub flags: CourtyardFlagsPose,
     /// 中央前排 face 组 SDF 阈值覆盖（None = 三阈值梯度 0.2/默认/0.8）。
     pub face_threshold: Option<f32>,
+    /// 角色台展品（fixture/odette；默认 fixture——golden 与证据测试内容）。
+    pub stage_character: CourtyardStageCharacter,
 }
 
 impl Default for CourtyardSettings {
     fn default() -> Self {
         Self {
+            zone: CourtyardZone::Trio,
             time_of_day: CourtyardTimeOfDay::Day,
             outline_mode: CourtyardOutlineMode::Hull,
             crowd: 100,
             post: false,
             flags: CourtyardFlagsPose::Rest,
             face_threshold: None,
+            stage_character: CourtyardStageCharacter::Fixture,
         }
     }
 }
 
-/// 庭院展台：分区合成（§3 布局；§4 分区详设）。
+/// 庭院展台：分区合成（§3 布局；§4 分区详设；v2 分区激活——只有聚焦
+/// 分区的展品生成，场地壳/展台画框常驻；overview = 全展品同屏）。
 pub fn courtyard(world: &mut World) -> CameraRecipe {
     let settings = world
         .get_resource::<CourtyardSettings>()
         .copied()
         .unwrap_or_default();
+    // 实体桶登记簿（W3 动态装卸）：每代重建——画框桶随场地壳常驻，
+    // 展品桶随内容档位生成。
+    world.insert_resource(CourtyardBuckets::default());
     // time_of_day → 庭院专用视图 preset（雾范围按庭院景深重调，见
     // views::courtyard_*；builder 在 driver 应用 binding.view 之后运行，
     // 写 StylizedViewSettings 即生效，与 builders::lighting 同一通道）。
@@ -404,19 +534,127 @@ pub fn courtyard(world: &mut World) -> CameraRecipe {
             CourtyardTimeOfDay::Night => crate::views::courtyard_night(&mut view.0),
         }
     }
-    courtyard_shell(world);
-    courtyard_trio(world, settings.face_threshold);
-    courtyard_p1_ramp(world);
-    courtyard_p2_outline(world);
-    courtyard_p3_hybrid(world);
-    courtyard_p4_effects(world);
-    courtyard_p5_flags(world, settings.flags);
-    courtyard_lod_axis(world);
-    courtyard_reference_stage(world);
-    courtyard_lamps(world, settings.crowd);
+    // 画框桶（W3：跨代常驻，任何参数切换不装卸）。
+    build_bucket(world, "frame", courtyard_shell);
+    for zone in EXHIBIT_ZONES {
+        if settings.zone == zone {
+            build_courtyard_zone(world, zone, &settings);
+        }
+    }
     // CameraRecipe 只有单附件槽（多附件替换 API 是 §11.1 的后续阶段）；
     // §9 捕获矩阵中 hybrid 与 post 不组合，hybrid 优先。
-    let attachment = match (settings.outline_mode, settings.post) {
+    let attachment = courtyard_attachment(&settings);
+    // 机位随内容档位（§7 一一对应）。
+    let preset_id = crate::metadata::courtyard_zone_camera_preset(settings.zone.id())
+        .expect("zone camera preset resolves");
+    let preset = crate::metadata::COURTYARD_CAMERA_PRESETS
+        .iter()
+        .find(|preset| preset.id == preset_id)
+        .expect("zone camera preset in table");
+    CameraRecipe::with_attachment(preset.eye, preset.look, attachment)
+}
+
+/// courtyard 展品分区（装卸循环序；overview 不是展品桶——它激活全部）。
+const EXHIBIT_ZONES: [CourtyardZone; 14] = [
+    CourtyardZone::Trio,
+    CourtyardZone::P1,
+    CourtyardZone::P2,
+    CourtyardZone::P3,
+    CourtyardZone::P4,
+    CourtyardZone::P5,
+    CourtyardZone::Lod,
+    CourtyardZone::Stage,
+    CourtyardZone::Lamps,
+    CourtyardZone::Rim,
+    CourtyardZone::Shadow,
+    CourtyardZone::Palette,
+    CourtyardZone::Metal,
+    CourtyardZone::Cutout,
+];
+
+/// 构建一个分区展品桶（构建与增量更新共用，单一源）。
+fn build_courtyard_zone(world: &mut World, zone: CourtyardZone, settings: &CourtyardSettings) {
+    build_bucket(world, zone.id(), |world| match zone {
+        CourtyardZone::Trio => courtyard_trio(world, settings.face_threshold),
+        CourtyardZone::P1 => courtyard_p1_ramp(world),
+        CourtyardZone::P2 => courtyard_p2_outline(world),
+        CourtyardZone::P3 => courtyard_p3_hybrid(world),
+        CourtyardZone::P4 => courtyard_p4_effects(world),
+        CourtyardZone::P5 => courtyard_p5_flags(world, settings.flags),
+        CourtyardZone::Lod => courtyard_lod_axis(world),
+        CourtyardZone::Stage => courtyard_reference_stage(world, settings.stage_character),
+        CourtyardZone::Lamps => courtyard_lamps(world, settings.crowd),
+        CourtyardZone::Rim => courtyard_rim(world),
+        CourtyardZone::Shadow => courtyard_shadow(world),
+        CourtyardZone::Palette => courtyard_palette(world),
+        CourtyardZone::Metal => courtyard_metal(world),
+        CourtyardZone::Cutout => courtyard_cutout(world),
+    });
+}
+
+/// courtyard 增量更新的结果（W3）。
+pub struct CourtyardUpdate {
+    /// 新相机配方（机位联动 §7 + 附件 W1，与全量构建同一来源）。
+    pub recipe: CameraRecipe,
+    /// 待退役实体（旧分区/重装桶；despawn 时序归调用方——先装后卸，
+    /// 补间落定后才退役旧区，见 05 §12 W1–W3 时序规则）。
+    pub retire: Vec<bevy::prelude::Entity>,
+}
+
+/// courtyard 增量更新（W3：分区展品动态装卸）。按 prev → next 的 diff
+/// 装载/退役展品桶；画框与观测相机常驻不动。只读写世界内容，
+/// 代次/账本/相机应用归 driver（`CaseDriver::note_content_update`）。
+///
+/// 参数敏感性（W0 矩阵）：zone = 卸旧区装新区；stage_character = 重装
+/// stage 桶（在场时）；crowd = 重装 lamps 桶（在场时）；face_threshold/
+/// flags/post/outline_mode/time_of_day 不进本函数（live 路径，05 §11.2）。
+pub fn courtyard_update(
+    world: &mut World,
+    prev: CourtyardSettings,
+    next: CourtyardSettings,
+) -> CourtyardUpdate {
+    let mut retire = Vec::new();
+    for zone in EXHIBIT_ZONES {
+        let id = zone.id();
+        let want = next.zone == zone;
+        // 内容参数重装触发（展品在场才有意义；不在场 = 设置已记录，
+        // 下次激活时按新值生成）。
+        let reload = match zone {
+            CourtyardZone::Stage => prev.stage_character != next.stage_character,
+            CourtyardZone::Lamps => prev.crowd != next.crowd,
+            _ => false,
+        };
+        let present = world
+            .get_resource::<CourtyardBuckets>()
+            .is_some_and(|buckets| buckets.exhibits.contains_key(id));
+        if present && (!want || reload) {
+            if let Some(mut buckets) = world.get_resource_mut::<CourtyardBuckets>() {
+                retire.extend(buckets.unload(id));
+            }
+        }
+        if want && (!present || reload) {
+            build_courtyard_zone(world, zone, &next);
+        }
+    }
+    // 相机配方与全量构建同一来源（机位联动 + 附件选择）。
+    let preset_id = crate::metadata::courtyard_zone_camera_preset(next.zone.id())
+        .expect("zone camera preset resolves");
+    let preset = crate::metadata::COURTYARD_CAMERA_PRESETS
+        .iter()
+        .find(|preset| preset.id == preset_id)
+        .expect("zone camera preset in table");
+    CourtyardUpdate {
+        recipe: CameraRecipe::with_attachment(preset.eye, preset.look, courtyard_attachment(&next)),
+        retire,
+    }
+}
+
+/// courtyard 相机附件选择（§11.1：附件由参数驱动、与机位正交；hybrid 与
+/// post 不组合，hybrid 优先）。builder 与控制器 live 附件切换（05 §11.2
+/// post/outline_mode 行）共用单一源。
+#[must_use]
+pub fn courtyard_attachment(settings: &CourtyardSettings) -> CameraAttachment {
+    match (settings.outline_mode, settings.post) {
         (CourtyardOutlineMode::Hybrid, _) => CameraAttachment::ScreenOutline,
         (_, true) => CameraAttachment::PostProcess(StylizedPostProcess {
             vignette_strength: 0.5,
@@ -425,9 +663,79 @@ pub fn courtyard(world: &mut World) -> CameraRecipe {
             ..StylizedPostProcess::default()
         }),
         (_, false) => CameraAttachment::None,
-    };
-    let panorama = &crate::metadata::COURTYARD_CAMERA_PRESETS[0];
-    CameraRecipe::with_attachment(panorama.eye, panorama.look, attachment)
+    }
+}
+
+/// courtyard 实体桶（W3 分区动态装卸的登记簿）：画框桶跨代常驻，展品桶
+/// 随分区装卸。builder 构建（[`courtyard`]）与增量更新（[`courtyard_update`]）
+/// 共用；只登记根实体（子实体随递归 despawn 退役，与账本同一口径）。
+#[derive(bevy::prelude::Resource, Clone, Debug, Default, PartialEq)]
+pub struct CourtyardBuckets {
+    /// 画框（地面/铺装/墙/平台）——任何参数切换都不动（v3：展台环退役）。
+    pub frame: Vec<bevy::prelude::Entity>,
+    /// 分区展品（key = 分区 id；只有激活分区的桶在场）。
+    pub exhibits: std::collections::HashMap<&'static str, Vec<bevy::prelude::Entity>>,
+}
+
+impl CourtyardBuckets {
+    /// 登记实体到桶（`"frame"` = 画框，其余 = 分区 id）。
+    pub fn register(&mut self, bucket: &'static str, entity: bevy::prelude::Entity) {
+        if bucket == "frame" {
+            self.frame.push(entity);
+        } else {
+            self.exhibits.entry(bucket).or_default().push(entity);
+        }
+    }
+
+    /// 卸下一个分区桶（从登记簿移除并返回实体；despawn 时序归调用方——
+    /// 05 §12 W1–W3 时序规则：先装后卸，补间落定后才退役旧区）。
+    pub fn unload(&mut self, zone: &str) -> Vec<bevy::prelude::Entity> {
+        self.exhibits.remove(zone).unwrap_or_default()
+    }
+}
+
+/// 在桶内构建（W3：分区动态装卸登记——差值登记法：构建前后实体快照差 =
+/// 本桶内容，登记与生成代码零耦合、无漏登风险）。子实体一并入桶，退役
+/// 时按根过滤（[`retire_entities`]，与 SceneLedger::retire 同一口径）。
+fn build_bucket(world: &mut World, bucket: &'static str, build: impl FnOnce(&mut World)) {
+    let before: std::collections::HashSet<bevy::prelude::Entity> =
+        world.iter_entities().map(|entity| entity.id()).collect();
+    build(world);
+    let spawned: Vec<bevy::prelude::Entity> = world
+        .iter_entities()
+        .map(|entity| entity.id())
+        .filter(|entity| !before.contains(entity))
+        .collect();
+    if let Some(mut buckets) = world.get_resource_mut::<CourtyardBuckets>() {
+        for entity in spawned {
+            buckets.register(bucket, entity);
+        }
+    }
+}
+
+/// 退役一批实体（W3 增量更新：调用方按补间时序执行——先装后卸，补间
+/// 落定后才退役旧区；只 despawn 桶内根实体，子实体随递归 despawn
+/// 退役——与 SceneLedger::retire 同一口径；已不在场的实体跳过）。
+pub fn retire_entities(world: &mut World, entities: &[bevy::prelude::Entity]) {
+    let set: std::collections::HashSet<bevy::prelude::Entity> =
+        entities.iter().copied().collect();
+    for &entity in entities {
+        let is_root = world
+            .get_entity(entity)
+            .ok()
+            .and_then(|entity_ref| {
+                entity_ref
+                    .get::<bevy::prelude::ChildOf>()
+                    .map(|parent| parent.parent())
+            })
+            .is_none_or(|parent| !set.contains(&parent));
+        if !is_root {
+            continue;
+        }
+        if let Ok(entity_mut) = world.get_entity_mut(entity) {
+            entity_mut.despawn();
+        }
+    }
 }
 
 /// 低饱和 Cel 材质（§2 色彩纪律：固有色低饱和，饱和度只出现在展品上）。
@@ -510,7 +818,8 @@ fn courtyard_shell(world: &mut World) {
             ));
         }
     }
-    // 中央平台：半径 2.2、高 0.3 圆台。
+    // 中央平台：半径 2.2、高 0.3 圆台。v3 展亭模式：唯一舞台（展台环
+    // 退役——空展台在单舞台模式里读作误导）。
     let platform = world.resource_mut::<Assets<Mesh>>().add(Cylinder::new(
         crate::metadata::COURTYARD_PLATFORM_RADIUS,
         0.3,
@@ -520,20 +829,6 @@ fn courtyard_shell(world: &mut World) {
         MeshMaterial3d(stand_material.clone()),
         Transform::from_xyz(0.0, 0.15, 0.0),
     ));
-    // 展台环：半径 5.5，60° 均布 6 座（0.8×0.8×1.0 方柱，顶面 y=1.0）。
-    let podium_mesh =
-        world
-            .resource_mut::<Assets<Mesh>>()
-            .add(bevy::math::primitives::Cuboid::from_size(Vec3::new(
-                0.8, 1.0, 0.8,
-            )));
-    for podium in COURTYARD_PODIUM_RING {
-        world.spawn((
-            Mesh3d(podium_mesh.clone()),
-            MeshMaterial3d(stand_material.clone()),
-            Transform::from_xyz(podium.x, 0.5, podium.z),
-        ));
-    }
 }
 
 /// 中央平台：三对照组 7 球（§4；face 前排 / hair 中排 / metal 后排，
@@ -544,12 +839,13 @@ fn courtyard_trio(world: &mut World, face_threshold: Option<f32>) {
         .resource_mut::<Assets<Mesh>>()
         .add(Cylinder::new(0.12, 0.7));
     let pedestal_material = courtyard_cel_material(world, LinearRgba::new(0.70, 0.68, 0.64, 1.0));
-    for (center, _) in COURTYARD_TRIO_BALLS {
+    for (center, _radius) in COURTYARD_TRIO_BALLS {
         world.spawn((
             Mesh3d(pedestal_mesh.clone()),
             MeshMaterial3d(pedestal_material.clone()),
             Transform::from_xyz(center.x, 0.65, center.z),
         ));
+        // 三对照组球 = trio 展品本体（06 §5）。
     }
 
     // face 前排：Character + face SDF（builders::face 的 128×128 线性渐变）。
@@ -680,10 +976,25 @@ fn courtyard_trio(world: &mut World, face_threshold: Option<f32>) {
     }
 }
 
-/// P1 · ramp 展台（东）：4 小球横排，左 1 解析 ramp，右 3 纹理 ramp
-/// 行 0/1/2（回收 builders::ramp 的对照语义）。
+/// 展台球基座（trio 形制：r0.12、高 0.7 圆柱，台面 y0.3 起、顶 y1.0）——
+/// v3 平台内容的统一展台语言（p1/p2/p4 横排球共用）。
+fn spawn_pedestals(world: &mut World, xs: &[f32]) {
+    let mesh = world
+        .resource_mut::<Assets<Mesh>>()
+        .add(Cylinder::new(0.12, 0.7));
+    let material = courtyard_cel_material(world, LinearRgba::new(0.70, 0.68, 0.64, 1.0));
+    for &x in xs {
+        world.spawn((
+            Mesh3d(mesh.clone()),
+            MeshMaterial3d(material.clone()),
+            Transform::from_xyz(x, 0.65, 0.0),
+        ));
+    }
+}
+
+/// P1 · ramp 内容（v3 上平台）：4 小球横排，左 1 解析 ramp，右 3 纹理
+/// ramp 行 0/1/2（回收 builders::ramp 的对照语义）。
 fn courtyard_p1_ramp(world: &mut World) {
-    let podium = COURTYARD_PODIUM_RING[0];
     let mesh = sphere(world, 0.28);
     let analytic = cel_material(world);
     let ramp = world.resource_mut::<Assets<Image>>().add(ramp_image(&[
@@ -698,11 +1009,12 @@ fn courtyard_p1_ramp(world: &mut World) {
             ramp_texture: Some(ramp),
             ..StylizedCelMaterial::default()
         });
-    // 横排（沿 X，正对 panorama 相机），球心位于展台顶面高度。
+    // 横排（沿 X，正对 hero 机位），球心高 = 基座顶 1.0 + r0.28。
+    spawn_pedestals(world, &[-1.05, -0.35, 0.35, 1.05]);
     world.spawn((
         Mesh3d(mesh.clone()),
         MeshMaterial3d(analytic),
-        Transform::from_xyz(podium.x - 1.05, 1.28, podium.z),
+        Transform::from_xyz(-1.05, 1.28, 0.0),
     ));
     for (i, dx) in [-0.35, 0.35, 1.05].into_iter().enumerate() {
         world.spawn((
@@ -712,17 +1024,17 @@ fn courtyard_p1_ramp(world: &mut World) {
                 profile_index: i as u32,
                 ..StylizedInstanceData::default()
             },
-            Transform::from_xyz(podium.x + dx, 1.28, podium.z),
+            Transform::from_xyz(dx, 1.28, 0.0),
         ));
     }
 }
 
-/// P2 · 描边 hull 展台（东南，近相机）：3 球纵列，hull 宽度 0/2/8
-/// （回收 builders::outline 的宽度梯度）。
+/// P2 · 描边 hull 内容（v3 上平台）：3 球横排，hull 宽度 0/2/8
+/// （回收 builders::outline 的宽度梯度；横排正对 hero 机位读宽度梯度）。
 fn courtyard_p2_outline(world: &mut World) {
-    let podium = COURTYARD_PODIUM_RING[1];
     let mesh = sphere(world, 0.35);
     let material = cel_material(world);
+    spawn_pedestals(world, &[-0.75, 0.0, 0.75]);
     for (i, width) in [0.0, 2.0, 8.0].into_iter().enumerate() {
         let outline =
             world
@@ -736,7 +1048,7 @@ fn courtyard_p2_outline(world: &mut World) {
         let mut entity = world.spawn((
             Mesh3d(mesh.clone()),
             MeshMaterial3d(material.clone()),
-            Transform::from_xyz(podium.x, 1.35, podium.z + (i as f32 - 1.0) * 0.75),
+            Transform::from_xyz((i as f32 - 1.0) * 0.75, 1.35, 0.0),
         ));
         if width > 0.0 {
             entity.insert(StylizedOutline::new(outline));
@@ -744,11 +1056,10 @@ fn courtyard_p2_outline(world: &mut World) {
     }
 }
 
-/// P3 · 描边 hybrid 展台（西南）：方块堆（2 cuboid + 1 小球），hull 剪影
-/// 始终在；screen-space 内部边缘经相机附件声明（outline_mode=Hybrid 时，
-/// 由 builders::courtyard 的 CameraRecipe 携带；Off/Hull 时 hull-only）。
+/// P3 · 描边 hybrid 内容（v3 上平台）：方块堆（2 cuboid + 1 小球），hull
+/// 剪影始终在；screen-space 内部边缘经相机附件声明（outline_mode=Hybrid
+/// 时由 CameraRecipe 携带；Off/Hull 时 hull-only）。
 fn courtyard_p3_hybrid(world: &mut World) {
-    let podium = COURTYARD_PODIUM_RING[2];
     let material = cel_material(world);
     let outline =
         world
@@ -772,24 +1083,25 @@ fn courtyard_p3_hybrid(world: &mut World) {
                 0.3, 0.3, 0.3,
             )));
     let ball = world.resource_mut::<Assets<Mesh>>().add(Sphere::new(0.18));
+    // 台面（y0.3）起堆：大盒贴面、小盒与球叠上。
     for (mesh, offset) in [
-        (big_box, Vec3::new(0.0, 1.125, 0.0)),
-        (small_box, Vec3::new(-0.1, 1.4, 0.05)),
-        (ball, Vec3::new(0.15, 1.43, 0.1)),
+        (big_box, Vec3::new(0.0, 0.425, 0.0)),
+        (small_box, Vec3::new(-0.1, 0.7, 0.05)),
+        (ball, Vec3::new(0.15, 0.73, 0.1)),
     ] {
         world.spawn((
             Mesh3d(mesh),
             MeshMaterial3d(material.clone()),
             StylizedOutline::new(outline.clone()),
-            Transform::from_translation(Vec3::new(podium.x, 0.0, podium.z) + offset),
+            Transform::from_translation(offset),
         ));
     }
 }
 
-/// P4 · 光照对照展台（西）：3 个 Hero 球横排——无覆盖 / key light 锁 +Z /
-/// 锁 −Z（`with_effect_light_dir`，回收 builders::effects 的对照语义）。
+/// P4 · 光照对照内容（v3 上平台）：3 个 Hero 球横排——无覆盖 / key light
+/// 锁 +Z / 锁 −Z（`with_effect_light_dir`，回收 builders::effects 的对照
+/// 语义）。
 fn courtyard_p4_effects(world: &mut World) {
-    let podium = COURTYARD_PODIUM_RING[3];
     let mesh = sphere(world, 0.35);
     let base = StylizedHeroParams::default().with_ramp_rows(1.0);
     let mut locked = base;
@@ -805,20 +1117,20 @@ fn courtyard_p4_effects(world: &mut World) {
             },
         ));
     }
+    spawn_pedestals(world, &[-1.0, 0.0, 1.0]);
     for (material, dx) in materials.into_iter().zip([-1.0, 0.0, 1.0]) {
         world.spawn((
             Mesh3d(mesh.clone()),
             MeshMaterial3d(material),
-            Transform::from_xyz(podium.x + dx, 1.35, podium.z),
+            Transform::from_xyz(dx, 1.35, 0.0),
         ));
     }
 }
 
-/// P5 · 旗帜（西北）：两根旗杆（高 2.6，立于展台顶面）挂双骨骼蒙皮条带
+/// P5 · 旗帜（v3 上平台）：两根旗杆（高 2.6，立于台面）挂双骨骼蒙皮条带
 /// 旗面（build_strip_world）；posed 时 root 旋转 0.5 rad（确定性定姿态，
 /// 回收 builders::animation 的姿态语义）。
 fn courtyard_p5_flags(world: &mut World, pose: CourtyardFlagsPose) {
-    let podium = COURTYARD_PODIUM_RING[4];
     let pole_mesh = world
         .resource_mut::<Assets<Mesh>>()
         .add(Cylinder::new(0.05, 2.6));
@@ -827,15 +1139,16 @@ fn courtyard_p5_flags(world: &mut World, pose: CourtyardFlagsPose) {
     let flag_material = courtyard_cel_material(world, LinearRgba::new(0.75, 0.22, 0.20, 1.0));
     const FLAG_TARGETS: [(&str, &str); 2] =
         [("flags.0", "flags.0.tip"), ("flags.1", "flags.1.tip")];
-    for (i, pole_x) in [-3.15f32, -2.35].into_iter().enumerate() {
+    // v3 上平台：杆 x ±0.4、立于台面（y0.3 起，杆顶 2.9）；条带自杆顶垂下。
+    for (i, pole_x) in [-0.4f32, 0.4].into_iter().enumerate() {
         world.spawn((
             Mesh3d(pole_mesh.clone()),
             MeshMaterial3d(pole_material.clone()),
-            Transform::from_xyz(pole_x, 2.3, podium.z),
+            Transform::from_xyz(pole_x, 1.6, 0.0),
         ));
         let root = build_strip_world_with_material(world, flag_material.clone());
         // 条带 bind 姿态占 y∈[-1.2,1.2]、root 关节在带底；root 放到
-        // (x, 1.2, z) 使旗面占 y∈[1.2,3.6]（自杆顶垂下），横向偏移
+        // (x, 0.5, 0) 使旗面占 y∈[0.5,2.9]（自杆顶垂下），横向偏移
         // +0.45 避免旗杆穿透旗面。
         let (root_target, tip_target) = FLAG_TARGETS[i];
         let tip = world
@@ -845,7 +1158,7 @@ fn courtyard_p5_flags(world: &mut World, pose: CourtyardFlagsPose) {
         {
             let mut entity = world.entity_mut(root);
             let mut transform = entity.get_mut::<Transform>().expect("transform");
-            transform.translation = Vec3::new(pole_x + 0.45, 1.2, podium.z);
+            transform.translation = Vec3::new(pole_x + 0.45, 0.5, 0.0);
             if pose == CourtyardFlagsPose::Posed {
                 transform.rotation = Quat::from_rotation_z(0.5);
             }
@@ -867,8 +1180,8 @@ fn courtyard_p5_flags(world: &mut World, pose: CourtyardFlagsPose) {
         };
         world.entity_mut(strip_entity).insert((
             bevy::camera::primitives::Aabb::from_min_max(
-                Vec3::new(pole_x - 1.2, 0.9, podium.z - 0.2),
-                Vec3::new(pole_x + 0.95, 3.8, podium.z + 0.2),
+                Vec3::new(pole_x - 1.2, 0.2, -0.2),
+                Vec3::new(pole_x + 0.95, 3.1, 0.2),
             ),
             bevy::camera::visibility::NoAutoAabb,
         ));
@@ -915,16 +1228,20 @@ fn courtyard_lod_axis(world: &mut World) {
     }
 }
 
-/// 角色台（北 (0,0,−8)，§4 资产门控区）：reference-scene GLB 角色展示。
+/// 角色台（v3 上平台：台基座立于台面 (0,0.55,0)，角色站基座顶 y0.8）：
+/// fixture = 合成 reference-scene GLB（golden/证据内容）；odette = 真
+/// Genshin 角色（compiled static-v3，经 `odette://` 资产源 + sidecar 资产
+/// adoption，交互展示档）。
 /// 资产缺席 = 该 lane BLOCKED，不做空台降级（S4 决策）。
 ///
-/// 角色经 `StylizedMaterialSet` 挂 NPR 材质（Character class，底色取 GLB
-/// 内联 baseColorFactor）：fixture 的 `_NPR_*` 语义与 §4「角色特性在角色
+/// fixture 角色经 `StylizedMaterialSet` 挂 NPR 材质（Character class，底色取
+/// GLB 内联 baseColorFactor）：fixture 的 `_NPR_*` 语义与 §4「角色特性在角色
 /// 本体上的真实 NPR 效果展示」由此落实；同时消除 vanilla StandardMaterial
 /// 路径（其 PBR 在 Dawn/Metal 下渲染纯黑——host 限定上游差异，见
-/// docs/platforms）。宿主须在插件装配中加 `StylizedAssetIntegrationPlugin`
-/// （adoption 系统由宿主注册，材质集数据由本构建器提供）。
-fn courtyard_reference_stage(world: &mut World) {
+/// docs/platforms）。odette 档材质集由 `StylizedSidecarSource` 从
+/// `odette://character.npr.json` 资产生成（同一 adoption 链路，宿主只须装配
+/// `StylizedAssetIntegrationPlugin` 并注册 `odette` 资产源）。
+fn courtyard_reference_stage(world: &mut World, character: CourtyardStageCharacter) {
     let stage_material = courtyard_cel_material(world, LinearRgba::new(0.70, 0.68, 0.64, 1.0));
     let stage = world
         .resource_mut::<Assets<Mesh>>()
@@ -932,11 +1249,49 @@ fn courtyard_reference_stage(world: &mut World) {
     world.spawn((
         Mesh3d(stage),
         MeshMaterial3d(stage_material),
-        Transform::from_xyz(0.0, 0.25, -8.0),
+        Transform::from_xyz(0.0, 0.55, 0.0),
     ));
-    let scene = world
-        .resource::<bevy::asset::AssetServer>()
-        .load("reference_scene.glb#Scene0");
+    let server = world.resource::<bevy::asset::AssetServer>().clone();
+    match character {
+        CourtyardStageCharacter::Odette => {
+            let scene = server.load("odette://character.glb#Scene0");
+            let sidecar = server.load("odette://character.npr.json");
+            // 面部 SDF 光照基订正：static-v3 是静态烘焙导出——Face 网格节点
+            // 无旋转（恒等变换，顶点已是最终朝向），sidecar 的 face 基向量
+            // 是 Blender 原作者空间（forward (0,−1,0)），直接代入会把脸判定
+            // 成背光（黑脸；六视角验收靠 per-case host face_forward 校准补偿，
+            // 庭院无该通道）。角色台上面部朝 +Z（南，机位侧），覆盖为
+            // 世界朝向 + 正面来光——per-material 覆盖只动该材质，不改全局
+            // view（golden 光照口径不变）。材质名是 odette compiled 资产
+            // 合同的一部分。
+            let face_basis = std::collections::BTreeMap::from([
+                ("face_forward_x".to_string(), 0.0),
+                ("face_forward_y".to_string(), 0.0),
+                ("face_forward_z".to_string(), 1.0),
+                ("face_up_x".to_string(), 0.0),
+                ("face_up_y".to_string(), 1.0),
+                ("face_up_z".to_string(), 0.0),
+                ("effect_light_dir_0".to_string(), 0.0),
+                ("effect_light_dir_1".to_string(), 0.0),
+                ("effect_light_dir_2".to_string(), 1.0),
+            ]);
+            world.spawn((
+                bevy::world_serialization::WorldAssetRoot(scene),
+                bevy_stylized::StylizedSidecarSource {
+                    sidecar,
+                    texture_prefix: "odette://".to_string(),
+                    param_overrides: std::collections::BTreeMap::from([(
+                        "runtime_HoYoverse___Odette_Face".to_string(),
+                        face_basis,
+                    )]),
+                },
+                Transform::from_xyz(0.0, 0.8, 0.0),
+            ));
+            return;
+        }
+        CourtyardStageCharacter::Fixture => {}
+    }
+    let scene = server.load("reference_scene.glb#Scene0");
     let descriptor = |name: &str, base: [f32; 3]| StylizedMaterialDescriptor {
         name: name.to_string(),
         surface_class: StylizedSurfaceClass::Character,
@@ -968,7 +1323,7 @@ fn courtyard_reference_stage(world: &mut World) {
             .collect(),
             texture_prefix: String::new(),
         },
-        Transform::from_xyz(0.0, 0.5, -8.0),
+        Transform::from_xyz(0.0, 0.8, 0.0),
     ));
 }
 
@@ -1034,6 +1389,189 @@ fn courtyard_lamps(world: &mut World, crowd: u32) {
     }
 }
 
+/// rim · 边缘光对照（V4）：3 球横排——rim off / 白 rim 强 / 暖色 rim 弱。
+/// 底色压暗以读边缘光。
+fn courtyard_rim(world: &mut World) {
+    let mesh = sphere(world, 0.35);
+    spawn_pedestals(world, &[-0.75, 0.0, 0.75]);
+    let variants = [
+        (0.0, LinearRgba::WHITE),                      // off（强度 0 = 关）
+        (1.2, LinearRgba::WHITE),                      // 白 rim 强
+        (0.6, LinearRgba::new(1.0, 0.75, 0.45, 1.0)),  // 暖色 rim 弱
+    ];
+    for (i, (intensity, color)) in variants.into_iter().enumerate() {
+        let mut params = StylizedCelParams::default().with_rim(2.5, intensity, color);
+        params.base_color_factor = bevy::math::Vec4::new(0.35, 0.38, 0.45, 1.0);
+        let material = world
+            .resource_mut::<Assets<StylizedCelMaterial>>()
+            .add(StylizedCelMaterial {
+                params,
+                ..StylizedCelMaterial::default()
+            });
+        world.spawn((
+            Mesh3d(mesh.clone()),
+            MeshMaterial3d(material),
+            Transform::from_xyz((i as f32 - 1.0) * 0.75, 1.35, 0.0),
+        ));
+    }
+}
+
+/// shadow · 阴影形状对照（V4）：3 球横排——默认（0.5/0.1/0.3）/ 硬高阈
+/// （0.7/0.02/0.15）/ 软低下限（0.35/0.3/0.45）。
+fn courtyard_shadow(world: &mut World) {
+    let mesh = sphere(world, 0.35);
+    spawn_pedestals(world, &[-0.75, 0.0, 0.75]);
+    let variants = [
+        (0.5, 0.1, 0.3),
+        (0.7, 0.02, 0.15),
+        (0.35, 0.3, 0.45),
+    ];
+    for (i, (threshold, softness, floor)) in variants.into_iter().enumerate() {
+        let mut params = StylizedCelParams::default().with_shadow(threshold, softness, floor);
+        params.base_color_factor = bevy::math::Vec4::new(0.55, 0.6, 0.68, 1.0);
+        let material = world
+            .resource_mut::<Assets<StylizedCelMaterial>>()
+            .add(StylizedCelMaterial {
+                params,
+                ..StylizedCelMaterial::default()
+            });
+        world.spawn((
+            Mesh3d(mesh.clone()),
+            MeshMaterial3d(material),
+            Transform::from_xyz((i as f32 - 1.0) * 0.75, 1.35, 0.0),
+        ));
+    }
+}
+
+/// palette · Character 四色调色板对照（V4）：3 球横排——默认灰阴影 /
+/// 暖阴影（夕照感）/ 冷阴影（蓝紫）。
+fn courtyard_palette(world: &mut World) {
+    let mesh = sphere(world, 0.35);
+    spawn_pedestals(world, &[-0.75, 0.0, 0.75]);
+    let white = LinearRgba::WHITE;
+    let variants = [
+        // 默认（灰阴影）。
+        (white, LinearRgba::new(0.55, 0.55, 0.62, 1.0), white, LinearRgba::new(0.7, 0.7, 0.75, 1.0)),
+        // 暖阴影。
+        (white, LinearRgba::new(0.72, 0.52, 0.42, 1.0), white, LinearRgba::new(0.85, 0.62, 0.5, 1.0)),
+        // 冷阴影（蓝紫）。
+        (white, LinearRgba::new(0.42, 0.48, 0.72, 1.0), white, LinearRgba::new(0.55, 0.6, 0.85, 1.0)),
+    ];
+    for (i, (soft_lit, soft_shadow, sharp_lit, sharp_shadow)) in variants.into_iter().enumerate() {
+        let mut params = StylizedCharacterParams::default()
+            .with_palette(soft_lit, soft_shadow, sharp_lit, sharp_shadow);
+        params.cel.base_color_factor = bevy::math::Vec4::new(0.85, 0.72, 0.65, 1.0);
+        let material = world
+            .resource_mut::<Assets<StylizedCharacterMaterial>>()
+            .add(StylizedCharacterMaterial {
+                params,
+                ..StylizedCharacterMaterial::default()
+            });
+        world.spawn((
+            Mesh3d(mesh.clone()),
+            MeshMaterial3d(material),
+            Transform::from_xyz((i as f32 - 1.0) * 0.75, 1.35, 0.0),
+        ));
+    }
+}
+
+/// metal · Hero 金属三色 + spec ramp（V4）：3 球横排——无 matcap 平色 /
+/// matcap 银灰 / matcap + 金属三色调 + spec ramp 强（递进可读）。
+fn courtyard_metal(world: &mut World) {
+    let mesh = sphere(world, 0.35);
+    let ilm = world.resource_mut::<Assets<Image>>().add(ilm_image(255));
+    let matcap = world
+        .resource_mut::<Assets<Image>>()
+        .add(matcap_image_silver(128));
+    spawn_pedestals(world, &[-0.75, 0.0, 0.75]);
+    for (i, (matcap_on, metal_enabled, spec_ramp)) in [
+        (false, false, 0.0f32),
+        (true, false, 0.0),
+        (true, true, 1.2),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let mut params = StylizedHeroParams::default();
+        params.character.cel.base_color_factor = bevy::math::Vec4::new(0.60, 0.62, 0.66, 1.0);
+        if matcap_on {
+            params = params.with_matcap(0.9, LinearRgba::new(1.0, 1.0, 1.0, 1.0));
+        }
+        if metal_enabled {
+            params.metal.controls.x = 1.0;
+            // 金属三色调（暗部青灰/亮部暖白/阴影蓝灰）。
+            params.metal.dark = bevy::math::Vec4::new(0.35, 0.45, 0.5, 1.0);
+            params.metal.light = bevy::math::Vec4::new(1.0, 0.95, 0.85, 1.0);
+            params.metal.shadow = bevy::math::Vec4::new(0.4, 0.45, 0.6, 1.0);
+        }
+        if spec_ramp > 0.0 {
+            params = params.with_spec_ramp_intensity(spec_ramp);
+        }
+        let material = world
+            .resource_mut::<Assets<StylizedHeroMaterial>>()
+            .add(StylizedHeroMaterial {
+                params,
+                ilm_texture: Some(ilm.clone()),
+                matcap_texture: matcap_on.then(|| matcap.clone()),
+                ..StylizedHeroMaterial::default()
+            });
+        world.spawn((
+            Mesh3d(mesh.clone()),
+            MeshMaterial3d(material),
+            Transform::from_xyz((i as f32 - 1.0) * 0.75, 1.35, 0.0),
+        ));
+    }
+}
+
+/// cutout · alpha 镂空（V4）：双竖卡（棋盘格 alpha 纹理 + cutoff 0.5 +
+/// double_sided）——镂空剪影语义（叶片/网格类内容的通道）。
+fn courtyard_cutout(world: &mut World) {
+    // 程序化棋盘格 alpha 纹理（8×8 格，交替透明/不透明）。
+    let n = 64usize;
+    let mut data = vec![0u8; n * n * 4];
+    for y in 0..n {
+        for x in 0..n {
+            let on = ((x / 8) + (y / 8)) % 2 == 0;
+            let offset = (y * n + x) * 4;
+            data[offset] = 0x9a;
+            data[offset + 1] = 0x68;
+            data[offset + 2] = 0x4a;
+            data[offset + 3] = if on { 255 } else { 0 };
+        }
+    }
+    let texture = world.resource_mut::<Assets<Image>>().add(Image::new_fill(
+        Extent3d {
+            width: n as u32,
+            height: n as u32,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        &data,
+        TextureFormat::Rgba8UnormSrgb,
+        RenderAssetUsages::default(),
+    ));
+    let mut params = StylizedCelParams::default().with_alpha_cutoff(0.5);
+    params.base_color_factor = bevy::math::Vec4::new(0.75, 0.55, 0.35, 1.0);
+    let material = world
+        .resource_mut::<Assets<StylizedCelMaterial>>()
+        .add(StylizedCelMaterial {
+            params,
+            base_color_texture: Some(texture),
+            double_sided: true,
+            ..StylizedCelMaterial::default()
+        });
+    let card = world
+        .resource_mut::<Assets<Mesh>>()
+        .add(bevy::math::primitives::Plane3d::new(Vec3::Z, bevy::math::Vec2::splat(0.55)));
+    for x in [-0.55f32, 0.55] {
+        world.spawn((
+            Mesh3d(card.clone()),
+            MeshMaterial3d(material.clone()),
+            Transform::from_xyz(x, 1.0, 0.0),
+        ));
+    }
+}
+
 #[cfg(test)]
 mod courtyard_tests {
     //! courtyard builder 的纯 CPU 冒烟：默认/参数化构建的分区实体计数、
@@ -1072,29 +1610,28 @@ mod courtyard_tests {
     }
 
     #[test]
-    fn courtyard_builds_all_zones_with_default_settings() {
+    fn courtyard_builds_focused_zone_with_default_settings() {
         let mut app = test_app(None);
         let world = app.world_mut();
         let mesh_before = count::<Mesh3d>(world);
         let instance_before = count::<StylizedInstanceData>(world);
         let recipe = courtyard(world);
-        // §7 panorama 机位；默认状态（hull/post off）无相机附件。
-        let panorama = &crate::metadata::COURTYARD_CAMERA_PRESETS[0];
-        assert_eq!(recipe.eye, panorama.eye);
-        assert_eq!(recipe.look, panorama.look);
+        // v3：默认 zone=trio——机位 = center-trio（内容联动），无相机附件。
+        let preset = &crate::metadata::COURTYARD_CAMERA_PRESETS[0];
+        assert_eq!(preset.id, "center-trio");
+        assert_eq!(recipe.eye, preset.eye);
+        assert_eq!(recipe.look, preset.look);
         assert!(matches!(recipe.attachment, CameraAttachment::None));
-        // 分区内容计数（相对构建前的增量，宿主插件的脚手架实体不计）：
-        // mesh 265 = 场地壳 29（地面/铺装/墙 20 弦/平台/展台 6）+ 三对照组
-        // 14（基座 7 + 球 7）+ P1 4 + P2 3 + P3 3 + P4 3 + P5 4（2 杆 +
-        // 2 蒙皮条带）+ LOD 4 + 角色台 1 + 灯阵 200（crowd=100：柱 + 球）。
-        assert_eq!(count::<Mesh3d>(world) - mesh_before, 265);
-        // 实例数据：face 3 + P1 ramp 3 + LOD 4 + 灯球 100。
-        assert_eq!(count::<StylizedInstanceData>(world) - instance_before, 110);
-        // hull 描边：P2 两球（宽度 2/8）+ P3 方块堆三件。
-        assert_eq!(count::<StylizedOutline>(world), 5);
-        // 蒙皮条带 ×2。
-        assert_eq!(count::<SkinnedMesh>(world), 2);
-        // SceneTarget：唯一且覆盖 §8 的稳定逻辑 ID。
+        // 内容档位（相对构建前的增量）：mesh 37 = 场地壳 23（地面/铺装/
+        // 墙 20 弦/平台；v3 展台环退役）+ 三对照组 14（基座 7 + 球 7）；
+        // 其余内容不生成。
+        assert_eq!(count::<Mesh3d>(world) - mesh_before, 37);
+        // 实例数据：face 3（P1/LOD/灯球不在场）。
+        assert_eq!(count::<StylizedInstanceData>(world) - instance_before, 3);
+        // P2/P3 未激活：无 hull 描边组件、无蒙皮条带。
+        assert_eq!(count::<StylizedOutline>(world), 0);
+        assert_eq!(count::<SkinnedMesh>(world), 0);
+        // SceneTarget：唯一；未激活分区的落点不在场。
         let targets = scene_targets(world);
         let unique: std::collections::BTreeSet<&&str> = targets.iter().collect();
         assert_eq!(
@@ -1102,19 +1639,16 @@ mod courtyard_tests {
             targets.len(),
             "SceneTarget ids must be unique"
         );
-        for expected in [
-            "trio.face.0",
-            "trio.face.1",
-            "trio.face.2",
-            "lamps",
-            "flags.0",
-            "flags.1",
-            "flags.0.tip",
-            "flags.1.tip",
-        ] {
+        for expected in ["trio.face.0", "trio.face.1", "trio.face.2"] {
             assert!(
                 targets.contains(&expected),
                 "missing SceneTarget {expected}"
+            );
+        }
+        for absent in ["lamps", "flags.0", "flags.1"] {
+            assert!(
+                !targets.contains(&absent),
+                "inactive zone target {absent} must not spawn"
             );
         }
         // 默认时刻 = day：庭院 preset 已落（雾 end=110），昼夜因子不动。
@@ -1139,18 +1673,146 @@ mod courtyard_tests {
         }
     }
 
+    /// W3：增量装卸——切内容只动展品桶（先装后卸，退役时序归调用方），
+    /// 画框常驻不动；相机配方随内容联动。
+    #[test]
+    fn courtyard_update_loads_and_unloads_zone_buckets() {
+        let mut app = test_app(None);
+        let world = app.world_mut();
+        courtyard(world);
+        let frame_before = world.resource::<CourtyardBuckets>().frame.clone();
+        assert_eq!(frame_before.len(), 23, "shell = 画框 23 实体（v3 展台环退役）");
+        assert_eq!(
+            world.resource::<CourtyardBuckets>().exhibits["trio"].len(),
+            14
+        );
+        // trio → p1：装 p1 桶（4 球 + 4 基座），trio 桶出登记簿进退役列表。
+        let update = courtyard_update(
+            world,
+            CourtyardSettings::default(),
+            CourtyardSettings {
+                zone: CourtyardZone::P1,
+                ..CourtyardSettings::default()
+            },
+        );
+        assert_eq!(update.retire.len(), 14, "trio 桶 14 实体待退役");
+        let buckets = world.resource::<CourtyardBuckets>();
+        assert_eq!(buckets.exhibits["p1"].len(), 8);
+        assert!(!buckets.exhibits.contains_key("trio"));
+        assert_eq!(buckets.frame, frame_before, "画框常驻不动");
+        // 配方联动：p1 → ramp 机位（§7 一一对应）。
+        assert_eq!(update.recipe.eye, Vec3::new(0.0, 1.7, 5.2));
+        // 调用方退役后：trio 实体离开世界，p1 与画框在场。
+        retire_entities(world, &update.retire);
+        let alive = world.iter_entities().count();
+        for entity in &update.retire {
+            assert!(world.get_entity(*entity).is_err(), "retired entity gone");
+        }
+        assert!(alive > 0);
+    }
+
+    /// W3：装卸/重装语义——内容切换只留目标桶；crowd/stage_character 只在
+    /// 桶在场时触发重装（不在场 = 设置已记录，下次激活生效）。
+    #[test]
+    fn courtyard_update_reload_semantics() {
+        let mut app = test_app(None);
+        let world = app.world_mut();
+        courtyard(world);
+        // trio → p2：卸 trio 装 p2。
+        let update = courtyard_update(
+            world,
+            CourtyardSettings::default(),
+            CourtyardSettings {
+                zone: CourtyardZone::P2,
+                ..CourtyardSettings::default()
+            },
+        );
+        retire_entities(world, &update.retire);
+        let buckets = world.resource::<CourtyardBuckets>();
+        assert_eq!(buckets.exhibits.len(), 1);
+        assert!(buckets.exhibits.contains_key("p2"));
+        // crowd 变化但 lamps 不在场（zone=p2）：不装卸，只留设置语义。
+        let update = courtyard_update(
+            world,
+            CourtyardSettings {
+                zone: CourtyardZone::P2,
+                crowd: 100,
+                ..CourtyardSettings::default()
+            },
+            CourtyardSettings {
+                zone: CourtyardZone::P2,
+                crowd: 0,
+                ..CourtyardSettings::default()
+            },
+        );
+        assert!(update.retire.is_empty());
+        assert_eq!(world.resource::<CourtyardBuckets>().exhibits.len(), 1);
+        // lamps 在场时 crowd 重装：p2 → lamps（crowd=100 装 200 实体），
+        // 再 crowd 100→0（桶重装——退役 200，空阵不登记）。
+        let update = courtyard_update(
+            world,
+            CourtyardSettings {
+                zone: CourtyardZone::P2,
+                crowd: 0,
+                ..CourtyardSettings::default()
+            },
+            CourtyardSettings {
+                zone: CourtyardZone::Lamps,
+                crowd: 100,
+                ..CourtyardSettings::default()
+            },
+        );
+        retire_entities(world, &update.retire);
+        assert_eq!(
+            world.resource::<CourtyardBuckets>().exhibits["lamps"].len(),
+            200
+        );
+        let update = courtyard_update(
+            world,
+            CourtyardSettings {
+                zone: CourtyardZone::Lamps,
+                crowd: 100,
+                ..CourtyardSettings::default()
+            },
+            CourtyardSettings {
+                zone: CourtyardZone::Lamps,
+                crowd: 0,
+                ..CourtyardSettings::default()
+            },
+        );
+        assert_eq!(update.retire.len(), 200, "crowd 重装退役整个 lamps 桶");
+        retire_entities(world, &update.retire);
+        let buckets = world.resource::<CourtyardBuckets>();
+        assert!(
+            !buckets.exhibits.contains_key("lamps"),
+            "crowd=0 空阵无实体登记（与全量构建同一语义）"
+        );
+        assert!(!buckets.exhibits.contains_key("p2"));
+    }
+
     #[test]
     fn courtyard_parameters_drive_content_and_attachments() {
-        // crowd=0 → 无灯阵（少 200 实体），且无 lamps 落点。
+        // lamps 内容 + crowd=0 → 空阵（只有场地壳 23），且无 lamps 落点；
+        // crowd=100 → 灯阵 200（柱 + 球）+ 100 实例。
         let mut app = test_app(Some(CourtyardSettings {
+            zone: CourtyardZone::Lamps,
             crowd: 0,
             ..CourtyardSettings::default()
         }));
         let world = app.world_mut();
         let mesh_before = count::<Mesh3d>(world);
         courtyard(world);
-        assert_eq!(count::<Mesh3d>(world) - mesh_before, 65);
+        assert_eq!(count::<Mesh3d>(world) - mesh_before, 23);
         assert!(!scene_targets(world).contains(&"lamps"));
+        let mut app = test_app(Some(CourtyardSettings {
+            zone: CourtyardZone::Lamps,
+            ..CourtyardSettings::default()
+        }));
+        let world = app.world_mut();
+        let mesh_before = count::<Mesh3d>(world);
+        courtyard(world);
+        assert_eq!(count::<Mesh3d>(world) - mesh_before, 223);
+        assert!(scene_targets(world).contains(&"lamps"));
 
         // night → day_night_factor=0；post → PostProcess 附件；
         // face_threshold 覆盖三实例。
@@ -1182,8 +1844,10 @@ mod courtyard_tests {
             assert_eq!(data.face_threshold, Some(0.5), "{}", target.0);
         }
 
-        // hybrid → ScreenOutline 附件（优先于 post）；posed → 旗 root 旋转 0.5 rad。
+        // hybrid → ScreenOutline 附件（优先于 post）；posed → 旗 root 旋转
+        // 0.5 rad（P5 分区激活）。
         let mut app = test_app(Some(CourtyardSettings {
+            zone: CourtyardZone::P5,
             outline_mode: CourtyardOutlineMode::Hybrid,
             post: true,
             flags: CourtyardFlagsPose::Posed,
@@ -1205,7 +1869,10 @@ mod courtyard_tests {
     /// 回归证据：capture 矩阵的 flags 机位曾因此丢旗面）。
     #[test]
     fn flag_strips_carry_overridden_culling_aabb() {
-        let mut app = test_app(None);
+        let mut app = test_app(Some(CourtyardSettings {
+            zone: CourtyardZone::P5,
+            ..CourtyardSettings::default()
+        }));
         courtyard(app.world_mut());
         let mut query = app.world_mut().query::<(
             &SkinnedMesh,
@@ -1216,8 +1883,8 @@ mod courtyard_tests {
         assert_eq!(strips.len(), 2, "both flag strips carry overridden aabbs");
         for (_, aabb, _) in strips {
             assert!(
-                aabb.center.z == -4.7631 && aabb.center.y > 1.0,
-                "aabb must cover the flag zone, not the origin: {:?}",
+                aabb.center.z == 0.0 && aabb.center.y > 1.0,
+                "aabb must cover the flag content on the platform, not the origin: {:?}",
                 aabb.center
             );
         }

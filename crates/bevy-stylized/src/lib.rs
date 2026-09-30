@@ -37,6 +37,7 @@ pub mod integration;
 #[cfg(all(feature = "gltf", feature = "render"))]
 pub use integration::{
     StylizedAssetIntegrationPlugin, StylizedMaterialAdoption, StylizedMaterialSet,
+    StylizedSidecarAsset, StylizedSidecarSource,
 };
 // `dynamic_quality` 依赖 render crate 的 `StylizedTierOverride`（V2-b 起
 // tier override 由 LOD 系统与 governor 共同消费，单一真源在 render）。

@@ -71,16 +71,45 @@
       "native_mask_prepass_preserves_cutouts_for_all_classes"
     ],
     "showcase_golden": [
-      "showcase_golden_courtyard_day",
-      "showcase_golden_courtyard_dusk",
-      "showcase_golden_courtyard_night",
       "showcase_golden_courtyard_trio",
+      "showcase_golden_courtyard_ramp",
       "showcase_golden_courtyard_outline_hull",
       "showcase_golden_courtyard_outline_hybrid",
-      "showcase_golden_courtyard_lod",
-      "showcase_golden_courtyard_post",
+      "showcase_golden_courtyard_lighting",
       "showcase_golden_courtyard_flags",
-      "showcase_golden_courtyard_stress"
+      "showcase_golden_courtyard_stage",
+      "showcase_golden_courtyard_lod",
+      "showcase_golden_courtyard_dusk",
+      "showcase_golden_courtyard_night",
+      "showcase_golden_courtyard_post",
+      "showcase_golden_courtyard_stress",
+      "showcase_golden_courtyard_rim",
+      "showcase_golden_courtyard_shadow",
+      "showcase_golden_courtyard_palette",
+      "showcase_golden_courtyard_metal",
+      "showcase_golden_courtyard_cutout"
+    ],
+    "scene-runtime::compiler_evidence": [
+      "compiled_courtyard_recipe_matches_showcase_capture",
+      "apply_params_sweeps_face_threshold_deterministically",
+      "deform_strip_root_binds_logical_target",
+      "recipe_parameters_bind_face_threshold_like_apply_params",
+      "undeclared_param_key_fails_structurally"
+    ],
+    "scene-runtime::driver_evidence": [
+      "single_step_capture_binds_experiment_tick_and_stamp",
+      "wait_pumping_cadence_does_not_change_experiment_state",
+      "scene_switch_a_b_a_returns_to_baseline",
+      "in_flight_observation_is_voided_on_scene_switch",
+      "action_graph_executes_in_stable_order"
+    ],
+    "scene-runtime::journal_evidence": [
+      "journal_replay_preserves_logical_and_pixel_identity",
+      "trailing_tentative_entry_is_indeterminate_not_reexecuted"
+    ],
+    "scene-runtime::reconfiguration_evidence": [
+      "portable_session_upgrades_to_standard_in_session",
+      "unenabled_device_feature_is_refused_without_state_change"
     ]
   },
   "asset-integration": [

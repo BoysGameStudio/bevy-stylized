@@ -158,7 +158,7 @@ fn journal_replay_preserves_logical_and_pixel_identity() {
             key: "crowd".to_string(),
             value: serde_json::json!(100),
         },
-        SessionCommand::SetCameraPreset("panorama".to_string()),
+        SessionCommand::SetCameraPreset("lamps".to_string()),
     ] {
         assert!(matches!(
             controller.command_recorded(app.world_mut(), &command, &mut journal),

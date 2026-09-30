@@ -351,6 +351,8 @@ mod tests {
                 key: "crowd".to_string(),
                 value: serde_json::json!(1000),
             },
+            // U3（06 §9）：Capture 变体的持久化往返。
+            SessionCommand::Capture,
         ];
         let journal = CommandJournal {
             schema: COMMAND_JOURNAL_SCHEMA,

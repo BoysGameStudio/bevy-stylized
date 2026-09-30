@@ -19,6 +19,7 @@ bevy = { workspace = true, features = [
     "bevy_animation",
     "bevy_gltf",
     "bevy_scene",
+    "bevy_window",
     "png",
     "reflect_auto_register",
 ] }

@@ -3,7 +3,7 @@ name = "showcase"
 version = "0.1.0"
 edition.workspace = true
 publish = false
-description = "Showcase suite for bevy-stylized (19 fixed cases plus a static character inspector)."
+description = "Showcase suite for bevy-stylized (courtyard single scene plus a static character inspector)."
 
 [[bin]]
 name = "showcase"
@@ -37,7 +37,9 @@ tempfile.workspace = true
 [features]
 # 开窗交互模式需要 winit（x11）与 egui 叠加层。默认关闭：headless 捕获
 # 与测试不含 winit，避免事件循环进入测试线程的兼容性问题。
-interactive = ["bevy/bevy_winit", "bevy/x11", "dep:bevy_egui"]
+# bevy_remote：BRP 实时检视（bevy-copilot；AGENTS.md「optional live BRP
+# inspection when exposed」）——只挂交互宿主，headless/lane 路径不含。
+interactive = ["bevy/bevy_winit", "bevy/x11", "dep:bevy_egui", "bevy/bevy_remote"]
 inspector = ["interactive", "bevy/wayland"]
 
 [lints]

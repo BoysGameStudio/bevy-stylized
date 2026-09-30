@@ -7,23 +7,16 @@
 
 use scenario_model::recipe::SceneRecipe;
 
-pub const PANORAMA_CAMERA: &str = r#"{
-    "position": [0.0, 3.4, 16.0],
-    "target": [0.0, 1.3, -2.0],
-    "fov_degrees": 45.0
-}"#;
-
-/// center-trio 机位（三对照组特写）。
 pub const TRIO_CAMERA: &str = r#"{
-    "position": [3.5, 4.0, 4.0],
-    "target": [0.0, 1.25, -0.2],
+    "position": [3.2, 3.4, 5.2],
+    "target": [0.0, 1.2, 0.0],
     "fov_degrees": 45.0
 }"#;
 
-/// flags 机位（旗帜特写）。
+/// flags 机位（旗帜特写；v3 平台摆位）。
 pub const FLAGS_CAMERA: &str = r#"{
-    "position": [0.0, 2.4, -0.4],
-    "target": [-2.75, 2.0, -4.76],
+    "position": [0.0, 2.8, 7.0],
+    "target": [0.0, 1.9, 0.0],
     "fov_degrees": 45.0
 }"#;
 
@@ -54,6 +47,8 @@ pub fn recipe_json(scene: &str, camera: &str, msaa: &str, actions: &str) -> Stri
 }
 
 /// courtyard 配方：声明 reference-scene 资产依赖（catalog 要求）。
+/// 默认参数（zone=trio）+ center-trio 机位 ≡ showcase 的
+/// `courtyard-trio` 捕获路径（编译证据与该 golden 基线逐字节比对）。
 pub fn courtyard_recipe_json(camera: &str, msaa: &str, actions: &str) -> String {
     recipe_json("courtyard", camera, msaa, actions).replace(
         r#""assets": []"#,
@@ -63,7 +58,7 @@ pub fn courtyard_recipe_json(camera: &str, msaa: &str, actions: &str) -> String 
 
 pub fn courtyard_recipe() -> SceneRecipe {
     SceneRecipe::from_json_slice(
-        courtyard_recipe_json(PANORAMA_CAMERA, "4", SETTLE_OBSERVE).as_bytes(),
+        courtyard_recipe_json(TRIO_CAMERA, "4", SETTLE_OBSERVE).as_bytes(),
     )
     .expect("recipe")
 }
@@ -105,6 +100,8 @@ pub fn strip_deform_recipe(rotation: f64) -> SceneRecipe {
           "kind": {{"type": "observe", "observation": "capture", "view": null}}}}
     ]"#
     );
+    // flags 展品只在 p5 档在场（分区激活）；zone 是视图作用域参数、
+    // 配方 parameters 不支持——由调用方在构建前往世界写 CourtyardSettings。
     SceneRecipe::from_json_slice(courtyard_recipe_json(FLAGS_CAMERA, "4", &actions).as_bytes())
         .expect("recipe")
 }

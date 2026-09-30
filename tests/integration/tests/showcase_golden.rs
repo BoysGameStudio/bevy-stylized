@@ -157,10 +157,8 @@ macro_rules! capture_case {
     };
 }
 
-capture_case!(showcase_golden_courtyard_day, "courtyard-day");
-capture_case!(showcase_golden_courtyard_dusk, "courtyard-dusk");
-capture_case!(showcase_golden_courtyard_night, "courtyard-night");
 capture_case!(showcase_golden_courtyard_trio, "courtyard-trio");
+capture_case!(showcase_golden_courtyard_ramp, "courtyard-ramp");
 capture_case!(
     showcase_golden_courtyard_outline_hull,
     "courtyard-outline-hull"
@@ -173,7 +171,17 @@ capture_case!(
 fn showcase_golden_courtyard_outline_hybrid() {
     judge("courtyard-outline-hybrid");
 }
-capture_case!(showcase_golden_courtyard_lod, "courtyard-lod");
-capture_case!(showcase_golden_courtyard_post, "courtyard-post");
+capture_case!(showcase_golden_courtyard_lighting, "courtyard-lighting");
 capture_case!(showcase_golden_courtyard_flags, "courtyard-flags");
+capture_case!(showcase_golden_courtyard_stage, "courtyard-stage");
+capture_case!(showcase_golden_courtyard_lod, "courtyard-lod");
+capture_case!(showcase_golden_courtyard_dusk, "courtyard-dusk");
+capture_case!(showcase_golden_courtyard_night, "courtyard-night");
+capture_case!(showcase_golden_courtyard_post, "courtyard-post");
 capture_case!(showcase_golden_courtyard_stress, "courtyard-stress");
+// V4 cel 特性补全（05 §12 V4 行；隔离上下文捕获合同见验收记录 v3 条目）。
+capture_case!(showcase_golden_courtyard_rim, "courtyard-rim");
+capture_case!(showcase_golden_courtyard_shadow, "courtyard-shadow");
+capture_case!(showcase_golden_courtyard_palette, "courtyard-palette");
+capture_case!(showcase_golden_courtyard_metal, "courtyard-metal");
+capture_case!(showcase_golden_courtyard_cutout, "courtyard-cutout");

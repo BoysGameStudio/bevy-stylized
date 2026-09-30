@@ -1,10 +1,12 @@
 //! Explicit scene material adoption, shared across instances and released on despawn.
+use bevy::asset::AssetLoader;
 use bevy::gltf::GltfMaterialName;
 use bevy::image::{ImageAddressMode, ImageLoaderSettings, ImageSampler, ImageSamplerDescriptor};
 use bevy::prelude::*;
 use bevy_stylized_core::{
     StylizedMaterialDescriptor, StylizedSurfaceClass, StylizedTextureSemantic,
 };
+use bevy_stylized_gltf::{StylizedImportError, StylizedSidecar, parse_sidecar_str};
 use bevy_stylized_render::{
     StylizedCelMaterial, StylizedCharacterMaterial, StylizedHeroMaterial, StylizedInstanceData,
 };
@@ -99,6 +101,108 @@ enum CachedMaterial {
     HostCharacter(Handle<HostMaterial<StylizedCharacterMaterial>>, Vec4),
     HostHero(Handle<HostMaterial<StylizedHeroMaterial>>, Vec4),
 }
+/// `.npr.json` sidecar as a Bevy asset（schema `bevy_stylized.sidecar/v1`）：
+/// 材质集经 AssetServer 加载（filesystem/HTTP/APK assets 同源），宿主不再
+/// 各自读文件系统。
+#[derive(Asset, TypePath, Debug)]
+pub struct StylizedSidecarAsset {
+    /// 解析后的 sidecar（材质 descriptor 表；效果网格光照基不在
+    /// StylizedMaterialSet 语义内，不进入 adoption）。
+    pub sidecar: StylizedSidecar,
+}
+
+/// `.npr.json` 的 AssetLoader（按 `json` 扩展名 + 资产类型解析；
+/// 解析失败 = 加载错误，绝不静默回退）。
+#[derive(Default, TypePath)]
+struct StylizedSidecarLoader;
+
+impl AssetLoader for StylizedSidecarLoader {
+    type Asset = StylizedSidecarAsset;
+    type Settings = ();
+    type Error = StylizedImportError;
+
+    async fn load(
+        &self,
+        reader: &mut dyn bevy::asset::io::Reader,
+        _settings: &(),
+        _load_context: &mut bevy::asset::LoadContext<'_>,
+    ) -> Result<Self::Asset, Self::Error> {
+        let mut bytes = Vec::new();
+        reader.read_to_end(&mut bytes).await.map_err(|source| {
+            StylizedImportError::Io {
+                path: "sidecar asset read".to_string(),
+                source,
+            }
+        })?;
+        let json = String::from_utf8(bytes).map_err(|error| StylizedImportError::Io {
+            path: "sidecar asset is not UTF-8".to_string(),
+            source: std::io::Error::new(std::io::ErrorKind::InvalidData, error),
+        })?;
+        Ok(StylizedSidecarAsset {
+            sidecar: parse_sidecar_str(&json)?,
+        })
+    }
+
+    fn extensions(&self) -> &[&str] {
+        &["json"]
+    }
+}
+
+/// 挂在场景根上：sidecar 资产就绪后生成 [`StylizedMaterialSet`]（一次性
+/// 应用，应用后移除本组件；adoption 链路与手写材质集完全同路）。
+#[derive(Component, Clone, Debug)]
+pub struct StylizedSidecarSource {
+    /// `.npr.json` 资产句柄。
+    pub sidecar: Handle<StylizedSidecarAsset>,
+    /// 纹理路径前缀（语义同 [`StylizedMaterialSet::texture_prefix`]；
+    /// 支持 `source://` 限定前缀）。
+    pub texture_prefix: String,
+    /// 材质静态参数覆盖（材质名 → 参数键值），adoption 前合入 descriptor；
+    /// 用于宿主级光照基订正（如展示机位需要的 effect_light_dir 覆盖），
+    /// 不改 sidecar 资产本体。
+    pub param_overrides: BTreeMap<String, BTreeMap<String, f32>>,
+}
+
+fn apply_sidecar_sources(
+    mut commands: Commands,
+    assets: Res<Assets<StylizedSidecarAsset>>,
+    sources: Query<(Entity, &StylizedSidecarSource)>,
+) {
+    for (entity, source) in &sources {
+        let Some(asset) = assets.get(&source.sidecar) else {
+            continue;
+        };
+        let mut materials = asset.sidecar.materials.clone();
+        for (name, overrides) in &source.param_overrides {
+            let Some(descriptor) = materials.get_mut(name) else {
+                warn!("sidecar param override targets unknown material {name:?}");
+                continue;
+            };
+            descriptor.static_params.extend(overrides.clone());
+        }
+        commands
+            .entity(entity)
+            .insert(StylizedMaterialSet {
+                materials,
+                texture_prefix: source.texture_prefix.clone(),
+            })
+            .remove::<StylizedSidecarSource>();
+    }
+}
+
+/// descriptor 纹理 uri → AssetServer 路径。空前缀 = uri 原样；`source://`
+/// 结尾的限定前缀直接拼接（不做斜杠规整，否则 `://` 会被 trim 破坏）；
+/// 其余按目录前缀拼接。
+fn texture_asset_path(texture_prefix: &str, uri: &str) -> String {
+    if texture_prefix.is_empty() {
+        uri.to_owned()
+    } else if texture_prefix.ends_with("://") {
+        format!("{texture_prefix}{uri}")
+    } else {
+        format!("{}/{uri}", texture_prefix.trim_end_matches('/'))
+    }
+}
+
 #[derive(Resource, Default)]
 struct MaterialCache(HashMap<String, CachedMaterial>);
 
@@ -106,11 +210,14 @@ struct MaterialCache(HashMap<String, CachedMaterial>);
 pub struct StylizedAssetIntegrationPlugin;
 impl Plugin for StylizedAssetIntegrationPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<MaterialCache>()
+        app.init_asset::<StylizedSidecarAsset>()
+            .init_asset_loader::<StylizedSidecarLoader>()
+            .init_resource::<MaterialCache>()
             .init_resource::<outline::OutlineCache>()
             .add_systems(
                 Update,
                 (
+                    apply_sidecar_sources,
                     adopt,
                     outline::adopt,
                     release_unused,
@@ -228,11 +335,7 @@ fn adopt(
                             .any(|key| {
                                 descriptor.static_params.get(*key).is_some_and(|v| *v > 0.5)
                             });
-                    let path = if set.texture_prefix.is_empty() {
-                        uri.to_owned()
-                    } else {
-                        format!("{}/{uri}", set.texture_prefix.trim_end_matches('/'))
-                    };
+                    let path = texture_asset_path(&set.texture_prefix, uri);
                     server
                         .load_builder()
                         .with_settings(move |settings: &mut ImageLoaderSettings| {
@@ -552,6 +655,74 @@ mod tests {
                 .resource::<Assets<StylizedCelMaterial>>()
                 .get(old)
                 .is_none()
+        );
+    }
+
+    #[test]
+    fn texture_paths_join_directory_and_source_prefixes() {
+        assert_eq!(texture_asset_path("", "textures/a.png"), "textures/a.png");
+        assert_eq!(
+            texture_asset_path("dir", "textures/a.png"),
+            "dir/textures/a.png"
+        );
+        assert_eq!(
+            texture_asset_path("dir/", "textures/a.png"),
+            "dir/textures/a.png"
+        );
+        // 资产 source 限定前缀原样拼接（trim 会破坏 `://`）。
+        assert_eq!(
+            texture_asset_path("odette://", "textures/a.png"),
+            "odette://textures/a.png"
+        );
+    }
+
+    #[test]
+    fn sidecar_source_applies_material_set_once_loaded() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()))
+            .init_asset::<StandardMaterial>()
+            .init_asset::<StylizedCelMaterial>()
+            .init_asset::<StylizedCharacterMaterial>()
+            .init_asset::<StylizedHeroMaterial>()
+            .add_plugins(StylizedAssetIntegrationPlugin);
+        let sidecar = parse_sidecar_str(
+            r#"{
+                "schema": "bevy-stylized.sidecar/v1",
+                "materials": { "body": { "surface_class": "cel" } }
+            }"#,
+        )
+        .expect("sidecar parses");
+        let handle = app
+            .world_mut()
+            .resource_mut::<Assets<StylizedSidecarAsset>>()
+            .add(StylizedSidecarAsset { sidecar });
+        let entity = app
+            .world_mut()
+            .spawn(StylizedSidecarSource {
+                sidecar: handle,
+                texture_prefix: "odette://".to_string(),
+                param_overrides: BTreeMap::from([(
+                    "body".to_string(),
+                    BTreeMap::from([("effect_light_dir_2".to_string(), 1.0)]),
+                )]),
+            })
+            .id();
+        app.update();
+        let set = app
+            .world()
+            .get::<StylizedMaterialSet>(entity)
+            .expect("material set applied from sidecar asset");
+        assert!(set.materials.contains_key("body"));
+        assert_eq!(
+            set.materials["body"].static_params.get("effect_light_dir_2"),
+            Some(&1.0),
+            "param override must merge into the adopted descriptor"
+        );
+        assert_eq!(set.texture_prefix, "odette://");
+        assert!(
+            !app.world()
+                .entity(entity)
+                .contains::<StylizedSidecarSource>()
         );
     }
 }

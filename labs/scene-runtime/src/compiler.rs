@@ -332,7 +332,7 @@ mod tests {
         )
     }
 
-    /// courtyard 配方（声明 reference-scene 资产依赖；相机 = panorama 机位）。
+    /// courtyard 配方（声明 reference-scene 资产依赖；相机坐标为固定测试输入）。
     pub fn courtyard_json(camera: &str, msaa: &str, actions: &str) -> String {
         recipe_json("courtyard", camera, msaa, actions).replace(
             r#""assets": []"#,
@@ -346,7 +346,7 @@ mod tests {
         "fov_degrees": 45.0
     }"#;
 
-    /// panorama 机位相机（与 scenes::metadata::COURTYARD_CAMERA_PRESETS[0] 一致）。
+    /// 编译测试的固定相机输入（v1 全景机位坐标的历史沿用，仅是固定数值）。
     pub const PANORAMA_CAMERA: &str = r#"{
         "position": [0.0, 3.4, 16.0],
         "target": [0.0, 1.3, -2.0],
